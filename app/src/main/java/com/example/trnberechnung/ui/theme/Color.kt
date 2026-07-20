@@ -41,3 +41,11 @@ val Pink80 = NauticalAccentWarm
 val Purple40 = NauticalPrimaryDark
 val PurpleGrey40 = NauticalTextSecondary
 val Pink40 = NauticalNoGo
+
+// Light, iOS-aligned palette used only by the first-run introduction.
+val OnboardingBlue = Color(0xFF13A4E8)
+val OnboardingOrange = Color(0xFFFFA000)
+val OnboardingTeal = Color(0xFF129D91)
+val OnboardingCard = Color(0xFFF7FCFC)
+val OnboardingInk = Color(0xFF080B10)
+val OnboardingMuted = Color(0xFF7D858D)

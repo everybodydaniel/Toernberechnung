@@ -11,6 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -31,6 +34,8 @@ import com.example.trnberechnung.viewmodel.TideViewModel
 import com.example.trnberechnung.viewmodel.TideViewModelFactory
 import org.maplibre.android.MapLibre
 import com.example.trnberechnung.ui.MainAppScreen
+import com.example.trnberechnung.ui.OnboardingScreen
+import com.example.trnberechnung.model.OnboardingPreferences
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,11 +62,24 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TörnberechnungTheme {
-                val viewModel: TideViewModel = viewModel(factory = factory)
-                LaunchedEffect(Unit) {
-                    viewModel.loadData()
+                val onboardingPreferences = remember { OnboardingPreferences(applicationContext) }
+                var onboardingCompleted by remember {
+                    mutableStateOf(onboardingPreferences.isCompleted)
                 }
-                MainAppScreen(viewModel)
+                if (onboardingCompleted) {
+                    val viewModel: TideViewModel = viewModel(factory = factory)
+                    LaunchedEffect(Unit) {
+                        viewModel.loadData()
+                    }
+                    MainAppScreen(viewModel)
+                } else {
+                    OnboardingScreen(
+                        onCompleted = {
+                            onboardingPreferences.markCompleted()
+                            onboardingCompleted = true
+                        }
+                    )
+                }
             }
         }
     }

@@ -166,9 +166,9 @@ fun MapScreen(
                 val isStart = selectedStartHarbor?.area == harbor.area
                 val isEnd = selectedEndHarbor?.area == harbor.area
                 val circleColor = when {
-                    isStart -> "#1B5E20"  
-                    isEnd -> "#B71C1C"    
-                    else -> "#0D47A1"     
+                    isStart -> "#1B5E20"
+                    isEnd -> "#B71C1C"
+                    else -> "#0D47A1"
                 }
                 val radius = if (isStart || isEnd) 9f else 6f
                 val strokeWidth = if (isStart || isEnd) 3f else 1.5f
@@ -203,9 +203,9 @@ fun MapScreen(
 
             depthPoints.forEach { dp ->
                 val color = when (dp.type) {
-                    com.example.trnberechnung.model.SegmentType.SAFE -> "#4CAF50"    
-                    com.example.trnberechnung.model.SegmentType.CRITICAL -> "#FF9800" 
-                    com.example.trnberechnung.model.SegmentType.NO_GO -> "#F44336"    
+                    com.example.trnberechnung.model.SegmentType.SAFE -> "#4CAF50"
+                    com.example.trnberechnung.model.SegmentType.CRITICAL -> "#FF9800"
+                    com.example.trnberechnung.model.SegmentType.NO_GO -> "#F44336"
                 }
 
                 cm.create(
@@ -245,9 +245,9 @@ fun MapScreen(
             if (routeSegments.isNotEmpty()) {
                 routeSegments.forEach { segment ->
                     val color = when (segment.type) {
-                        com.example.trnberechnung.model.SegmentType.SAFE -> "#00BFA6"    
-                        com.example.trnberechnung.model.SegmentType.CRITICAL -> "#FFB74D" 
-                        com.example.trnberechnung.model.SegmentType.NO_GO -> "#FF5252"    
+                        com.example.trnberechnung.model.SegmentType.SAFE -> "#00BFA6"
+                        com.example.trnberechnung.model.SegmentType.CRITICAL -> "#FFB74D"
+                        com.example.trnberechnung.model.SegmentType.NO_GO -> "#FF5252"
                     }
                     lm.create(
                         LineOptions()
@@ -391,8 +391,9 @@ fun MapScreen(
                                   "sources": {
                                     "osm": {
                                       "type": "raster",
-                                      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-                                      "tileSize": 256
+                                      "tiles": ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"],
+                                      "tileSize": 256,
+                                      "attribution": "&copy; OpenStreetMap contributors"
                                     },
                                     "openseamap": {
                                       "type": "raster",
@@ -411,8 +412,8 @@ fun MapScreen(
                             if (mapState.isDestroyed) return@setStyle
 
                             val regionBounds = LatLngBounds.Builder()
-                                .include(LatLng(50.5, 3.3))   
-                                .include(LatLng(57.8, 15.2))  
+                                .include(LatLng(50.5, 3.3))
+                                .include(LatLng(57.8, 15.2))
                                 .build()
                             map.setLatLngBoundsForCameraTarget(regionBounds)
                             try {
@@ -482,7 +483,7 @@ fun MapScreen(
                     .padding(bottom = 12.dp, start = 60.dp, end = 60.dp)
                     .shadow(4.dp, RoundedCornerShape(8.dp))
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xCC0D1B2A))  
+                    .background(Color(0xCC0D1B2A))
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

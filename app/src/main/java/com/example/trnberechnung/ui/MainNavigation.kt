@@ -40,8 +40,7 @@ import com.example.trnberechnung.viewmodel.TideViewModel
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector?) {
     object MapRoute : Screen("map_route", "Karte", Icons.Default.LocationOn)
-    object Weather : Screen("weather", "Wetter", null)
-    object Tide : Screen("tides", "Gezeiten", Icons.Default.DateRange)
+    object Revier : Screen("revier", "Revier", null)
     object Crew : Screen("crew", "Crew", Icons.Default.Person)
     object Logbook : Screen("logbook", "Logbuch", Icons.Default.List)
     object Settings : Screen("settings", "Einstellungen", Icons.Default.Settings)
@@ -49,8 +48,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
 
 val bottomNavItems = listOf(
     Screen.MapRoute,
-    Screen.Weather,
-    Screen.Tide,
+    Screen.Revier,
     Screen.Crew,
     Screen.Logbook
 )
@@ -137,28 +135,19 @@ fun MainAppScreen(viewModel: TideViewModel) {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.MapRoute.route) {
-
                 val routeViewModel: RoutePlanningViewModel = viewModel()
                 RoutePlanningScreen(viewModel, routeViewModel)
             }
-            composable(Screen.Weather.route) {
-
-                WeatherOverlayScreen(viewModel)
-            }
-            composable(Screen.Tide.route) {
-
-                TideGraphScreen(viewModel)
+            composable(Screen.Revier.route) {
+                RevierScreen(viewModel)
             }
             composable(Screen.Crew.route) {
-
                 CrewScreen(viewModel)
             }
             composable(Screen.Logbook.route) {
-
                 LogbookScreen(viewModel)
             }
             composable(Screen.Settings.route) {
-
                 DashboardScreen {
                     navController.navigate(Screen.MapRoute.route)
                 }
@@ -182,18 +171,17 @@ fun BottomNavigationBar(navController: NavHostController) {
             NavigationBarItem(
                 modifier = Modifier.testTag("nav_${screen.route}"),
                 icon = {
-                    if (screen.icon != null) {
-                        Icon(
-                            screen.icon,
-                            contentDescription = screen.title,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    } else {
-
-                        Text(
-                            "⛅",
-                            fontSize = 20.sp
-                        )
+                    when (screen.route) {
+                        "revier" -> Text("☁️", fontSize = 20.sp)
+                        else -> {
+                            if (screen.icon != null) {
+                                Icon(
+                                    screen.icon,
+                                    contentDescription = screen.title,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                     }
                 },
                 label = {

@@ -30,13 +30,36 @@ import com.example.trnberechnung.ui.theme.TörnberechnungTheme
 import com.example.trnberechnung.viewmodel.TideViewModel
 import com.example.trnberechnung.viewmodel.TideViewModelFactory
 import org.maplibre.android.MapLibre
+import org.maplibre.android.WellKnownTileServer
+import org.maplibre.android.module.http.HttpRequestUtil
+import okhttp3.OkHttpClient
+import android.util.Log
 import com.example.trnberechnung.ui.MainAppScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        MapLibre.getInstance(applicationContext)
+        // 1. System-Agent setzen (für HttpURLConnection)
+        val userAgent = "ToernberechnungApp/1.0 (https://example.com/toernberechnung; info@example.com) Android"
+        System.setProperty("http.agent", userAgent)
+
+        // 2. MapLibre initialisieren
+        // Für MapLibre 11+ ist die Angabe des TileServers oder eines Keys oft zwingend vor der ersten Nutzung des HTTP-Stacks.
+        MapLibre.getInstance(this, null, WellKnownTileServer.MapLibre)
+
+        // 3. OkHttp Interceptor für MapLibre (Fix für 403 Forbidden)
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("User-Agent", userAgent)
+                    .header("Referer", "https://example.com/toernberechnung")
+                    .build()
+                Log.d("MapLibre-HTTP", "Request to: ${request.url()} with User-Agent and Referer")
+                chain.proceed(request)
+            }
+            .build()
+        HttpRequestUtil.setOkHttpClient(okHttpClient)
 
         lifecycleScope.launch(Dispatchers.IO) {
             SeaMask.build(applicationContext)

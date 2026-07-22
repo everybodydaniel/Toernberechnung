@@ -36,8 +36,16 @@ class RoutePlanningViewModel(application: Application) : AndroidViewModel(applic
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState
 
+    private var currentWindSpeedKn: Double = 0.0
+    private var currentWindDirDeg: Double = 0.0
+
     init {
         loadAndCalculate()
+    }
+
+    fun updateWindState(speedKn: Double, directionDeg: Double) {
+        currentWindSpeedKn = speedKn
+        currentWindDirDeg = directionDeg
     }
 
     fun loadAndCalculate(
@@ -49,7 +57,7 @@ class RoutePlanningViewModel(application: Application) : AndroidViewModel(applic
         val finalTime = departureTime ?: _uiState.value.departureTime
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
-                isLoading = true, 
+                isLoading = true,
                 statusMessage = "Lade Inseldaten…",
                 departureTime = finalTime
             )
@@ -59,6 +67,9 @@ class RoutePlanningViewModel(application: Application) : AndroidViewModel(applic
                 val draft = boatRepo.draft.toDouble()
                 val margin = boatRepo.safetyMargin.toDouble()
 
+                // Adjust safety margin based on wind (e.g., 0.1m extra for every 10kn wind)
+                val adjustedMargin = margin + (currentWindSpeedKn / 100.0)
+
                 val islands = withContext(Dispatchers.IO) {
                     IslandCoordinatesProvider.getIslandCoordinates(getApplication())
                 }
@@ -67,7 +78,7 @@ class RoutePlanningViewModel(application: Application) : AndroidViewModel(applic
                     islands = islands,
                     statusMessage = "Berechne Seeroute…",
                     boatDraft = draft,
-                    safetyMargin = margin
+                    safetyMargin = adjustedMargin
                 )
 
                 val segments = withContext(Dispatchers.Default) {
@@ -75,7 +86,7 @@ class RoutePlanningViewModel(application: Application) : AndroidViewModel(applic
                         NauticalRouterV2.calculateSegmentedRoute(
                             customStart, customEnd,
                             draft = draft,
-                            margin = margin,
+                            margin = adjustedMargin,
                             currentTime = finalTime,
                             tideEvents = tideEvents
                         )
@@ -94,7 +105,7 @@ class RoutePlanningViewModel(application: Application) : AndroidViewModel(applic
                         route = route,
                         tideOffset = tideOffset,
                         draft = draft,
-                        margin = margin,
+                        margin = adjustedMargin,
                         spacingM = 1000.0
                     )
                 }
@@ -109,7 +120,7 @@ class RoutePlanningViewModel(application: Application) : AndroidViewModel(applic
                     isLoading = false,
                     error = null,
                     routeDistanceNm = totalDistNm,
-                    statusMessage = "Seeroute berechnet: %.1f nm (Tiefgang: %.1fm)".format(totalDistNm, draft)
+                    statusMessage = "Seeroute berechnet: %.1f nm (Tiefgang: %.1fm, Wind-Aufschlag: %.2fm)".format(totalDistNm, draft, adjustedMargin - margin)
                 )
 
             } catch (e: Exception) {
@@ -143,7 +154,7 @@ class RoutePlanningViewModel(application: Application) : AndroidViewModel(applic
     }
 
     private fun haversineNm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val R = 3440.065 
+        val R = 3440.065
         val dLat = Math.toRadians(lat2 - lat1)
         val dLon = Math.toRadians(lon2 - lon1)
         val a = kotlin.math.sin(dLat / 2).let { it * it } +

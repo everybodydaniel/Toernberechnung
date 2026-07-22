@@ -66,9 +66,15 @@ private const val TAG = "RoutePlanningScreen"
 fun IslandRoutePlanningScreen(viewModel: RoutePlanningViewModel, tideViewModel: TideViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val tideEvents by tideViewModel.currentTideEvents.collectAsState()
+    val currentWeather by tideViewModel.currentWeather.collectAsState()
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(tideEvents) {
+    LaunchedEffect(tideEvents, currentWeather) {
+        currentWeather?.let {
+            val speedKn = (it.windSpeed ?: 0.0) / 1.852
+            val dirDeg = (it.windDirection ?: 0).toDouble()
+            viewModel.updateWindState(speedKn, dirDeg)
+        }
         viewModel.loadAndCalculate(tideEvents)
     }
 
@@ -360,15 +366,15 @@ private fun DepartureTimeSection(
                     Text("Simulation der Gezeiten für:")
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { 
+                        Button(onClick = {
                             onTimeChanged(currentTime.minusHours(1))
                         }) { Text("-1h") }
-                        Button(onClick = { 
+                        Button(onClick = {
                             onTimeChanged(currentTime.plusHours(1))
                         }) { Text("+1h") }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { 
+                    Button(onClick = {
                         onTimeChanged(java.time.LocalDateTime.now())
                     }, modifier = Modifier.fillMaxWidth()) {
                         Text("Aktuelle Zeit")
@@ -632,9 +638,9 @@ private fun IslandRouteMap(
             if (routeSegments.isNotEmpty()) {
                 routeSegments.forEach { segment ->
                     val color = when (segment.type) {
-                        com.example.trnberechnung.model.SegmentType.SAFE -> "#007AFF"    
-                        com.example.trnberechnung.model.SegmentType.CRITICAL -> "#FF9500" 
-                        com.example.trnberechnung.model.SegmentType.NO_GO -> "#FF3B30"    
+                        com.example.trnberechnung.model.SegmentType.SAFE -> "#007AFF"
+                        com.example.trnberechnung.model.SegmentType.CRITICAL -> "#FF9500"
+                        com.example.trnberechnung.model.SegmentType.NO_GO -> "#FF3B30"
                     }
                     lm.create(
                         LineOptions()
@@ -669,7 +675,25 @@ private fun IslandRouteMap(
             }
 
             islands.forEach { island ->
+                cm.create(
+                    CircleOptions()
+                        .withLatLng(island.position)
+                        .withCircleRadius(7f)
+                        .withCircleColor(ColorUtils.colorToRgbaString(AndroidColor.parseColor("#007AFF")))
+                        .withCircleStrokeColor(ColorUtils.colorToRgbaString(AndroidColor.WHITE))
+                        .withCircleStrokeWidth(2f)
+                )
 
+                sm.create(
+                    SymbolOptions()
+                        .withLatLng(island.position)
+                        .withTextField(island.name)
+                        .withTextSize(11f)
+                        .withTextColor(ColorUtils.colorToRgbaString(AndroidColor.WHITE))
+                        .withTextHaloColor(ColorUtils.colorToRgbaString(AndroidColor.parseColor("#007AFF")))
+                        .withTextHaloWidth(1.5f)
+                        .withTextOffset(arrayOf(0f, 1.2f))
+                )
             }
         } catch (e: Exception) {
             Log.w(TAG, "Map visuals update failed", e)
@@ -736,8 +760,9 @@ private fun IslandRouteMap(
                                   "sources": {
                                     "osm": {
                                       "type": "raster",
-                                      "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-                                      "tileSize": 256
+                                      "tiles": ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"],
+                                      "tileSize": 256,
+                                      "attribution": "&copy; OpenStreetMap contributors"
                                     },
                                     "openseamap": {
                                       "type": "raster",

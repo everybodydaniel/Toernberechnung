@@ -458,16 +458,6 @@ private fun AssessmentChip(label: String, isOk: Boolean, isWarning: Boolean) {
     }
 }
 
-data class DailyForecast(
-    val dayLabel: String,
-    val condition: String,
-    val highTemp: Int,
-    val lowTemp: Int,
-    val maxWind: Int,
-    val totalPrecip: Double,
-    val maxPrecipProb: Int,
-    val minVisibility: Int?
-)
 
 private fun aggregateToDays(hourlyData: List<WeatherDto>): List<DailyForecast> {
     if (hourlyData.isEmpty()) return emptyList()

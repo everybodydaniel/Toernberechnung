@@ -12,6 +12,15 @@ interface CrewMemberDao {
     @Query("SELECT * FROM crew_members ORDER BY id ASC")
     fun getAllCrew(): Flow<List<CrewMember>>
 
+    @Query("SELECT * FROM crew_members WHERE isOnBoard = 1 ORDER BY id ASC")
+    fun getOnBoardCrew(): Flow<List<CrewMember>>
+
+    @Query("SELECT * FROM crew_members WHERE skipperId = :skipperId LIMIT 1")
+    suspend fun getBySkipperId(skipperId: String): CrewMember?
+
+    @Query("SELECT COUNT(*) FROM crew_members WHERE isOnBoard = 1")
+    suspend fun countOnBoard(): Int
+
     @Insert
     suspend fun insertCrew(member: CrewMember)
 

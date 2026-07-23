@@ -2,15 +2,22 @@ package com.example.trnberechnung.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Logout
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,19 +25,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.widget.Toast
+import com.example.trnberechnung.model.AuthRepository
 import com.example.trnberechnung.model.BoatProfileRepository
 import com.example.trnberechnung.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    onStartNavigation: () -> Unit
+    authRepo: AuthRepository? = null,
+    onNavigateToLogin: () -> Unit = {},
+    onStartNavigation: () -> Unit,
+    onToggleDarkMode: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val repo = remember { BoatProfileRepository(context) }
@@ -282,6 +296,17 @@ fun DashboardScreen(
             )
         }
 
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // ══════════════════════════════════════════════════
+        // Crewspace-Konto Sektion
+        // ══════════════════════════════════════════════════
+        CrewspaceProfileSection(
+            authRepo = authRepo,
+            onNavigateToLogin = onNavigateToLogin,
+            onToggleDarkMode = onToggleDarkMode
+        )
+
         Spacer(modifier = Modifier.height(32.dp))
     }
 }
@@ -360,4 +385,281 @@ private fun ProfileNumberField(
             unfocusedTextColor = NauticalTextPrimary
         )
     )
+}
+
+// ══════════════════════════════════════════════════════════════
+// Crewspace-Konto Profil-Sektion
+// ══════════════════════════════════════════════════════════════
+
+@Composable
+private fun CrewspaceProfileSection(
+    authRepo: AuthRepository? = null,
+    onNavigateToLogin: () -> Unit = {},
+    onToggleDarkMode: (Boolean) -> Unit = {}
+) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    
+    val isLoggedIn = authRepo?.isLoggedIn ?: false
+    val skipperId = authRepo?.skipperId ?: ""
+    val userName = authRepo?.userName ?: ""
+    val userEmail = authRepo?.userEmail ?: ""
+
+    Column {
+        // Header
+        SectionHeader(icon = Icons.Default.Person, title = "CREWSPACE-KONTO")
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                // ── Profilbild + Name + Email ──
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Avatar-Platzhalter
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(NauticalPrimary.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = NauticalPrimary,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column {
+                        if (isLoggedIn) {
+                            Text(
+                                text = userName,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NauticalTextPrimary
+                            )
+                            Text(
+                                text = userEmail,
+                                fontSize = 13.sp,
+                                color = NauticalTextSecondary
+                            )
+                        } else {
+                            Text(
+                                text = "Gastmodus",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NauticalTextPrimary
+                            )
+                            Text(
+                                text = "Nicht angemeldet",
+                                fontSize = 13.sp,
+                                color = NauticalTextSecondary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = NauticalDivider, thickness = 0.5.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── Skipper-ID Box ──
+                Text(
+                    text = "DEINE SKIPPER-ID",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NauticalTextSecondary,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (isLoggedIn) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(NauticalPrimary.copy(alpha = 0.06f))
+                            .border(1.dp, NauticalPrimary.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                            .clickable {
+                                clipboardManager.setText(AnnotatedString(skipperId))
+                                Toast
+                                    .makeText(context, "Skipper-ID kopiert!", Toast.LENGTH_SHORT)
+                                    .show()
+                            }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = skipperId,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = NauticalPrimary,
+                            modifier = Modifier.weight(1f),
+                            letterSpacing = 0.3.sp
+                        )
+                        Icon(
+                            Icons.Outlined.ContentCopy,
+                            contentDescription = "Kopieren",
+                            tint = NauticalPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Teile diese ID, damit andere dich im Crewspace finden können.",
+                        fontSize = 11.sp,
+                        color = NauticalTextSecondary.copy(alpha = 0.7f)
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.LightGray.copy(alpha = 0.1f))
+                            .border(1.dp, Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Melde dich an, um eine ID zu erhalten",
+                            fontSize = 13.sp,
+                            color = NauticalTextSecondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = NauticalDivider, thickness = 0.5.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ── App Appearance ──
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = NauticalTextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Dark Mode",
+                        fontSize = 15.sp,
+                        color = NauticalTextPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    var isDark by remember { mutableStateOf(authRepo?.isDarkMode ?: false) }
+                    Switch(
+                        checked = isDark,
+                        onCheckedChange = { 
+                            isDark = it
+                            onToggleDarkMode(it)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = NauticalPrimary
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = NauticalDivider, thickness = 0.5.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ── Anmeldung & Sicherheit ──
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { /* Navigation zu Sicherheitseinstellungen */ }
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.Lock,
+                        contentDescription = null,
+                        tint = NauticalTextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Anmeldung & Sicherheit",
+                        fontSize = 15.sp,
+                        color = NauticalTextPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text("›", fontSize = 18.sp, color = NauticalTextSecondary.copy(alpha = 0.4f))
+                }
+
+                if (isLoggedIn) {
+                    // ── Abmelden ──
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable {
+                                authRepo?.logout()
+                                onNavigateToLogin()
+                            }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.Logout,
+                            contentDescription = null,
+                            tint = Color(0xFFFF3B30),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Abmelden",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFFF3B30)
+                        )
+                    }
+                } else {
+                    // ── Anmelden ──
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onNavigateToLogin() }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = NauticalPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Anmelden / Account verbinden",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = NauticalPrimary
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

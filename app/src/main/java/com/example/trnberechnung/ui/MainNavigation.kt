@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
@@ -35,13 +36,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.trnberechnung.ui.theme.*
+import com.example.trnberechnung.model.AuthRepository
+import com.example.trnberechnung.viewmodel.CrewspaceViewModel
+import com.example.trnberechnung.viewmodel.CrewspaceViewModelFactory
 import com.example.trnberechnung.viewmodel.RoutePlanningViewModel
 import com.example.trnberechnung.viewmodel.TideViewModel
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector?) {
     object MapRoute : Screen("map_route", "Karte", Icons.Default.LocationOn)
     object Revier : Screen("revier", "Revier", null)
-    object Crew : Screen("crew", "Crew", Icons.Default.Person)
+    object Crew : Screen("crew", "Crewspace", Icons.Outlined.Chat)
     object Logbook : Screen("logbook", "Logbuch", Icons.Default.List)
     object Settings : Screen("settings", "Einstellungen", Icons.Default.Settings)
 }
@@ -55,7 +59,13 @@ val bottomNavItems = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainAppScreen(viewModel: TideViewModel) {
+fun MainAppScreen(
+    viewModel: TideViewModel, 
+    crewspaceViewModelFactory: CrewspaceViewModelFactory? = null,
+    authRepo: AuthRepository? = null,
+    onNavigateToLogin: () -> Unit = {},
+    onToggleDarkMode: (Boolean) -> Unit = {}
+) {
     val navController = rememberNavController()
     var expandedMenu by remember { mutableStateOf(false) }
 
@@ -142,15 +152,30 @@ fun MainAppScreen(viewModel: TideViewModel) {
                 RevierScreen(viewModel)
             }
             composable(Screen.Crew.route) {
-                CrewScreen(viewModel)
+                if (crewspaceViewModelFactory != null) {
+                    val crewspaceViewModel: CrewspaceViewModel = viewModel(factory = crewspaceViewModelFactory)
+                    CrewspaceScreen(
+                        viewModel = crewspaceViewModel,
+                        authRepo = authRepo,
+                        onNavigateToLogin = onNavigateToLogin
+                    )
+                } else {
+                    // Fallback: altes CrewScreen, falls Factory nicht gesetzt
+                    CrewScreen(viewModel)
+                }
             }
             composable(Screen.Logbook.route) {
                 LogbookScreen(viewModel)
             }
             composable(Screen.Settings.route) {
-                DashboardScreen {
-                    navController.navigate(Screen.MapRoute.route)
-                }
+                DashboardScreen(
+                    authRepo = authRepo,
+                    onNavigateToLogin = onNavigateToLogin,
+                    onStartNavigation = {
+                        navController.navigate(Screen.MapRoute.route)
+                    },
+                    onToggleDarkMode = onToggleDarkMode
+                )
             }
         }
     }

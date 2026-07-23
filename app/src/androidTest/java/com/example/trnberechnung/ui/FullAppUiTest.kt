@@ -1,8 +1,10 @@
 package com.example.trnberechnung.ui
 
+import android.content.Context
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.example.trnberechnung.MainActivity
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -15,10 +17,44 @@ class FullAppUiTest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
+    @Before
+    fun resetOnboardingState() {
+        composeTestRule.activity
+            .getSharedPreferences("onboarding_preferences", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
+        composeTestRule.activityRule.scenario.recreate()
+        composeTestRule.waitForIdle()
+    }
+
     @Test
     fun testFullAppNavigationFlow() {
+        // A fresh installation must complete all onboarding pages and accept the
+        // nautical disclaimer before entering the main application.
+        repeat(2) {
+            composeTestRule.onNodeWithTag("onboarding_continue")
+                .assertIsEnabled()
+                .performClick()
+            composeTestRule.waitForIdle()
+        }
+        composeTestRule.onNodeWithTag("onboarding_continue").assertIsNotEnabled()
+        composeTestRule.onNodeWithTag("onboarding_disclaimer_checkbox")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeTestRule.onNodeWithTag("onboarding_continue")
+            .assertIsEnabled()
+            .performClick()
+
         // 1. Start auf der Karte (MapRoute ist Start-Destination)
         // Wir warten kurz, bis die Karte geladen ist (Semantics check)
+        composeTestRule.onNodeWithTag("nav_map_route").assertIsSelected()
+
+        // The completed state must survive the next Activity start.
+        composeTestRule.activityRule.scenario.recreate()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("onboarding_screen").assertDoesNotExist()
         composeTestRule.onNodeWithTag("nav_map_route").assertIsSelected()
 
         // 2. Wechsel zu Wetter

@@ -2,6 +2,7 @@ package com.example.trnberechnung.repository
 
 import com.example.trnberechnung.database.TideDao
 import com.example.trnberechnung.database.TideEntity
+import com.example.trnberechnung.database.PlannerEventDao
 import com.example.trnberechnung.model.*
 import com.example.trnberechnung.network.BshApiService
 import com.example.trnberechnung.network.RetrofitInstance
@@ -18,12 +19,20 @@ class TideRepositoryTest {
     private val logbookDao = mockk<LogbookDao>(relaxed = true)
     private val crewMemberDao = mockk<CrewMemberDao>(relaxed = true)
     private val checklistDao = mockk<ChecklistDao>(relaxed = true)
+    private val plannerEventDao = mockk<PlannerEventDao>(relaxed = true)
 
     private lateinit var repository: TideRepository
 
     @Before
     fun setup() {
-        repository = TideRepository(tideDao, logbookDao, crewMemberDao, checklistDao)
+        repository =
+            TideRepository(
+                tideDao,
+                logbookDao,
+                crewMemberDao,
+                checklistDao,
+                plannerEventDao,
+            )
     }
 
     @Test

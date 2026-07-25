@@ -3,15 +3,19 @@ package com.example.trnberechnung.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trnberechnung.model.*
+import com.example.trnberechnung.messaging.ChatNavigationState
+import com.example.trnberechnung.repository.ChatRepository
 import com.example.trnberechnung.repository.TideRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 
 class CrewspaceViewModel(
     private val repository: TideRepository,
+    private val chatRepository: ChatRepository,
     private val authRepo: AuthRepository
 ) : ViewModel() {
 
@@ -25,6 +29,7 @@ class CrewspaceViewModel(
     val uiState: StateFlow<CrewspaceUiState> = _uiState.asStateFlow()
 
     private var activeChatMessagesJob: Job? = null
+    private var markReadJob: Job? = null
 
     init {
         // Crew-Daten aus der Datenbank beobachten
@@ -42,11 +47,53 @@ class CrewspaceViewModel(
         // Chats beobachten
         viewModelScope.launch {
             val ownId = _uiState.value.ownSkipperId
-            repository.getChatThreadsForUser(ownId).collect { threads ->
+            chatRepository.threads(ownId).collect { threads ->
+                val activeId = _uiState.value.activeChatThread?.id
                 _uiState.update { state ->
-                    state.copy(chatThreads = threads.map { it.toModel(ownId) })
+                    val models =
+                        threads.map {
+                            it.toModel(ownId).let { model ->
+                                if (model.id == activeId) model.copy(unreadCount = 0) else model
+                            }
+                        }
+                    val active =
+                        state.activeChatThread?.let { selected ->
+                            models.firstOrNull { it.id == selected.id }
+                                ?.copy(messages = selected.messages)
+                                ?: selected
+                        }
+                    state.copy(chatThreads = models, activeChatThread = active)
+                }
+                if (
+                    activeId != null &&
+                    threads.firstOrNull { it.id == activeId }?.unreadCount?.let { it > 0 } == true
+                ) {
+                    scheduleMarkRead(activeId)
                 }
             }
+        }
+
+        viewModelScope.launch {
+            chatRepository.connectionState.collect { connection ->
+                _uiState.update { it.copy(chatConnectionState = connection.name) }
+            }
+        }
+
+        viewModelScope.launch {
+            ChatNavigationState.pendingConversationId
+                .filterNotNull()
+                .collect { conversationId ->
+                    val ownerId = _uiState.value.ownSkipperId
+                    var stored = chatRepository.thread(ownerId, conversationId)
+                    if (stored == null) {
+                        runCatching { chatRepository.syncConversations() }
+                        stored = chatRepository.thread(ownerId, conversationId)
+                    }
+                    stored?.let {
+                        openChat(it.toModel(ownerId))
+                        ChatNavigationState.consumeConversation(conversationId)
+                    }
+                }
         }
         
         // Planner Events beobachten
@@ -60,8 +107,9 @@ class CrewspaceViewModel(
 
         // Server-Sync beim Start
         viewModelScope.launch {
-            repository.syncRemoteConversations(authRepo.idToken, _uiState.value.ownSkipperId)
-            repository.syncRemoteEvents(authRepo.idToken)
+            runCatching { chatRepository.activate() }
+                .onFailure { showChatError(it) }
+            runCatching { repository.syncRemoteEvents(authRepo.getIdToken()) }
         }
     }
 
@@ -103,88 +151,66 @@ class CrewspaceViewModel(
         _uiState.update { it.copy(newConversationSkipperId = id) }
     }
 
-    fun startChat(skipperId: String, displayName: String = "") {
+    fun startChat(skipperId: String) {
         viewModelScope.launch {
-            val ownId = _uiState.value.ownSkipperId
-            val ownName = _uiState.value.ownDisplayName
-
-            // 1. Try remote direct chat creation/fetch
-            val remoteThread = repository.createRemoteDirectChat(authRepo.idToken, skipperId, ownId)
-            val threadId = remoteThread?.id ?: listOf(ownId, skipperId).sorted().joinToString("_")
-            
-            val existingThread = _uiState.value.chatThreads.firstOrNull { it.id == threadId || it.participantSkipperId == skipperId }
-            
-            if (existingThread != null) {
-                _uiState.update {
-                    it.copy(showNewConversationSheet = false, newConversationSkipperId = "")
-                }
-                openChat(existingThread)
-            } else {
-                var resolvedName = when {
-                    remoteThread != null && remoteThread.participant2Name.isNotBlank() && remoteThread.participant2Name != skipperId -> remoteThread.participant2Name
-                    displayName.isNotBlank() -> displayName
-                    else -> ""
-                }
-
-                // If name is still blank, try querying the skipper profile from backend
-                if (resolvedName.isBlank() && authRepo.idToken.isNotBlank()) {
-                    try {
-                        val profileRes = com.example.trnberechnung.network.RetrofitInstance.socialFeedApi.getSkipper("Bearer ${authRepo.idToken}", skipperId)
-                        if (profileRes.isSuccessful && profileRes.body() != null) {
-                            resolvedName = profileRes.body()!!.name
-                        }
-                    } catch (e: Exception) {
-                        android.util.Log.e("CREWSPACE", "Failed to fetch skipper profile: ${e.message}")
+            _uiState.update { it.copy(chatBusy = true, chatError = null) }
+            runCatching { chatRepository.createDirectChat(skipperId) }
+                .onSuccess { remoteThread ->
+                    val ownId = _uiState.value.ownSkipperId
+                    val thread = remoteThread.toModel(ownId)
+                    _uiState.update {
+                        it.copy(
+                            showNewConversationSheet = false,
+                            newConversationSkipperId = "",
+                            chatBusy = false,
+                        )
                     }
+                    openChat(thread)
                 }
-
-                if (resolvedName.isBlank()) {
-                    resolvedName = skipperId
+                .onFailure {
+                    _uiState.update { state -> state.copy(chatBusy = false) }
+                    showChatError(it)
                 }
-
-                val newThread = ChatThread(
-                    id = threadId,
-                    type = ChatThreadType.DIRECT,
-                    participantName = resolvedName,
-                    participantSkipperId = skipperId
-                )
-                repository.insertChatThread(newThread.toEntity(ownId, ownName))
-                
-                _uiState.update {
-                    it.copy(showNewConversationSheet = false, newConversationSkipperId = "")
-                }
-                openChat(newThread)
-            }
         }
     }
 
     fun openChat(thread: ChatThread) {
         activeChatMessagesJob?.cancel()
-        activeChatMessagesJob = viewModelScope.launch {
-            // Polling job in parallel for remote messages
-            launch {
-                while (true) {
-                    repository.syncRemoteMessages(authRepo.idToken, thread.id)
-                    kotlinx.coroutines.delay(3000)
+        ChatNavigationState.setActiveConversation(thread.id)
+        _uiState.update { it.copy(activeChatThread = thread, chatError = null) }
+        activeChatMessagesJob =
+            viewModelScope.launch {
+                val ownerId = _uiState.value.ownSkipperId
+                var latestReadIncomingId: String? = null
+                chatRepository.thread(ownerId, thread.id)?.let { stored ->
+                    launch {
+                        runCatching { chatRepository.synchronizeMessages(stored) }
+                            .onFailure { showChatError(it) }
+                    }
+                }
+                scheduleMarkRead(thread.id)
+                chatRepository.messages(ownerId, thread.id).collect { messageEntities ->
+                    val messages = messageEntities.map { it.toModel(ownerId) }
+                    messages.lastOrNull { !it.isOwnMessage }?.let { newestIncoming ->
+                        val identity = newestIncoming.serverId ?: newestIncoming.id
+                        if (identity != latestReadIncomingId) {
+                            latestReadIncomingId = identity
+                            scheduleMarkRead(thread.id)
+                        }
+                    }
+                    val currentThread =
+                        _uiState.value.chatThreads.find { it.id == thread.id } ?: thread
+                    val activeThread = currentThread.copy(unreadCount = 0, messages = messages)
+                    _uiState.update { it.copy(activeChatThread = activeThread) }
                 }
             }
-
-            repository.getMessagesForThread(thread.id).collect { messageEntities ->
-                val ownId = _uiState.value.ownSkipperId
-                val messages = messageEntities.map { it.toModel(ownId) }
-                
-                // Wir aktualisieren den aktiven Thread mit den neuen Nachrichten
-                val currentThread = _uiState.value.chatThreads.find { it.id == thread.id } ?: thread
-                val activeThread = currentThread.copy(unreadCount = 0, messages = messages)
-                
-                _uiState.update { it.copy(activeChatThread = activeThread) }
-            }
-        }
     }
 
     fun closeChat() {
         activeChatMessagesJob?.cancel()
-        _uiState.update { it.copy(activeChatThread = null, chatInput = "") }
+        markReadJob?.cancel()
+        ChatNavigationState.setActiveConversation(null)
+        _uiState.update { it.copy(activeChatThread = null, chatInput = "", chatError = null) }
     }
 
     fun updateChatInput(text: String) {
@@ -195,61 +221,88 @@ class CrewspaceViewModel(
         val state = _uiState.value
         val thread = state.activeChatThread ?: return
         val text = state.chatInput.trim()
-        if (text.isBlank()) return
+        if (text.isBlank() || !thread.isChatAvailable) return
 
         viewModelScope.launch {
-            repository.sendRemoteMessage(
-                idToken = authRepo.idToken,
-                threadId = thread.id,
-                text = text,
-                senderId = state.ownSkipperId,
-                senderName = state.ownDisplayName
-            )
-            
-            // Thread Preview aktualisieren
-            val updatedThread = thread.copy(
-                lastMessage = text,
-                lastMessageTimestamp = System.currentTimeMillis()
-            )
-            repository.insertChatThread(updatedThread.toEntity(state.ownSkipperId, state.ownDisplayName))
-        }
-        
-        _uiState.update { it.copy(chatInput = "") }
-    }
-    
-    fun sendAttachmentMessage(type: ChatMessageType, content: String, duration: Int = 0) {
-        val state = _uiState.value
-        val thread = state.activeChatThread ?: return
-
-        val message = ChatMessage(
-            threadId = thread.id,
-            senderId = state.ownSkipperId,
-            senderName = state.ownDisplayName,
-            content = content,
-            type = type,
-            voiceDurationSeconds = duration,
-            isOwnMessage = true
-        )
-
-        viewModelScope.launch {
-            repository.insertChatMessage(message.toEntity())
-            
-            val previewText = when(type) {
-                ChatMessageType.VOICE -> "Sprachnachricht"
-                ChatMessageType.IMAGE -> "Bild"
-                ChatMessageType.EVENT -> {
-                    val parts = content.split("|")
-                    "Termin: ${parts.getOrNull(0) ?: ""}"
+            runCatching { chatRepository.queueText(thread.id, text) }
+                .onSuccess {
+                    _uiState.update { it.copy(chatInput = "", chatError = null) }
                 }
-                else -> content
-            }
-            
-            val updatedThread = thread.copy(
-                lastMessage = previewText,
-                lastMessageTimestamp = message.timestamp
-            )
-            repository.insertChatThread(updatedThread.toEntity(state.ownSkipperId, state.ownDisplayName))
+                .onFailure(::showChatError)
         }
+    }
+
+    fun sendAttachmentMessage(type: ChatMessageType, content: String, duration: Int = 0) {
+        val thread = _uiState.value.activeChatThread ?: return
+        if (!thread.isChatAvailable) return
+        viewModelScope.launch {
+            val result =
+                if (type == ChatMessageType.IMAGE || type == ChatMessageType.VOICE) {
+                    runCatching {
+                        chatRepository.queueAttachment(
+                            conversationId = thread.id,
+                            source = content,
+                            type = type,
+                            durationSeconds = duration,
+                        )
+                    }
+                } else {
+                    runCatching { chatRepository.queueText(thread.id, content, type) }
+                }
+            result.onFailure(::showChatError)
+        }
+    }
+
+    fun retryMessage(localId: String) {
+        viewModelScope.launch {
+            runCatching { chatRepository.retryMessage(localId) }
+                .onFailure(::showChatError)
+        }
+    }
+
+    fun loadOlderMessages() {
+        val conversationId = _uiState.value.activeChatThread?.id ?: return
+        viewModelScope.launch {
+            runCatching { chatRepository.loadOlderMessages(conversationId) }
+                .onFailure(::showChatError)
+        }
+    }
+
+    fun blockActiveChat() {
+        val uid = _uiState.value.activeChatThread?.participantSkipperId ?: return
+        viewModelScope.launch {
+            runCatching { chatRepository.block(uid) }
+                .onFailure(::showChatError)
+        }
+    }
+
+    fun unblockActiveChat() {
+        val uid = _uiState.value.activeChatThread?.participantSkipperId ?: return
+        viewModelScope.launch {
+            runCatching { chatRepository.unblock(uid) }
+                .onFailure(::showChatError)
+        }
+    }
+
+    fun clearChatError() {
+        _uiState.update { it.copy(chatError = null) }
+    }
+
+    private fun showChatError(error: Throwable) {
+        _uiState.update {
+            it.copy(chatError = error.localizedMessage ?: "Chat-Aktion fehlgeschlagen.")
+        }
+    }
+
+    private fun scheduleMarkRead(conversationId: String) {
+        markReadJob?.cancel()
+        markReadJob =
+            viewModelScope.launch {
+                delay(250)
+                if (_uiState.value.activeChatThread?.id == conversationId) {
+                    runCatching { chatRepository.markConversationRead(conversationId) }
+                }
+            }
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -383,50 +436,6 @@ class CrewspaceViewModel(
     fun updateCrew(member: CrewMember) {
         viewModelScope.launch {
             repository.updateCrew(member)
-        }
-    }
-
-    // ══════════════════════════════════════════════════════════════
-    // Mock-Daten für Demo / Vorschau
-    // ══════════════════════════════════════════════════════════════
-
-    fun loadMockChatData() {
-        val now = System.currentTimeMillis()
-        val mockMessages = listOf(
-            ChatMessage(
-                threadId = "mock-thread-1",
-                senderId = "external-skipper",
-                senderName = "Skipper",
-                content = "Hallo",
-                type = ChatMessageType.TEXT,
-                timestamp = now - 60_000,
-                isOwnMessage = false
-            ),
-            ChatMessage(
-                threadId = "mock-thread-1",
-                senderId = "external-skipper",
-                senderName = "Skipper",
-                content = "Sprachnachricht",
-                type = ChatMessageType.VOICE,
-                voiceDurationSeconds = 8,
-                timestamp = now,
-                isOwnMessage = false
-            )
-        )
-
-        val mockThread = ChatThread(
-            id = "mock-thread-1",
-            type = ChatThreadType.DIRECT,
-            participantName = "Skipper",
-            participantSkipperId = "ext-skipper-id",
-            lastMessage = "Sprachnachricht",
-            lastMessageTimestamp = now,
-            unreadCount = 2,
-            messages = mockMessages
-        )
-
-        _uiState.update {
-            it.copy(chatThreads = listOf(mockThread))
         }
     }
 

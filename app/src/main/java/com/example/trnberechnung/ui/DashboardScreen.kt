@@ -43,6 +43,7 @@ import com.example.trnberechnung.ui.theme.*
 fun DashboardScreen(
     authRepo: AuthRepository? = null,
     onNavigateToLogin: () -> Unit = {},
+    onLogout: () -> Unit = {},
     onStartNavigation: () -> Unit,
     onToggleDarkMode: (Boolean) -> Unit = {}
 ) {
@@ -304,6 +305,7 @@ fun DashboardScreen(
         CrewspaceProfileSection(
             authRepo = authRepo,
             onNavigateToLogin = onNavigateToLogin,
+            onLogout = onLogout,
             onToggleDarkMode = onToggleDarkMode
         )
 
@@ -395,6 +397,7 @@ private fun ProfileNumberField(
 private fun CrewspaceProfileSection(
     authRepo: AuthRepository? = null,
     onNavigateToLogin: () -> Unit = {},
+    onLogout: () -> Unit = {},
     onToggleDarkMode: (Boolean) -> Unit = {}
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -614,8 +617,7 @@ private fun CrewspaceProfileSection(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
                             .clickable {
-                                authRepo?.logout()
-                                onNavigateToLogin()
+                                onLogout()
                             }
                             .padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically

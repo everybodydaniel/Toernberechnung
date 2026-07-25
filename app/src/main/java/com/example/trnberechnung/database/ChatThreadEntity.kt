@@ -1,12 +1,20 @@
 package com.example.trnberechnung.database
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
+import androidx.room.Index
 import com.example.trnberechnung.model.ChatThreadType
 
-@Entity(tableName = "chat_threads")
+@Entity(
+    tableName = "chat_threads",
+    primaryKeys = ["ownerId", "id"],
+    indices = [
+        Index(value = ["ownerId"]),
+        Index(value = ["ownerId", "lastMessageTimestamp"]),
+    ],
+)
 data class ChatThreadEntity(
-    @PrimaryKey val id: String,
+    val ownerId: String,
+    val id: String,
     val type: ChatThreadType,
     val participant1Id: String,
     val participant1Name: String,
@@ -14,5 +22,11 @@ data class ChatThreadEntity(
     val participant2Name: String,
     val lastMessage: String,
     val lastMessageTimestamp: Long,
-    val unreadCount: Int
+    val unreadCount: Int,
+    val lastMessageAt: String? = null,
+    val updatedAt: String? = null,
+    val blocked: Boolean = false,
+    val blockedByMe: Boolean = false,
+    val afterCursor: String? = null,
+    val beforeCursor: String? = null,
 )

@@ -384,6 +384,59 @@ class TideViewModel(
         )
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // SEAFARER MESSAGES (BfS-Nachrichten)
+    // ══════════════════════════════════════════════════════════════
+
+    val unreadMessages = repository.unreadMessages
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allActiveMessages = repository.allActiveMessages
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val archivedMessages = repository.archivedMessages
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val unreadMessageCount = repository.unreadMessageCount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    private val _seafarerSearchQuery = MutableStateFlow("")
+    val seafarerSearchQuery: StateFlow<String> = _seafarerSearchQuery
+
+    private val _seafarerSearchResults = MutableStateFlow<List<com.example.trnberechnung.database.SeafarerMessageEntity>>(emptyList())
+    val seafarerSearchResults: StateFlow<List<com.example.trnberechnung.database.SeafarerMessageEntity>> = _seafarerSearchResults
+
+    fun syncSeafarerMessages() {
+        viewModelScope.launch {
+            repository.syncSeafarerMessages()
+        }
+    }
+
+    fun markMessageAsRead(messageId: String) {
+        viewModelScope.launch { repository.markMessageAsRead(messageId) }
+    }
+
+    fun markAllMessagesAsRead() {
+        viewModelScope.launch { repository.markAllMessagesAsRead() }
+    }
+
+    fun archiveMessage(messageId: String) {
+        viewModelScope.launch { repository.archiveMessage(messageId) }
+    }
+
+    fun searchSeafarerMessages(query: String) {
+        _seafarerSearchQuery.value = query
+        if (query.isBlank()) {
+            _seafarerSearchResults.value = emptyList()
+            return
+        }
+        viewModelScope.launch {
+            repository.searchMessages(query).collect { results ->
+                _seafarerSearchResults.value = results
+            }
+        }
+    }
+
     companion object {
         /** Lokale Hafen-Liste – nur echte Wattenmeer-Häfen innerhalb des Routing-Grids */
         val LOCAL_HARBOURS = listOf(

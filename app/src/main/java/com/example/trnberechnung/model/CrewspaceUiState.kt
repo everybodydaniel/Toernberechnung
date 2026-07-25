@@ -35,6 +35,9 @@ data class CrewspaceUiState(
     val showNewConversationSheet: Boolean = false,
     val newConversationTab: NewConversationTab = NewConversationTab.DIRECT,
     val newConversationSkipperId: String = "",
+    val chatConnectionState: String = "DISCONNECTED",
+    val chatError: String? = null,
+    val chatBusy: Boolean = false,
 
     // ── Planung ──
     val selectedDate: LocalDate = LocalDate.now(),
@@ -59,9 +62,9 @@ data class CrewspaceUiState(
     val aiIsLoading: Boolean = false,
 
     // ── Profil / Einstellungen ──
-    val ownSkipperId: String = "ApJsWzmN0PXHF7pVJsx9saqzD1x2",
-    val ownDisplayName: String = "Daniel",
-    val ownEmail: String = "gamil.vom.com4@gmail.com"
+    val ownSkipperId: String = "",
+    val ownDisplayName: String = "",
+    val ownEmail: String = ""
 )
 
 /**

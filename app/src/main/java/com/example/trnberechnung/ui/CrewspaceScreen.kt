@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
+import com.example.trnberechnung.messaging.ChatNavigationState
 import com.example.trnberechnung.model.*
 import com.example.trnberechnung.viewmodel.CrewspaceViewModel
 import java.time.DayOfWeek
@@ -84,6 +85,16 @@ fun CrewspaceScreen(
     onNavigateToLogin: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val activeConversationId = uiState.activeChatThread?.id
+
+    DisposableEffect(activeConversationId) {
+        ChatNavigationState.setActiveConversation(activeConversationId)
+        onDispose {
+            if (ChatNavigationState.activeConversationId.value == activeConversationId) {
+                ChatNavigationState.setActiveConversation(null)
+            }
+        }
+    }
 
     // Wenn ein aktiver Chat offen ist, zeige den Chat-Detail-Screen
     if (uiState.activeChatThread != null) {
@@ -694,6 +705,15 @@ private fun NewConversationBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            uiState.chatError?.let { error ->
+                Text(
+                    text = error,
+                    color = Color(0xFFB42318),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+
             // ── Chat starten Button ──
             Button(
                 onClick = {
@@ -702,7 +722,7 @@ private fun NewConversationBottomSheet(
                     )
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.newConversationSkipperId.isNotBlank(),
+                enabled = uiState.newConversationSkipperId.isNotBlank() && !uiState.chatBusy,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CrewspaceAccent,
                     contentColor = Color.White,
@@ -713,7 +733,7 @@ private fun NewConversationBottomSheet(
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
                 Text(
-                    text = "→ Chat starten",
+                    text = if (uiState.chatBusy) "Wird geöffnet …" else "→ Chat starten",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -731,12 +751,21 @@ private fun ChatDetailScreen(viewModel: CrewspaceViewModel, thread: ChatThread) 
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val focusManager = LocalFocusManager.current
+    var previousMessageIds by remember(thread.id) { mutableStateOf<List<String>>(emptyList()) }
 
-    // Auto-scroll zum letzten Item
-    LaunchedEffect(thread.messages.size) {
-        if (thread.messages.isNotEmpty()) {
-            listState.animateScrollToItem(thread.messages.size - 1)
+    LaunchedEffect(thread.messages.map { it.id }) {
+        val currentIds = thread.messages.map { it.id }
+        val appendedAtBottom =
+            previousMessageIds.isEmpty() ||
+                (
+                    currentIds.size > previousMessageIds.size &&
+                        currentIds.take(previousMessageIds.size) == previousMessageIds
+                )
+        if (currentIds.isNotEmpty() && appendedAtBottom) {
+            // Index 0 is the "Ältere Nachrichten laden" row.
+            listState.animateScrollToItem(currentIds.size)
         }
+        previousMessageIds = currentIds
     }
 
     Column(
@@ -792,6 +821,62 @@ private fun ChatDetailScreen(viewModel: CrewspaceViewModel, thread: ChatThread) 
                     color = CrewspaceTextSecondary
                 )
             }
+
+            Spacer(modifier = Modifier.weight(1f))
+            if (
+                thread.type == ChatThreadType.DIRECT &&
+                (thread.isChatAvailable || thread.isBlockedByMe)
+            ) {
+                IconButton(
+                    onClick = {
+                        if (thread.isBlockedByMe) {
+                            viewModel.unblockActiveChat()
+                        } else {
+                            viewModel.blockActiveChat()
+                        }
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Block,
+                        contentDescription =
+                            if (thread.isBlockedByMe) {
+                                "Blockierung aufheben"
+                            } else {
+                                "Kontakt blockieren"
+                            },
+                        tint =
+                            if (thread.isBlockedByMe) {
+                                Color(0xFFFF3B30)
+                            } else {
+                                CrewspaceTextSecondary
+                            },
+                    )
+                }
+            }
+        }
+
+        uiState.chatError?.let { error ->
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFFFE8E6))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = error,
+                    color = Color(0xFFB42318),
+                    fontSize = 12.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = viewModel::clearChatError,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Fehler schließen")
+                }
+            }
         }
 
         // ── Nachrichten-Liste ──
@@ -804,9 +889,18 @@ private fun ChatDetailScreen(viewModel: CrewspaceViewModel, thread: ChatThread) 
             verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = PaddingValues(vertical = 8.dp)
         ) {
+            item(key = "load_older") {
+                TextButton(
+                    onClick = viewModel::loadOlderMessages,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Ältere Nachrichten laden")
+                }
+            }
             items(thread.messages, key = { it.id }) { message ->
                 ChatBubble(
                     message = message,
+                    onRetry = { viewModel.retryMessage(message.id) },
                     onAcceptEvent = { title, desc, dateStr ->
                         try {
                             val parsedDate = LocalDate.parse(dateStr)
@@ -820,20 +914,31 @@ private fun ChatDetailScreen(viewModel: CrewspaceViewModel, thread: ChatThread) 
         }
 
         // ── Chat-Input-Leiste ──
-        ChatInputBar(
-            text = uiState.chatInput,
-            onTextChange = { viewModel.updateChatInput(it) },
-            onSend = {
-                viewModel.sendMessage()
-                focusManager.clearFocus()
-            },
-            onAttachImage = { uri -> 
-                viewModel.sendAttachmentMessage(ChatMessageType.IMAGE, uri) 
-            },
-            onSendVoice = { duration -> 
-                viewModel.sendAttachmentMessage(ChatMessageType.VOICE, "Voice Message", duration) 
+        if (thread.isChatAvailable) {
+            ChatInputBar(
+                text = uiState.chatInput,
+                onTextChange = { viewModel.updateChatInput(it) },
+                onSend = {
+                    viewModel.sendMessage()
+                    focusManager.clearFocus()
+                },
+                onAttachImage = { uri ->
+                    viewModel.sendAttachmentMessage(ChatMessageType.IMAGE, uri)
+                },
+                onSendVoice = { uri, duration ->
+                    viewModel.sendAttachmentMessage(ChatMessageType.VOICE, uri, duration)
+                },
+            )
+        } else {
+            Surface(color = CrewspaceSurface) {
+                Text(
+                    text = "Chat nicht verfügbar",
+                    color = CrewspaceTextSecondary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                )
             }
-        )
+        }
     }
 }
 
@@ -842,6 +947,7 @@ private fun ChatDetailScreen(viewModel: CrewspaceViewModel, thread: ChatThread) 
 @Composable
 private fun ChatBubble(
     message: ChatMessage,
+    onRetry: () -> Unit = {},
     onAcceptEvent: (title: String, desc: String, dateStr: String) -> Unit = { _, _, _ -> }
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
@@ -897,7 +1003,8 @@ private fun ChatBubble(
                 VoiceMessageBubble(
                     durationSeconds = message.voiceDurationSeconds,
                     time = time,
-                    isOwnMessage = message.isOwnMessage
+                    isOwnMessage = message.isOwnMessage,
+                    mediaSource = message.localMediaUri ?: message.mediaUrl,
                 )
             }
             ChatMessageType.IMAGE -> {
@@ -917,7 +1024,12 @@ private fun ChatBubble(
                                 .background(Color.LightGray),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Outlined.Image, contentDescription = "Bild", tint = Color.Gray, modifier = Modifier.size(48.dp))
+                            coil.compose.AsyncImage(
+                                model = message.localMediaUri ?: message.mediaUrl,
+                                contentDescription = "Bild",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            )
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
@@ -987,6 +1099,51 @@ private fun ChatBubble(
                     }
                 }
             }
+            ChatMessageType.UNKNOWN -> {
+                Box(
+                    modifier =
+                        Modifier
+                            .widthIn(max = 280.dp)
+                            .clip(bubbleShape)
+                            .background(bubbleColor)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text = "Nicht unterstützte Nachricht",
+                        fontSize = 14.sp,
+                        color = textColor,
+                    )
+                }
+            }
+        }
+
+        if (message.isOwnMessage && message.deliveryState != ChatDeliveryState.SENT) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text =
+                        when (message.deliveryState) {
+                            ChatDeliveryState.PENDING -> "Wird gesendet …"
+                            ChatDeliveryState.UPLOADING -> "Wird hochgeladen …"
+                            ChatDeliveryState.FAILED -> "Senden fehlgeschlagen"
+                            ChatDeliveryState.SENT -> ""
+                        },
+                    color =
+                        if (message.deliveryState == ChatDeliveryState.FAILED) {
+                            Color(0xFFB42318)
+                        } else {
+                            CrewspaceTextSecondary
+                        },
+                    fontSize = 11.sp,
+                )
+                if (message.deliveryState == ChatDeliveryState.FAILED) {
+                    TextButton(onClick = onRetry, contentPadding = PaddingValues(0.dp)) {
+                        Text("Erneut", fontSize = 11.sp)
+                    }
+                }
+            }
         }
     }
 }
@@ -997,8 +1154,70 @@ private fun ChatBubble(
 private fun VoiceMessageBubble(
     durationSeconds: Int,
     time: String,
-    isOwnMessage: Boolean
+    isOwnMessage: Boolean,
+    mediaSource: String?,
 ) {
+    val context = LocalContext.current
+    var player by remember(mediaSource) { mutableStateOf<android.media.MediaPlayer?>(null) }
+    var isPlaying by remember(mediaSource) { mutableStateOf(false) }
+    var isPreparing by remember(mediaSource) { mutableStateOf(false) }
+    DisposableEffect(mediaSource) {
+        onDispose {
+            player?.release()
+            player = null
+        }
+    }
+
+    fun togglePlayback() {
+        val source = mediaSource ?: return
+        val activePlayer = player
+        if (isPreparing) return
+        if (activePlayer != null && isPlaying) {
+            runCatching { activePlayer.pause() }
+                .onSuccess { isPlaying = false }
+            return
+        }
+        if (activePlayer != null) {
+            runCatching { activePlayer.start() }
+                .onSuccess { isPlaying = true }
+            return
+        }
+        runCatching {
+            android.media.MediaPlayer().also { newPlayer ->
+                player = newPlayer
+                isPreparing = true
+                val uri = android.net.Uri.parse(source)
+                if (uri.scheme == "http" || uri.scheme == "https") {
+                    newPlayer.setDataSource(source)
+                } else {
+                    newPlayer.setDataSource(context, uri)
+                }
+                newPlayer.setOnPreparedListener {
+                    isPreparing = false
+                    it.start()
+                    isPlaying = true
+                }
+                newPlayer.setOnCompletionListener {
+                    isPlaying = false
+                    it.seekTo(0)
+                }
+                newPlayer.setOnErrorListener { failedPlayer, _, _ ->
+                    isPreparing = false
+                    isPlaying = false
+                    failedPlayer.release()
+                    player = null
+                    true
+                }
+                newPlayer.prepareAsync()
+            }
+        }.onFailure {
+            Toast.makeText(context, "Audio konnte nicht abgespielt werden.", Toast.LENGTH_SHORT).show()
+            player?.release()
+            player = null
+            isPreparing = false
+        }
+    }
+
     val bgColor = if (isOwnMessage) CrewspaceAccent else CrewspaceSurface
     val contentColor = if (isOwnMessage) Color.White else CrewspaceTextPrimary
     val timeColor = if (isOwnMessage) Color.White.copy(alpha = 0.7f) else CrewspaceTextSecondary
@@ -1029,11 +1248,12 @@ private fun VoiceMessageBubble(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(contentColor.copy(alpha = 0.15f)),
+                        .background(contentColor.copy(alpha = 0.15f))
+                        .clickable(enabled = mediaSource != null, onClick = ::togglePlayback),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Default.PlayArrow,
+                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = "Abspielen",
                         tint = contentColor,
                         modifier = Modifier.size(18.dp)
@@ -1085,9 +1305,109 @@ private fun ChatInputBar(
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onAttachImage: (String) -> Unit,
-    onSendVoice: (Int) -> Unit
+    onSendVoice: (String, Int) -> Unit,
 ) {
     val context = LocalContext.current
+    var recorder by remember { mutableStateOf<android.media.MediaRecorder?>(null) }
+    var recordingFile by remember { mutableStateOf<java.io.File?>(null) }
+    var recordingStartedAt by remember { mutableLongStateOf(0L) }
+    var isRecording by remember { mutableStateOf(false) }
+
+    @Suppress("DEPRECATION")
+    fun startRecording() {
+        if (isRecording) return
+        val directory = java.io.File(context.cacheDir, "chat_recordings").apply { mkdirs() }
+        val file = java.io.File(directory, "voice-${java.util.UUID.randomUUID()}.m4a")
+        runCatching {
+            val newRecorder =
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    android.media.MediaRecorder(context)
+                } else {
+                    android.media.MediaRecorder()
+                }
+            newRecorder.setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+            newRecorder.setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+            newRecorder.setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+            newRecorder.setAudioEncodingBitRate(96_000)
+            newRecorder.setAudioSamplingRate(44_100)
+            newRecorder.setMaxDuration(900_000)
+            newRecorder.setOutputFile(file.absolutePath)
+            recorder = newRecorder
+            recordingFile = file
+            recordingStartedAt = android.os.SystemClock.elapsedRealtime()
+            isRecording = true
+            newRecorder.setOnInfoListener { completedRecorder, what, _ ->
+                if (what == android.media.MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
+                    val stopped = runCatching { completedRecorder.stop() }.isSuccess
+                    completedRecorder.release()
+                    recorder = null
+                    recordingFile = null
+                    isRecording = false
+                    if (stopped && file.isFile) {
+                        onSendVoice(android.net.Uri.fromFile(file).toString(), 900)
+                    } else {
+                        file.delete()
+                    }
+                }
+            }
+            newRecorder.prepare()
+            newRecorder.start()
+        }.onFailure {
+            recorder?.release()
+            recorder = null
+            recordingFile = null
+            recordingStartedAt = 0L
+            isRecording = false
+            file.delete()
+            Toast.makeText(context, "Audioaufnahme konnte nicht gestartet werden.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun stopRecording(send: Boolean) {
+        val activeRecorder = recorder ?: return
+        val file = recordingFile
+        val duration =
+            ((android.os.SystemClock.elapsedRealtime() - recordingStartedAt + 999L) / 1_000L)
+                .toInt()
+                .coerceAtLeast(1)
+        val stopped = runCatching { activeRecorder.stop() }.isSuccess
+        activeRecorder.release()
+        recorder = null
+        recordingFile = null
+        isRecording = false
+        if (send && stopped && file?.isFile == true) {
+            onSendVoice(android.net.Uri.fromFile(file).toString(), duration)
+        } else {
+            file?.delete()
+        }
+    }
+
+    val audioPermissionLauncher =
+        androidx.activity.compose.rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            if (granted) {
+                startRecording()
+            } else {
+                Toast.makeText(
+                    context,
+                    "Für Sprachnachrichten wird Mikrofonzugriff benötigt.",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            recorder?.let { active ->
+                runCatching { active.stop() }
+                active.release()
+            }
+            recorder = null
+            recordingFile?.delete()
+        }
+    }
+
     val imagePicker = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
     ) { uri ->
@@ -1162,18 +1482,29 @@ private fun ChatInputBar(
         // Mikrofon / Senden Button
         if (text.isBlank()) {
             IconButton(
-                onClick = { 
-                    Toast.makeText(context, "Sprachnachricht aufgenommen!", Toast.LENGTH_SHORT).show()
-                    onSendVoice((5..30).random())
+                onClick = {
+                    if (isRecording) {
+                        stopRecording(send = true)
+                    } else if (
+                        androidx.core.content.ContextCompat.checkSelfPermission(
+                            context,
+                            android.Manifest.permission.RECORD_AUDIO,
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        startRecording()
+                    } else {
+                        audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    }
                 },
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(CrewspaceAccent)
+                    .background(if (isRecording) Color(0xFFFF3B30) else CrewspaceAccent)
             ) {
                 Icon(
-                    Icons.Outlined.Mic,
-                    contentDescription = "Sprachaufnahme",
+                    if (isRecording) Icons.Default.Stop else Icons.Outlined.Mic,
+                    contentDescription =
+                        if (isRecording) "Aufnahme stoppen und senden" else "Sprachaufnahme starten",
                     tint = Color.White,
                     modifier = Modifier.size(22.dp)
                 )

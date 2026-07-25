@@ -14,19 +14,18 @@ import com.example.trnberechnung.model.toModel
 import com.example.trnberechnung.network.RetrofitInstance
 import com.example.trnberechnung.dto.WeatherDto
 import kotlinx.coroutines.flow.Flow
-import com.example.trnberechnung.database.ChatDao
-import com.example.trnberechnung.database.ChatThreadEntity
-import com.example.trnberechnung.database.ChatMessageEntity
 import com.example.trnberechnung.database.PlannerEventDao
 import com.example.trnberechnung.database.PlannerEventEntity
+import com.example.trnberechnung.database.SeafarerMessageDao
+import com.example.trnberechnung.database.SeafarerMessageEntity
 
 class TideRepository(
     private val tideDao: TideDao,
     private val logbookDao: LogbookDao,
     private val crewMemberDao: CrewMemberDao,
     private val checklistDao: ChecklistDao,
-    private val chatDao: ChatDao,
-    private val plannerEventDao: PlannerEventDao
+    private val plannerEventDao: PlannerEventDao,
+    private val seafarerMessageDao: SeafarerMessageDao? = null
 ) {
 
     suspend fun getDataFromApi(): List<TideStationData> {
@@ -124,22 +123,8 @@ class TideRepository(
     }
 
     // ══════════════════════════════════════════════════════════════
-    // CHATS & PLANNER (Local DB + Remote Sync)
+    // PLANNER (Chat lives in the dedicated ChatRepository)
     // ══════════════════════════════════════════════════════════════
-
-    fun getChatThreadsForUser(userId: String): Flow<List<ChatThreadEntity>> =
-        chatDao.getThreadsForUser(userId)
-
-    suspend fun insertChatThread(thread: ChatThreadEntity) {
-        chatDao.insertThread(thread)
-    }
-
-    fun getMessagesForThread(threadId: String): Flow<List<ChatMessageEntity>> =
-        chatDao.getMessagesForThread(threadId)
-
-    suspend fun insertChatMessage(message: ChatMessageEntity) {
-        chatDao.insertMessage(message)
-    }
 
     val allPlannerEvents: Flow<List<PlannerEventEntity>> =
         plannerEventDao.getAllEvents()
@@ -154,110 +139,13 @@ class TideRepository(
 
     // ── Server Sync Methods ──
 
-    suspend fun syncRemoteConversations(idToken: String, ownUserId: String) {
-        if (idToken.isBlank()) return
-        try {
-            val response = com.example.trnberechnung.network.RetrofitInstance.socialFeedApi.getConversations("Bearer $idToken")
-            if (response.isSuccessful) {
-                response.body()?.forEach { conv ->
-                    val otherIndex = conv.memberIds?.indexOfFirst { it != ownUserId } ?: -1
-                    val otherId = if (otherIndex >= 0) conv.memberIds!![otherIndex] else (conv.memberIds?.firstOrNull() ?: "")
-                    val otherName = if (otherIndex >= 0) (conv.memberNames?.getOrNull(otherIndex) ?: conv.title) else conv.title
-
-                    val entity = ChatThreadEntity(
-                        id = conv.id,
-                        type = if (conv.kind == "group") com.example.trnberechnung.model.ChatThreadType.GROUP else com.example.trnberechnung.model.ChatThreadType.DIRECT,
-                        participant1Id = ownUserId,
-                        participant1Name = "",
-                        participant2Id = otherId,
-                        participant2Name = otherName,
-                        lastMessage = conv.lastMessage ?: "",
-                        lastMessageTimestamp = System.currentTimeMillis(),
-                        unreadCount = conv.unreadCount
-                    )
-                    chatDao.insertThread(entity)
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("SYNC", "Error syncing conversations: ${e.message}")
-        }
-    }
-
-    suspend fun syncRemoteMessages(idToken: String, threadId: String) {
-        if (idToken.isBlank() || threadId.isBlank()) return
-        try {
-            val response = com.example.trnberechnung.network.RetrofitInstance.socialFeedApi.getMessages("Bearer $idToken", threadId)
-            if (response.isSuccessful) {
-                response.body()?.forEach { msg ->
-                    val type = when (msg.mediaType) {
-                        "image" -> com.example.trnberechnung.model.ChatMessageType.IMAGE
-                        "audio" -> com.example.trnberechnung.model.ChatMessageType.VOICE
-                        else -> {
-                            if (msg.text.startsWith("Termin:")) com.example.trnberechnung.model.ChatMessageType.EVENT
-                            else com.example.trnberechnung.model.ChatMessageType.TEXT
-                        }
-                    }
-                    val entity = ChatMessageEntity(
-                        id = msg.id,
-                        threadId = msg.conversationId,
-                        senderId = msg.senderId,
-                        senderName = msg.senderName,
-                        content = msg.text,
-                        type = type,
-                        voiceDurationSeconds = msg.mediaDurationSeconds?.toInt() ?: 0,
-                        timestamp = System.currentTimeMillis()
-                    )
-                    chatDao.insertMessage(entity)
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("SYNC", "Error syncing messages: ${e.message}")
-        }
-    }
-
-    suspend fun sendRemoteMessage(idToken: String, threadId: String, text: String, senderId: String, senderName: String): Boolean {
-        if (idToken.isNotBlank()) {
-            try {
-                val req = com.example.trnberechnung.network.ApiCreateMessageRequest(text = text)
-                val response = com.example.trnberechnung.network.RetrofitInstance.socialFeedApi.sendMessage("Bearer $idToken", threadId, req)
-                if (response.isSuccessful && response.body() != null) {
-                    val msg = response.body()!!
-                    val entity = ChatMessageEntity(
-                        id = msg.id,
-                        threadId = msg.conversationId,
-                        senderId = msg.senderId,
-                        senderName = msg.senderName,
-                        content = msg.text,
-                        type = com.example.trnberechnung.model.ChatMessageType.TEXT,
-                        voiceDurationSeconds = 0,
-                        timestamp = System.currentTimeMillis()
-                    )
-                    chatDao.insertMessage(entity)
-                    return true
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("SYNC", "Error sending message to remote: ${e.message}")
-            }
-        }
-        // Fallback local insert
-        val localMsg = ChatMessageEntity(
-            id = java.util.UUID.randomUUID().toString(),
-            threadId = threadId,
-            senderId = senderId,
-            senderName = senderName,
-            content = text,
-            type = com.example.trnberechnung.model.ChatMessageType.TEXT,
-            voiceDurationSeconds = 0,
-            timestamp = System.currentTimeMillis()
-        )
-        chatDao.insertMessage(localMsg)
-        return false
-    }
-
     suspend fun syncRemoteEvents(idToken: String) {
         if (idToken.isBlank()) return
         try {
-            val response = com.example.trnberechnung.network.RetrofitInstance.socialFeedApi.getEvents("Bearer $idToken")
+            val response =
+                com.example.trnberechnung.network.RetrofitInstance.crewspaceApi.events(
+                    "Bearer $idToken",
+                )
             if (response.isSuccessful) {
                 response.body()?.forEach { ev ->
                     val localDate = try {
@@ -279,34 +167,100 @@ class TideRepository(
         }
     }
 
-    suspend fun createRemoteDirectChat(idToken: String, targetSkipperId: String, ownUserId: String): ChatThreadEntity? {
-        if (idToken.isBlank() || targetSkipperId.isBlank()) return null
-        try {
-            val req = com.example.trnberechnung.network.ApiCreateDirectChatRequest(skipperId = targetSkipperId)
-            val response = com.example.trnberechnung.network.RetrofitInstance.socialFeedApi.createDirectChat("Bearer $idToken", req)
-            if (response.isSuccessful && response.body() != null) {
-                val conv = response.body()!!
-                val otherIndex = conv.memberIds?.indexOfFirst { it != ownUserId } ?: -1
-                val otherId = if (otherIndex >= 0) conv.memberIds!![otherIndex] else targetSkipperId
-                val otherName = if (otherIndex >= 0) (conv.memberNames?.getOrNull(otherIndex) ?: conv.title) else conv.title
+    // ══════════════════════════════════════════════════════════════
+    // SEAFARER MESSAGES (BfS-Nachrichten)
+    // ══════════════════════════════════════════════════════════════
 
-                val entity = ChatThreadEntity(
-                    id = conv.id,
-                    type = com.example.trnberechnung.model.ChatThreadType.DIRECT,
-                    participant1Id = ownUserId,
-                    participant1Name = "",
-                    participant2Id = otherId,
-                    participant2Name = otherName.ifBlank { targetSkipperId },
-                    lastMessage = conv.lastMessage ?: "",
-                    lastMessageTimestamp = System.currentTimeMillis(),
-                    unreadCount = conv.unreadCount
-                )
-                chatDao.insertThread(entity)
-                return entity
+    val allActiveMessages: Flow<List<SeafarerMessageEntity>>
+        get() = seafarerMessageDao?.getAllActive() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    val unreadMessages: Flow<List<SeafarerMessageEntity>>
+        get() = seafarerMessageDao?.getUnread() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    val readMessages: Flow<List<SeafarerMessageEntity>>
+        get() = seafarerMessageDao?.getRead() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    val archivedMessages: Flow<List<SeafarerMessageEntity>>
+        get() = seafarerMessageDao?.getArchived() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    val unreadMessageCount: Flow<Int>
+        get() = seafarerMessageDao?.getUnreadCount() ?: kotlinx.coroutines.flow.flowOf(0)
+
+    fun searchMessages(query: String): Flow<List<SeafarerMessageEntity>> =
+        seafarerMessageDao?.search(query) ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    suspend fun markMessageAsRead(messageId: String) {
+        seafarerMessageDao?.markAsRead(messageId)
+    }
+
+    suspend fun markAllMessagesAsRead() {
+        seafarerMessageDao?.markAllAsRead()
+    }
+
+    suspend fun archiveMessage(messageId: String) {
+        seafarerMessageDao?.archive(messageId)
+    }
+
+    /**
+     * Fetch nautical warnings from BSH ELWIS API and store in local database.
+     */
+    suspend fun syncSeafarerMessages() {
+        try {
+            val response = RetrofitInstance.elwisApi.getNauticalWarnings(limit = 100)
+            if (response.isSuccessful) {
+                val features = response.body()?.features ?: emptyList()
+                val entities = features.mapNotNull { feature ->
+                    val props = feature.properties ?: return@mapNotNull null
+                    val id = feature.id ?: props.warningNumber ?: return@mapNotNull null
+
+                    // Parse coordinates if available
+                    var lat: Double? = null
+                    var lon: Double? = null
+                    feature.geometry?.coordinates?.let { coords ->
+                        if (coords.size >= 2) {
+                            try {
+                                lon = (coords[0] as? Number)?.toDouble()
+                                lat = (coords[1] as? Number)?.toDouble()
+                            } catch (_: Exception) { }
+                        }
+                    }
+
+                    // Parse dates
+                    val publishedAt = try {
+                        props.dateFrom?.let {
+                            java.time.OffsetDateTime.parse(it).toInstant().toEpochMilli()
+                        } ?: System.currentTimeMillis()
+                    } catch (_: Exception) { System.currentTimeMillis() }
+
+                    val expiresAt = try {
+                        props.dateTo?.let {
+                            java.time.OffsetDateTime.parse(it).toInstant().toEpochMilli()
+                        }
+                    } catch (_: Exception) { null }
+
+                    SeafarerMessageEntity(
+                        id = id,
+                        title = props.subject ?: props.warningType ?: "Nautische Warnung",
+                        area = props.areaDescription ?: "Nordsee",
+                        category = props.warningType ?: "NfS",
+                        content = props.text ?: "",
+                        publishedAt = publishedAt,
+                        expiresAt = expiresAt,
+                        source = props.authority ?: "BSH",
+                        bfsNumber = props.warningNumber ?: "",
+                        latitude = lat,
+                        longitude = lon
+                    )
+                }
+                if (entities.isNotEmpty()) {
+                    seafarerMessageDao?.insertAll(entities)
+                }
+                android.util.Log.d("ELWIS", "Synced ${entities.size} nautical warnings")
+            } else {
+                android.util.Log.e("ELWIS", "API error: ${response.code()}")
             }
         } catch (e: Exception) {
-            android.util.Log.e("SYNC", "Error creating direct chat: ${e.message}")
+            android.util.Log.e("ELWIS", "Sync error: ${e.message}", e)
         }
-        return null
     }
 }

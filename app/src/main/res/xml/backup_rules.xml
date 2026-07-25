@@ -6,8 +6,6 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Firebase Installation IDs are device-bound and must never be restored. -->
+    <exclude domain="sharedpref" path="crewspace_push.xml"/>
 </full-backup-content>

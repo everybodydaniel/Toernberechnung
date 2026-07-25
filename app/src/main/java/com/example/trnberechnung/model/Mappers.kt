@@ -16,12 +16,15 @@ fun ChatThreadEntity.toModel(ownSkipperId: String, messages: List<ChatMessage> =
         lastMessage = lastMessage,
         lastMessageTimestamp = lastMessageTimestamp,
         unreadCount = unreadCount,
-        messages = messages
+        messages = messages,
+        isChatAvailable = !blocked,
+        isBlockedByMe = blockedByMe
     )
 }
 
 fun ChatThread.toEntity(ownSkipperId: String, ownName: String): ChatThreadEntity {
     return ChatThreadEntity(
+        ownerId = ownSkipperId,
         id = id,
         type = type,
         participant1Id = ownSkipperId,
@@ -30,13 +33,17 @@ fun ChatThread.toEntity(ownSkipperId: String, ownName: String): ChatThreadEntity
         participant2Name = participantName,
         lastMessage = lastMessage,
         lastMessageTimestamp = lastMessageTimestamp,
-        unreadCount = unreadCount
+        unreadCount = unreadCount,
+        blocked = !isChatAvailable,
+        blockedByMe = isBlockedByMe
     )
 }
 
 fun ChatMessageEntity.toModel(ownSkipperId: String): ChatMessage {
     return ChatMessage(
         id = id,
+        serverId = serverId,
+        clientMessageId = clientMessageId,
         threadId = threadId,
         senderId = senderId,
         senderName = senderName,
@@ -44,20 +51,35 @@ fun ChatMessageEntity.toModel(ownSkipperId: String): ChatMessage {
         type = type,
         voiceDurationSeconds = voiceDurationSeconds,
         timestamp = timestamp,
-        isOwnMessage = (senderId == ownSkipperId)
+        isOwnMessage = (senderId == ownSkipperId),
+        mediaUrl = mediaUrl,
+        localMediaUri = localMediaUri,
+        mediaMimeType = mediaMimeType,
+        deliveryState =
+            runCatching { ChatDeliveryState.valueOf(deliveryState) }
+                .getOrDefault(ChatDeliveryState.SENT),
+        failureReason = failureReason
     )
 }
 
-fun ChatMessage.toEntity(): ChatMessageEntity {
+fun ChatMessage.toEntity(ownerId: String): ChatMessageEntity {
     return ChatMessageEntity(
+        ownerId = ownerId,
         id = id,
+        serverId = serverId,
+        clientMessageId = clientMessageId,
         threadId = threadId,
         senderId = senderId,
         senderName = senderName,
         content = content,
         type = type,
         voiceDurationSeconds = voiceDurationSeconds,
-        timestamp = timestamp
+        timestamp = timestamp,
+        mediaUrl = mediaUrl,
+        localMediaUri = localMediaUri,
+        mediaMimeType = mediaMimeType,
+        deliveryState = deliveryState.name,
+        failureReason = failureReason
     )
 }
 

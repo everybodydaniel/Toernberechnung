@@ -2,125 +2,122 @@ package com.example.trnberechnung.model
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
+import kotlinx.coroutines.tasks.await
 
+/**
+ * Owns the Firebase session. ID tokens deliberately never touch disk; Firebase
+ * refreshes and persists the authenticated session through its official SDK.
+ */
 class AuthRepository(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs: SharedPreferences =
+        appContext.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
 
-    var isLoggedIn: Boolean
-        get() = prefs.getBoolean("is_logged_in", false)
-        set(value) = prefs.edit().putBoolean("is_logged_in", value).apply()
+    val isFirebaseConfigured: Boolean
+        get() = FirebaseApp.getApps(appContext).isNotEmpty()
+
+    val configurationError: String?
+        get() =
+            if (isFirebaseConfigured) {
+                null
+            } else {
+                "Firebase ist nicht konfiguriert. Bitte app/google-services.json für " +
+                    "com.example.trnberechnung hinterlegen."
+            }
+
+    val isLoggedIn: Boolean
+        get() = authOrNull()?.currentUser != null
 
     var isSkipped: Boolean
         get() = prefs.getBoolean("is_skipped", false)
         set(value) = prefs.edit().putBoolean("is_skipped", value).apply()
 
-    var userName: String
-        get() = prefs.getString("user_name", "") ?: ""
-        set(value) = prefs.edit().putString("user_name", value).apply()
+    val skipperId: String
+        get() = authOrNull()?.currentUser?.uid.orEmpty()
 
-    var userEmail: String
-        get() = prefs.getString("user_email", "") ?: ""
-        set(value) = prefs.edit().putString("user_email", value).apply()
+    val userName: String
+        get() {
+            val user = authOrNull()?.currentUser ?: return ""
+            return user.displayName?.takeIf { it.isNotBlank() }
+                ?: prefs.getString(displayNameKey(user.uid), null)
+                ?: user.email?.substringBefore("@").orEmpty()
+        }
 
-    var skipperId: String
-        get() = prefs.getString("skipper_id", "") ?: ""
-        set(value) = prefs.edit().putString("skipper_id", value).apply()
-        
+    val userEmail: String
+        get() = authOrNull()?.currentUser?.email.orEmpty()
+
     var isDarkMode: Boolean
         get() = prefs.getBoolean("is_dark_mode", false)
         set(value) = prefs.edit().putBoolean("is_dark_mode", value).apply()
 
-    var idToken: String
-        get() = prefs.getString("id_token", "") ?: ""
-        set(value) = prefs.edit().putString("id_token", value).apply()
-
-    fun hasAccount(email: String): Boolean {
-        return prefs.contains("account_${email.lowercase()}")
-    }
-
-    suspend fun loginWithFirebase(name: String, email: String, pass: String = "DefaultPass123!"): Boolean {
-        return try {
-            val req = com.example.trnberechnung.network.FirebaseAuthRequest(email, pass)
-            var response = com.example.trnberechnung.network.RetrofitInstance.firebaseAuthApi.signInWithPassword(
-                com.example.trnberechnung.network.RetrofitInstance.FIREBASE_API_KEY, req
-            )
-            
-            // If sign in fails, try sign up
-            if (!response.isSuccessful || response.body()?.idToken == null) {
-                response = com.example.trnberechnung.network.RetrofitInstance.firebaseAuthApi.signUp(
-                    com.example.trnberechnung.network.RetrofitInstance.FIREBASE_API_KEY, req
-                )
-            }
-
-            if (response.isSuccessful && response.body()?.idToken != null) {
-                val body = response.body()!!
-                idToken = body.idToken!!
-                skipperId = body.localId ?: generateSkipperId()
-                userName = name.ifBlank { email.substringBefore("@") }
-                userEmail = email.lowercase()
-                isLoggedIn = true
-                isSkipped = false
-                prefs.edit().putString("account_${userEmail}", "$userName|$skipperId|$idToken").apply()
-
-                // Immediately trigger profile creation/registration on Go server
-                try {
-                    com.example.trnberechnung.network.RetrofitInstance.socialFeedApi.getConversations("Bearer $idToken")
-                } catch (e: Exception) {
-                    android.util.Log.e("AUTH", "Failed to register profile on server: ${e.message}")
-                }
-
-                true
-            } else {
-                // Fallback to local mock login if offline / network error
-                login(name, email)
-                true
-            }
-        } catch (e: Exception) {
-            // Fallback to local mock login if offline / network error
-            login(name, email)
-            true
+    suspend fun signIn(email: String, password: String): Result<Unit> =
+        runCatching {
+            requireConfiguredAuth()
+                .signInWithEmailAndPassword(email.trim(), password)
+                .await()
+            isSkipped = false
         }
-    }
 
-    fun login(name: String, email: String) {
-        val lowerEmail = email.lowercase()
-        val accountData = prefs.getString("account_$lowerEmail", null)
-        
-        if (accountData != null) {
-            val parts = accountData.split("|")
-            userName = parts.getOrNull(0) ?: name
-            skipperId = parts.getOrNull(1) ?: generateSkipperId()
-            idToken = parts.getOrNull(2) ?: ""
-            userEmail = lowerEmail
-        } else {
-            userName = name
-            userEmail = lowerEmail
-            skipperId = generateSkipperId()
-            prefs.edit().putString("account_$lowerEmail", "$userName|$skipperId|$idToken").apply()
+    suspend fun register(name: String, email: String, password: String): Result<Unit> =
+        runCatching {
+            val auth = requireConfiguredAuth()
+            val result =
+                auth.createUserWithEmailAndPassword(email.trim(), password)
+                    .await()
+            val user =
+                result.user
+                    ?: throw IllegalStateException("Firebase hat keinen Benutzer zurückgegeben.")
+            val cleanName = name.trim()
+            if (cleanName.isNotEmpty()) {
+                user.updateProfile(
+                    UserProfileChangeRequest.Builder()
+                        .setDisplayName(cleanName)
+                        .build(),
+                ).await()
+                prefs.edit().putString(displayNameKey(user.uid), cleanName).apply()
+            }
+            isSkipped = false
         }
-        
-        isLoggedIn = true
-        isSkipped = false
+
+    /**
+     * Returns a fresh, verified Firebase ID token for an authenticated request.
+     */
+    suspend fun getIdToken(forceRefresh: Boolean = false): String {
+        val user =
+            requireConfiguredAuth().currentUser
+                ?: throw AuthenticationRequiredException()
+        return user.getIdToken(forceRefresh).await().token
+            ?: throw AuthenticationRequiredException("Firebase lieferte kein ID-Token.")
     }
 
     fun skip() {
+        authOrNull()?.signOut()
         isSkipped = true
-        isLoggedIn = false
     }
 
     fun logout() {
-        isLoggedIn = false
+        authOrNull()?.signOut()
         isSkipped = false
-        userName = ""
-        userEmail = ""
-        skipperId = ""
-        idToken = ""
     }
 
-    private fun generateSkipperId(): String {
-        val allowedChars = ('A'..'Z') + ('a'..'z') + ('0'..'9')
-        return (1..16)
-            .map { allowedChars.random() }
-            .joinToString("")
+    private fun authOrNull(): FirebaseAuth? {
+        val firebaseApp = FirebaseApp.getApps(appContext).firstOrNull() ?: return null
+        return FirebaseAuth.getInstance(firebaseApp)
     }
+
+    private fun requireConfiguredAuth(): FirebaseAuth =
+        authOrNull() ?: throw FirebaseNotConfiguredException(configurationError.orEmpty())
+
+    private fun displayNameKey(uid: String) = "display_name_$uid"
 }
+
+class FirebaseNotConfiguredException(
+    message: String,
+) : IllegalStateException(message)
+
+class AuthenticationRequiredException(
+    message: String = "Bitte zuerst mit Firebase anmelden.",
+) : IllegalStateException(message)

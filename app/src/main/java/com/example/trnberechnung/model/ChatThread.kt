@@ -11,8 +11,7 @@ enum class ChatThreadType {
 }
 
 /**
- * Mock-Datenmodell für einen Chat-Thread (Konversation).
- * Repräsentiert entweder eine Direktnachricht oder eine Gruppenunterhaltung.
+ * UI-Modell einer über Room persistierten Direkt- oder Gruppenunterhaltung.
  */
 data class ChatThread(
     val id: String = UUID.randomUUID().toString(),
@@ -22,5 +21,7 @@ data class ChatThread(
     val lastMessage: String = "",      // Vorschau der letzten Nachricht
     val lastMessageTimestamp: Long = System.currentTimeMillis(),
     val unreadCount: Int = 0,
-    val messages: List<ChatMessage> = emptyList()
+    val messages: List<ChatMessage> = emptyList(),
+    val isChatAvailable: Boolean = true,
+    val isBlockedByMe: Boolean = false
 )

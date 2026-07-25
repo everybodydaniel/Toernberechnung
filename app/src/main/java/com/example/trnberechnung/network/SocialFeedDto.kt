@@ -3,30 +3,6 @@ package com.example.trnberechnung.network
 import com.google.gson.annotations.SerializedName
 
 // ══════════════════════════════════════════════════════════════
-// Firebase Auth DTOs
-// ══════════════════════════════════════════════════════════════
-
-data class FirebaseAuthRequest(
-    val email: String,
-    val password: String,
-    val returnSecureToken: Boolean = true
-)
-
-data class FirebaseAuthResponse(
-    val idToken: String?,
-    val email: String?,
-    val refreshToken: String?,
-    val expiresIn: String?,
-    val localId: String?,
-    val error: FirebaseErrorDetails? = null
-)
-
-data class FirebaseErrorDetails(
-    val code: Int?,
-    val message: String?
-)
-
-// ══════════════════════════════════════════════════════════════
 // Skipper Profile (schema: skipper_profiles)
 // ══════════════════════════════════════════════════════════════
 
@@ -116,8 +92,17 @@ data class ApiCrewspaceConversation(
     @SerializedName("last_message") val lastMessage: String?,
     @SerializedName("last_message_at") val lastMessageAt: String?,
     @SerializedName("unread_count") val unreadCount: Int = 0,
-    @SerializedName("updated_at") val updatedAt: String?
-)
+    @SerializedName("updated_at") val updatedAt: String?,
+    @SerializedName("chat_available") private val wireChatAvailable: Boolean? = null
+) {
+    /**
+     * Older compatible servers do not send this additive field. Gson does not
+     * reliably run Kotlin default constructors, so keep the wire value nullable
+     * and expose the intended backwards-compatible default explicitly.
+     */
+    val chatAvailable: Boolean
+        get() = wireChatAvailable ?: true
+}
 
 data class ApiCrewspaceGroupInfo(
     val id: String,
@@ -165,6 +150,7 @@ data class ApiUpdateMemberRequest(
 
 data class ApiCrewspaceMessage(
     val id: String,
+    @SerializedName("client_message_id") val clientMessageId: String? = null,
     @SerializedName("conversation_id") val conversationId: String,
     @SerializedName("sender_id") val senderId: String,
     @SerializedName("sender_name") val senderName: String,
@@ -178,10 +164,40 @@ data class ApiCrewspaceMessage(
 )
 
 data class ApiCreateMessageRequest(
+    @SerializedName("client_message_id") val clientMessageId: String,
     val text: String,
     @SerializedName("media_url") val mediaUrl: String? = null,
     @SerializedName("media_type") val mediaType: String? = null,
     @SerializedName("media_duration_seconds") val mediaDurationSeconds: Double? = null
+)
+
+data class ApiMessagePage(
+    val messages: List<ApiCrewspaceMessage> = emptyList(),
+    @SerializedName("next_before_cursor") val nextBeforeCursor: String? = null,
+    @SerializedName("next_after_cursor") val nextAfterCursor: String? = null,
+    @SerializedName("has_more") val hasMore: Boolean = false
+)
+
+data class ApiUpdateMeRequest(
+    val name: String
+)
+
+data class ApiDeviceRegistrationRequest(
+    @SerializedName("installation_id") val installationId: String,
+    val platform: String = "android"
+)
+
+data class ApiBlocksResponse(
+    @SerializedName("blocked_uids") val blockedUids: List<String> = emptyList()
+)
+
+data class ApiRealtimeEnvelope(
+    val version: Int,
+    val type: String,
+    @SerializedName("event_id") val eventId: String? = null,
+    @SerializedName("occurred_at") val occurredAt: String? = null,
+    val message: ApiCrewspaceMessage? = null,
+    val conversation: ApiCrewspaceConversation? = null
 )
 
 // ══════════════════════════════════════════════════════════════

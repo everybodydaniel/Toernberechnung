@@ -99,10 +99,10 @@ object IslandCoordinatesProvider {
         val response = client.newCall(request).execute()
 
         if (!response.isSuccessful) {
-            throw RuntimeException("WFS request failed: HTTP ${response.code()}")
+            throw RuntimeException("WFS request failed: HTTP ${response.code}")
         }
 
-        val body = response.body()?.string()
+        val body = response.body?.string()
             ?: throw RuntimeException("WFS response body is null")
 
         parseWfsGeoJson(body)

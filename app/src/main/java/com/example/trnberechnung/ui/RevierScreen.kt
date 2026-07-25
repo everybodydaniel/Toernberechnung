@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -48,7 +49,10 @@ import kotlin.math.sin
 
 
 @Composable
-fun RevierScreen(viewModel: TideViewModel) {
+fun RevierScreen(
+    viewModel: TideViewModel,
+    bottomOverlayClearance: Dp = 0.dp
+) {
     var selectedTab by remember { mutableStateOf(0) } // 0 = Wetter, 1 = Gezeiten
     val weather by viewModel.currentWeather.collectAsState()
     val forecast by viewModel.forecastData.collectAsState()
@@ -109,7 +113,7 @@ fun RevierScreen(viewModel: TideViewModel) {
                                 loading = tideLoading
                             )
                         }
-                        Spacer(modifier = Modifier.height(32.dp))
+                        Spacer(modifier = Modifier.height(maxOf(32.dp, bottomOverlayClearance)))
                     }
                 }
             }

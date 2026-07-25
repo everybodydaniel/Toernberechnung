@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,7 +42,11 @@ import androidx.compose.ui.geometry.Offset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RoutePlanningScreen(viewModel: TideViewModel, routeViewModel: RoutePlanningViewModel) {
+fun RoutePlanningScreen(
+    viewModel: TideViewModel,
+    routeViewModel: RoutePlanningViewModel,
+    bottomOverlayClearance: Dp = 0.dp
+) {
     val context = LocalContext.current
     val stations by viewModel.data.collectAsState()
     val allStations by viewModel.allStations.collectAsState()
@@ -766,7 +771,7 @@ fun RoutePlanningScreen(viewModel: TideViewModel, routeViewModel: RoutePlanningV
                 )
             }
         }
-        Spacer(modifier = Modifier.height(100.dp))
+        Spacer(modifier = Modifier.height(maxOf(100.dp, bottomOverlayClearance)))
     }
 
     if (showResultDialog) {
@@ -836,7 +841,9 @@ fun RoutePlanningScreen(viewModel: TideViewModel, routeViewModel: RoutePlanningV
 
     SnackbarHost(
         hostState = snackbarHostState,
-        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = maxOf(16.dp, bottomOverlayClearance))
     )
 }
 }

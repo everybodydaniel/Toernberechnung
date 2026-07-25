@@ -79,9 +79,8 @@ class FullAppUiTest {
         composeTestRule.onNodeWithTag("screen_header_logbook").assertExists()
 
         // 6. Navigation zu den Einstellungen (Bootsprofil) via TopBar
-        // Das Icon hat kein Tag, aber wir können nach Content Description suchen
-        composeTestRule.onNodeWithContentDescription("Settings").performClick()
-        composeTestRule.onNodeWithText("Einstellungen").performClick()
+        // Der stabile Test-Tag löst die direkte Navigation mit einem Klick aus.
+        composeTestRule.onNodeWithTag("topbar_settings").performClick()
 
         // Wir sollten jetzt im Dashboard sein
         composeTestRule.onNodeWithTag("boat_name_input").assertExists()

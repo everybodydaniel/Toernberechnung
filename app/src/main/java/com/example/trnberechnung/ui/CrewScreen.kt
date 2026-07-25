@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.trnberechnung.model.CrewMember
@@ -55,7 +56,10 @@ private val availableRanks = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CrewScreen(viewModel: TideViewModel) {
+fun CrewScreen(
+    viewModel: TideViewModel,
+    bottomOverlayClearance: Dp = 0.dp
+) {
     val crew by viewModel.allCrew.collectAsState()
     val context = LocalContext.current
 
@@ -228,7 +232,9 @@ fun CrewScreen(viewModel: TideViewModel) {
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp)
+                    contentPadding = PaddingValues(
+                        bottom = maxOf(16.dp, bottomOverlayClearance)
+                    )
                 ) {
                     items(crew, key = { it.id }) { member ->
                         CrewMemberCard(

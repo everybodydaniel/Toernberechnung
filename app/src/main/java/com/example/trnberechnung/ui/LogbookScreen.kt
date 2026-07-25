@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.trnberechnung.model.LogbookEntry
@@ -65,7 +66,10 @@ internal val CHECKLIST_NAV = listOf(
 internal const val CHECKLIST_SIZE = 15
 
 @Composable
-fun LogbookScreen(viewModel: TideViewModel) {
+fun LogbookScreen(
+    viewModel: TideViewModel,
+    bottomOverlayClearance: Dp = 0.dp
+) {
     val logs by viewModel.allLogs.collectAsState()
     val context = LocalContext.current
     var logToDelete by remember { mutableStateOf<LogbookEntry?>(null) }
@@ -142,7 +146,9 @@ fun LogbookScreen(viewModel: TideViewModel) {
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
+                contentPadding = PaddingValues(
+                    bottom = maxOf(16.dp, bottomOverlayClearance)
+                )
             ) {
                 items(logs, key = { it.id }) { log ->
                     LogbookOverviewCard(

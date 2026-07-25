@@ -41,6 +41,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
@@ -82,7 +83,8 @@ private val CrewspaceUnreadBadge = Color(0xFF2563EB)
 fun CrewspaceScreen(
     viewModel: CrewspaceViewModel,
     authRepo: AuthRepository? = null,
-    onNavigateToLogin: () -> Unit = {}
+    onNavigateToLogin: () -> Unit = {},
+    bottomOverlayClearance: Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val activeConversationId = uiState.activeChatThread?.id
@@ -98,7 +100,14 @@ fun CrewspaceScreen(
 
     // Wenn ein aktiver Chat offen ist, zeige den Chat-Detail-Screen
     if (uiState.activeChatThread != null) {
-        ChatDetailScreen(viewModel = viewModel, thread = uiState.activeChatThread!!)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(CrewspaceBg)
+                .padding(bottom = bottomOverlayClearance)
+        ) {
+            ChatDetailScreen(viewModel = viewModel, thread = uiState.activeChatThread!!)
+        }
         return
     }
 
@@ -106,6 +115,7 @@ fun CrewspaceScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(CrewspaceBg)
+            .padding(bottom = bottomOverlayClearance)
     ) {
         // ── Header ──
         CrewspaceHeader()

@@ -44,7 +44,7 @@ import com.example.trnberechnung.viewmodel.TideViewModel
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector?) {
     object MapRoute : Screen("map_route", "Karte", Icons.Default.LocationOn)
-    object Revier : Screen("revier", "Revier", null)
+    object Revier : Screen("revier", "Wetter", null)
     object Crew : Screen("crew", "Crewspace", Icons.Outlined.Chat)
     object Logbook : Screen("logbook", "Logbuch", Icons.Default.List)
     object Settings : Screen("settings", "Einstellungen", Icons.Default.Settings)
@@ -60,7 +60,7 @@ val bottomNavItems = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScreen(
-    viewModel: TideViewModel, 
+    viewModel: TideViewModel,
     crewspaceViewModelFactory: CrewspaceViewModelFactory? = null,
     authRepo: AuthRepository? = null,
     onNavigateToLogin: () -> Unit = {},

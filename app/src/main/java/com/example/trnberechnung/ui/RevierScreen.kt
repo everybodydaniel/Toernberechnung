@@ -1,5 +1,8 @@
 package com.example.trnberechnung.ui
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -74,31 +77,41 @@ fun RevierScreen(viewModel: TideViewModel) {
             // Tab Switcher
             RevierTabSwitcher(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                if (selectedTab == 0) {
-                    WeatherContent(
-                        stationName = selectedStation?.gaugeLabel ?: "Standort wählen",
-                        weather = weather,
-                        forecast = forecast,
-                        dailyForecast = dailyForecast,
-                        onStationClick = { showStationDialog = true },
-                        viewModel = viewModel
-                    )
-                } else {
-                    val tideLoading by viewModel.tideLoading.collectAsState()
-                    TideContent(
-                        station = selectedStation,
-                        events = tideEvents,
-                        loading = tideLoading
-                    )
+            Box(modifier = Modifier.fillMaxSize()) {
+                AnimatedContent(
+                    targetState = selectedTab,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                    },
+                    label = "TabTransition"
+                ) { targetTab ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (targetTab == 0) {
+                            WeatherContent(
+                                stationName = selectedStation?.gaugeLabel ?: "Standort wählen",
+                                weather = weather,
+                                forecast = forecast,
+                                dailyForecast = dailyForecast,
+                                onStationClick = { showStationDialog = true },
+                                viewModel = viewModel
+                            )
+                        } else {
+                            val tideLoading by viewModel.tideLoading.collectAsState()
+                            TideContent(
+                                station = selectedStation,
+                                events = tideEvents,
+                                loading = tideLoading
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(32.dp))
+                    }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -332,6 +345,8 @@ fun WeatherContent(
 
     // Wind Karte
     val allStations by viewModel.allStations.collectAsState()
+    var selectedWindHour by remember { mutableStateOf(0) }
+
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -339,44 +354,70 @@ fun WeatherContent(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("WINDKARTE OSTFRIESLAND", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
             }
-            Text(
-                "Windkarte",
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+
+            // Time Selector for Wind Map
+            Spacer(modifier = Modifier.height(12.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(12) { i ->
+                    val forecastItem = forecast.getOrNull(i)
+                    val time = if (i == 0) "Jetzt" else try {
+                        OffsetDateTime.parse(forecastItem?.timestamp).atZoneSameInstant(ZoneId.of("Europe/Berlin")).format(DateTimeFormatter.ofPattern("HH:mm"))
+                    } catch (e: Exception) { "--:--" }
+                    val day = try {
+                        OffsetDateTime.parse(forecastItem?.timestamp).atZoneSameInstant(ZoneId.of("Europe/Berlin")).format(DateTimeFormatter.ofPattern("EEE"))
+                    } catch (e: Exception) { "" }
+
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (selectedWindHour == i) Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                            .clickable { selectedWindHour = i }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(day, color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
+                        Text(time, color = Color.White, fontSize = 12.sp, fontWeight = if (selectedWindHour == i) FontWeight.Bold else FontWeight.Normal)
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(250.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color.White.copy(alpha = 0.05f)),
                 contentAlignment = Alignment.Center
             ) {
+                val displayWeather = if (selectedWindHour == 0) weather else forecast.getOrNull(selectedWindHour)
                 WindMapComponent(
                     modifier = Modifier.fillMaxSize(),
                     stations = allStations,
-                    currentWeather = weather
+                    currentWeather = displayWeather
                 )
 
                 // Overlay information
-                Column(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                    horizontalAlignment = Alignment.End
-                ) {
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(4.dp)
+                if (selectedWindHour == 0) {
+                    Column(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                        horizontalAlignment = Alignment.End
                     ) {
-                        Text(
-                            "LIVE",
-                            color = Color.Red,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                "LIVE",
+                                color = Color.Red,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -530,34 +571,108 @@ fun WindGustGraph(forecast: List<WeatherDto>) {
 
 @Composable
 fun RevierWeekForecastRow(day: DailyForecast, weekMin: Int, weekMax: Int) {
+    var expanded by remember { mutableStateOf(false) }
     val range = (weekMax - weekMin).coerceAtLeast(1).toFloat()
     val startFrac = ((day.lowTemp - weekMin) / range).coerceIn(0f, 1f)
     val endFrac = ((day.highTemp - weekMin) / range).coerceIn(0f, 1f)
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .padding(vertical = 4.dp)
     ) {
-        Text(day.dayLabel, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp, modifier = Modifier.width(40.dp))
-        Text(iconToEmoji(day.condition), fontSize = 20.sp, modifier = Modifier.width(32.dp))
-        if (day.maxPrecipProb > 0) {
-            Text("${day.maxPrecipProb}%", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, modifier = Modifier.width(36.dp))
-        } else {
-            Spacer(modifier = Modifier.width(36.dp))
-        }
-        Text("${day.lowTemp}°", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, modifier = Modifier.width(30.dp), textAlign = TextAlign.End)
-        Box(modifier = Modifier.weight(1f).padding(horizontal = 8.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.1f))) {
-            val cs: Array<Pair<Float, Color>> = arrayOf(
-                0f to Color.Transparent,
-                startFrac to Color.Transparent,
-                startFrac to Color(0xFF4FC3F7),
-                endFrac to Color(0xFFFFB74D),
-                endFrac to Color.Transparent,
-                1f to Color.Transparent
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(day.dayLabel, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp, modifier = Modifier.width(40.dp))
+            Text(iconToEmoji(day.condition), fontSize = 20.sp, modifier = Modifier.width(32.dp))
+            if (day.maxPrecipProb > 0) {
+                Text("${day.maxPrecipProb}%", color = Color(0xFF4FC3F7), fontSize = 10.sp, modifier = Modifier.width(36.dp), fontWeight = FontWeight.Bold)
+            } else {
+                Spacer(modifier = Modifier.width(36.dp))
+            }
+            Text("${day.lowTemp}°", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, modifier = Modifier.width(30.dp), textAlign = TextAlign.End)
+            Box(modifier = Modifier.weight(1f).padding(horizontal = 8.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.1f))) {
+                val cs: Array<Pair<Float, Color>> = arrayOf(
+                    0f to Color.Transparent,
+                    startFrac to Color.Transparent,
+                    startFrac to Color(0xFF4FC3F7),
+                    endFrac to Color(0xFFFFB74D),
+                    endFrac to Color.Transparent,
+                    1f to Color.Transparent
+                )
+                Box(modifier = Modifier.fillMaxSize().background(Brush.horizontalGradient(colorStops = cs)))
+            }
+            Text("${day.highTemp}°", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp, modifier = Modifier.width(30.dp), textAlign = TextAlign.End)
+
+            val rotation by animateFloatAsState(if (expanded) 90f else 0f)
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                null,
+                tint = Color.White.copy(alpha = 0.3f),
+                modifier = Modifier.size(16.dp).graphicsLayer(rotationZ = rotation)
             )
-            Box(modifier = Modifier.fillMaxSize().background(Brush.horizontalGradient(colorStops = cs)))
         }
-        Text("${day.highTemp}°", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp, modifier = Modifier.width(30.dp), textAlign = TextAlign.End)
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(16.dp))
+
+        AnimatedVisibility(visible = expanded) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 40.dp, end = 16.dp, bottom = 12.dp)
+                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    DetailInfoItem(Icons.Default.Air, "Wind / Böen", "${day.maxWind} / ${day.maxGust} kn")
+                    DetailInfoItem(Icons.Default.WaterDrop, "Regenmenge", "%.1f mm".format(day.totalPrecip))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    DetailInfoItem(
+                        Icons.Default.Visibility,
+                        "Sichtweite",
+                        if (day.minVisibility != null) "${day.minVisibility} km" else "--"
+                    )
+                    DetailInfoItem(
+                        Icons.Default.WbSunny,
+                        "Sonnenschein",
+                        if (day.totalSunshine != null) {
+                            if (day.totalSunshine >= 60) {
+                                "%.1f h".format(day.totalSunshine / 60.0)
+                            } else {
+                                "${day.totalSunshine.toInt()} min"
+                            }
+                        } else "--"
+                    )
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    DetailInfoItem(
+                        Icons.Default.DeviceThermostat,
+                        "Luftfeuchte",
+                        if (day.avgHumidity != null) "${day.avgHumidity}%" else "--"
+                    )
+                    DetailInfoItem(
+                        Icons.Default.Opacity,
+                        "Regenrisiko",
+                        "${day.maxPrecipProb}%"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailInfoItem(icon: ImageVector, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+        Spacer(modifier = Modifier.width(4.dp))
+        Column {
+            Text(label, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+            Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        }
     }
 }
 
@@ -576,10 +691,9 @@ fun TideContent(
     loading: Boolean = false
 ) {
     val now = LocalDateTime.now()
-    val windowStart = now.minusHours(18)
-    val windowEnd = now.plusHours(18)
 
-    val windowEvents = remember(events, now.hour) {
+    // Parse events with time
+    val eventsWithTime = remember(events) {
         events.mapNotNull { event ->
             try {
                 val cleanTs = event.timestamp
@@ -597,8 +711,105 @@ fun TideContent(
             } catch (_: Exception) {
                 null
             }
-        }.filter { (_, dt) ->
-            !dt.isBefore(windowStart) && !dt.isAfter(windowEnd)
+        }.sortedBy { it.second }
+    }
+
+    val nextEventPair = eventsWithTime.firstOrNull { it.second.isAfter(now) }
+    val lastEventPair = eventsWithTime.lastOrNull { it.second.isBefore(now) }
+
+    val isRising = nextEventPair?.first?.type == "HW"
+    val statusText = if (isRising) "Steigendes Wasser" else "Fallendes Wasser"
+    val nextEventLabel = if (nextEventPair?.first?.type == "HW") "Nächstes Hochwasser" else "Nächstes Niedrigwasser"
+
+    val diffMinutes = nextEventPair?.let { java.time.Duration.between(now, it.second).toMinutes() } ?: 0
+    val countdownText = if (diffMinutes > 0) {
+        val h = diffMinutes / 60
+        val m = diffMinutes % 60
+        if (h > 0) "in $h Std. $m Min." else "in $m Min."
+    } else ""
+
+    // Hero Tide Card (Screenshot 3 style)
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            station?.gaugeLabel ?: station?.area ?: "Unbekannt",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+                    }
+                    Text(
+                        "BSH ${station?.gaugeLabel?.take(4) ?: "PEGEL"}",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+
+                // Tide Arrow Icon
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        if (isRising) Icons.Default.ArrowOutward else Icons.Default.SouthEast,
+                        null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                Column {
+                    Text(statusText, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Text(nextEventLabel, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        nextEventPair?.second?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "--:--",
+                        color = Color.White,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(countdownText, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                }
+            }
+        }
+    }
+
+    val windowStart = now.minusHours(12)
+    val windowEnd = now.plusHours(12)
+    val windowEvents = eventsWithTime.filter { (_, dt) -> !dt.isBefore(windowStart) && !dt.isAfter(windowEnd) }
+
+    // Astronomische Gezeiten (Horizontal Cards)
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.History, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("ASTRONOMISCHE GEZEITEN", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val upcoming = eventsWithTime.filter { it.second.isAfter(now.minusHours(2)) }.take(4)
+                items(upcoming) { (ev, dt) ->
+                    TideEventTile(
+                        type = ev.type,
+                        time = dt.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        height = "%.2f m SKN".format(ev.value ?: 0.0),
+                        diff = if (ev.type == "HW") "Flut" else "Ebbe"
+                    )
+                }
+            }
         }
     }
 
@@ -606,25 +817,12 @@ fun TideContent(
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Info,
-                    null,
-                    tint = Color.White.copy(alpha = 0.6f),
-                    modifier = Modifier.size(14.dp)
-                )
+                Icon(Icons.Default.Straighten, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    "GEZEITENGRUNDWERTE",
-                    fontSize = 10.sp,
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Bold
-                )
+                Text("GEZEITENGRUNDWERTE", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TideBasisTile("MHW", station?.meanHighWater?.let { "%.2f m".format(it) } ?: "3.10 m")
                 TideBasisTile("MNW", station?.meanLowWater?.let { "%.2f m".format(it) } ?: "0.67 m")
                 TideBasisTile("MTH", "2.43 m")
@@ -632,110 +830,21 @@ fun TideContent(
         }
     }
 
-    // Wasserstandsvorhersage
+    // Wasserstandsvorhersage Graph
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Info,
-                    null,
-                    tint = Color.White.copy(alpha = 0.6f),
-                    modifier = Modifier.size(14.dp)
-                )
+                Icon(Icons.Default.SsidChart, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    "WASSERSTANDSVORHERSAGE",
-                    fontSize = 10.sp,
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Text(
-                station?.gaugeLabel ?: "Station wählen",
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            val updateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
-            Text(
-                "Ausgegeben heute, $updateTime Uhr",
-                color = Color.White.copy(alpha = 0.5f),
-                fontSize = 12.sp
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val displayEvents = events.filter {
-                    try {
-                        val cleanTs = it.timestamp
-                            .replace("T", " ")
-                            .replace(Regex("Z$"), "")
-                            .replace(Regex("\\+\\d{2}:\\d{2}$"), "")
-                            .replace(Regex("\\+\\d{2}$"), "")
-                            .trim()
-                        val dt = try {
-                            LocalDateTime.parse(
-                                cleanTs,
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                            )
-                        } catch (_: Exception) {
-                            LocalDateTime.parse(cleanTs, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                        }
-                        dt.isAfter(LocalDateTime.now())
-                    } catch (e: Exception) {
-                        false
-                    }
-                }.take(3)
-
-                if (displayEvents.isNotEmpty()) {
-                    displayEvents.forEach { ev ->
-                        val timeStr = try {
-                            val cleanTs = ev.timestamp
-                                .replace(Regex("\\+\\d{2}:\\d{2}$"), "")
-                                .replace(Regex("\\+\\d{2}$"), "")
-                                .trim()
-                            val dt = try {
-                                LocalDateTime.parse(
-                                    cleanTs,
-                                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                                )
-                            } catch (_: Exception) {
-                                LocalDateTime.parse(cleanTs, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            }
-                            dt.format(DateTimeFormatter.ofPattern("HH:mm"))
-                        } catch (_: Exception) {
-                            ev.timestamp.substringAfter(" ").take(5)
-                        }
-                        TideEventTile(
-                            Modifier.weight(1f),
-                            ev.type,
-                            timeStr,
-                            "%.2f m".format(ev.value ?: 0.0),
-                            "+/- 0,0"
-                        )
-                    }
-                } else {
-                    TideEventTile(Modifier.weight(1f), "HW", "--:--", "-.-- m", "+/- 0,0")
-                    TideEventTile(Modifier.weight(1f), "NW", "--:--", "-.-- m", "+/- 0,0")
-                    TideEventTile(Modifier.weight(1f), "HW", "--:--", "-.-- m", "+/- 0,0")
-                }
+                Text("WASSERSTANDSVORHERSAGE", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                "LOKALER WASSERSTANDSVERLAUF · SKN",
-                fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.6f),
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .padding(top = 12.dp, bottom = 8.dp, start = 8.dp, end = 8.dp)
+                    .padding(horizontal = 8.dp)
             ) {
                 if (windowEvents.size < 2) {
                     Text(
@@ -938,26 +1047,34 @@ fun TideBasisTile(label: String, value: String) {
 }
 
 @Composable
-fun TideEventTile(modifier: Modifier, type: String, time: String, height: String, diff: String) {
+fun TideEventTile(type: String, time: String, height: String, diff: String) {
     Surface(
-        modifier = modifier.height(110.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White.copy(alpha = 0.1f)
+        modifier = Modifier
+            .width(130.dp)
+            .height(110.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White.copy(alpha = 0.08f),
+        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.1f))
     ) {
-        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.Center) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.Center) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(if (type == "HW") Color(0xFF4FC3F7).copy(alpha = 0.15f) else Color(0xFF9575CD).copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
-                    if (type == "HW") Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    if (type == "HW") Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
                     null,
-                    tint = if (type == "HW") Color(0xFF4FC3F7) else Color(0xFFFFB74D),
-                    modifier = Modifier.size(12.dp)
+                    tint = if (type == "HW") Color(0xFF4FC3F7) else Color(0xFF9575CD),
+                    modifier = Modifier.size(14.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(type, color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
+            Spacer(modifier = Modifier.height(8.dp))
             Text(time, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            Text(height, color = Color.White, fontSize = 12.sp)
-            Text(diff, color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
+            Text(height, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+            Text(diff, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
         }
     }
 }
@@ -1011,7 +1128,8 @@ fun StationSelectionDialog(
                             }
                             Text(station.gaugeLabel ?: station.area, color = Color.White, fontSize = 16.sp)
                         }
-                        Text("17°", color = Color.White, fontSize = 16.sp)
+                        val temp = station.temperature?.toInt() ?: 17
+                        Text("$temp°", color = Color.White, fontSize = 16.sp)
                     }
                 }
             }
@@ -1054,15 +1172,34 @@ private fun aggregateToDays(hourlyData: List<WeatherDto>): List<DailyForecast> {
         val precipProbs = hours.mapNotNull { it.precipitationProbability }
         val icons = hours.mapNotNull { it.icon }
         val dominantIcon = icons.groupBy { it }.maxByOrNull { it.value.size }?.key ?: "clear-day"
+
+        val windSpeeds = hours.mapNotNull { it.windSpeed }
+        val windGusts = hours.mapNotNull { it.windGustSpeed }
+        val maxWindKn = if (windSpeeds.isNotEmpty()) (windSpeeds.maxOrNull()!! / 1.852).toInt() else 0
+        val maxGustKn = if (windGusts.isNotEmpty()) (windGusts.maxOrNull()!! / 1.852).toInt() else 0
+
+        val totalPrecip = hours.mapNotNull { it.precipitation }.sum()
+        val visibilities = hours.mapNotNull { it.visibility }
+        val minVisibility = if (visibilities.isNotEmpty()) visibilities.minOrNull() else null
+
+        val humidities = hours.mapNotNull { it.relativeHumidity }
+        val avgHumidity = if (humidities.isNotEmpty()) humidities.average().toInt() else null
+
+        val sunshines = hours.mapNotNull { it.sunshine }
+        val totalSunshine = if (sunshines.isNotEmpty()) sunshines.sum() else null
+
         DailyForecast(
             dayLabel = dayLabel,
             condition = dominantIcon,
             highTemp = temps.maxOrNull()?.toInt() ?: 0,
             lowTemp = temps.minOrNull()?.toInt() ?: 0,
-            maxWind = 0,
-            totalPrecip = 0.0,
+            maxWind = maxWindKn,
+            maxGust = maxGustKn,
+            totalPrecip = totalPrecip,
             maxPrecipProb = precipProbs.maxOrNull() ?: 0,
-            minVisibility = null
+            minVisibility = minVisibility,
+            avgHumidity = avgHumidity,
+            totalSunshine = totalSunshine
         )
     }
 }

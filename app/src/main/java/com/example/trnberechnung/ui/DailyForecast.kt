@@ -6,7 +6,10 @@ data class DailyForecast(
     val highTemp: Int,
     val lowTemp: Int,
     val maxWind: Int,
+    val maxGust: Int,
     val totalPrecip: Double,
     val maxPrecipProb: Int,
-    val minVisibility: Int?
+    val minVisibility: Int?,
+    val avgHumidity: Int?,
+    val totalSunshine: Double?
 )

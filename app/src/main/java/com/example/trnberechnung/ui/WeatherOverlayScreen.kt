@@ -513,15 +513,22 @@ private fun aggregateToDays(hourlyData: List<WeatherDto>): List<DailyForecast> {
         val displayCondition = translateCondition(dominantIcon)
             .let { if (it == dominantIcon) translateCondition(dominantCondition) else it }
 
+        val gusts = hours.mapNotNull { it.windGustSpeed }
+        val humidities = hours.mapNotNull { it.relativeHumidity }
+        val sunshines = hours.mapNotNull { it.sunshine }
+
         DailyForecast(
             dayLabel = dayLabel,
             condition = displayCondition,
             highTemp = temps.maxOrNull()?.toInt() ?: 0,
             lowTemp = temps.minOrNull()?.toInt() ?: 0,
-            maxWind = winds.maxOrNull()?.toInt() ?: 0,
+            maxWind = (winds.maxOrNull() ?: 0.0).toInt(),
+            maxGust = (gusts.maxOrNull() ?: 0.0).toInt(),
             totalPrecip = precips.sum(),
             maxPrecipProb = precipProbs.maxOrNull() ?: 0,
-            minVisibility = visibilities.minOrNull()
+            minVisibility = visibilities.minOrNull(),
+            avgHumidity = if (humidities.isNotEmpty()) humidities.average().toInt() else null,
+            totalSunshine = if (sunshines.isNotEmpty()) sunshines.sum() else null
         )
     }
 }

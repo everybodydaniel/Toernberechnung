@@ -133,22 +133,30 @@ private fun updateWindMarkers(
     symbolManager.deleteAll()
 
     stations.forEach { station ->
-        val windSpeed = (currentWeather?.windSpeed?.div(1.852))?.toInt() ?: 0
-        val windDirection = currentWeather?.windDirection ?: 0
+        // Use station-specific weather if available, otherwise fallback to current location weather
+        val ws = station.windSpeed ?: currentWeather?.windSpeed
+        val gs = station.windGustSpeed ?: currentWeather?.windGustSpeed
+        val wd = station.windDirection ?: currentWeather?.windDirection ?: 0
 
-        if (windSpeed > 0) {
+        val windSpeedKn = (ws?.div(1.852))?.toInt() ?: 0
+        val gustSpeedKn = (gs?.div(1.852))?.toInt() ?: 0
+        val dirText = windDirectionToText(wd)
+
+        if (windSpeedKn > 0) {
             symbolManager.create(
                 SymbolOptions()
                     .withLatLng(LatLng(station.latitude, station.longitude))
                     .withIconImage("wind-arrow")
-                    .withIconRotate(windDirection.toFloat() + 180f)
-                    .withIconSize(1.0f)
-                    .withTextField("$windSpeed kn")
-                    .withTextOffset(arrayOf(0f, 1.5f))
+                    .withIconRotate(wd.toFloat() + 180f)
+                    .withIconSize(0.8f)
+                    .withTextField("$windSpeedKn/$gustSpeedKn\n$dirText")
+                    .withTextSize(10f)
+                    .withTextFont(arrayOf("Open Sans Bold", "Arial Unicode MS Bold"))
                     .withTextColor(ColorUtils.colorToRgbaString(AndroidColor.WHITE))
-                    .withTextHaloColor(ColorUtils.colorToRgbaString(AndroidColor.parseColor("#00BFA6")))
+                    .withTextHaloColor(ColorUtils.colorToRgbaString(AndroidColor.parseColor("#263238")))
                     .withTextHaloWidth(2f)
-                    .withTextSize(12f)
+                    .withTextOffset(arrayOf(0f, 1.2f))
+                    .withTextJustify("center")
             )
         }
     }

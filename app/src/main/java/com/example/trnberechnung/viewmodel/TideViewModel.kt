@@ -79,15 +79,12 @@ class TideViewModel(
                 val apiData = repository.getDataFromApi()
                 _data.value = apiData
 
-                if (apiData.isNotEmpty()) {
-
-                    val merged = LOCAL_HARBOURS.map { harbour ->
-
+                val stationsToUpdate = if (apiData.isNotEmpty()) {
+                    LOCAL_HARBOURS.map { harbour ->
                         val bshMatch = apiData.minByOrNull { bsh ->
                             haversineKm(harbour.latitude, harbour.longitude, bsh.latitude, bsh.longitude)
                         }
                         if (bshMatch != null && haversineKm(harbour.latitude, harbour.longitude, bshMatch.latitude, bshMatch.longitude) < 20.0) {
-
                             harbour.copy(
                                 events = bshMatch.events,
                                 meanHighWater = bshMatch.meanHighWater,
@@ -99,8 +96,22 @@ class TideViewModel(
                             harbour
                         }
                     }
-                    _allStations.value = merged
+                } else {
+                    LOCAL_HARBOURS
                 }
+
+                // Fetch weather for all stations
+                val stationsWithWeather = stationsToUpdate.map { station ->
+                    val weather = repository.getWeatherData(station.latitude, station.longitude)
+                    station.copy(
+                        temperature = weather?.temperature,
+                        windSpeed = weather?.windSpeed,
+                        windGustSpeed = weather?.windGustSpeed,
+                        windDirection = weather?.windDirection
+                    )
+                }
+                _allStations.value = stationsWithWeather
+
             } catch (e: Exception) {
 
                 try {
@@ -179,10 +190,10 @@ class TideViewModel(
             try {
 
                 val cleanTs = event.timestamp
-                    .replace("T", " ") 
-                    .replace(Regex("Z$"), "") 
-                    .replace(Regex("\\+\\d{2}:\\d{2}$"), "") 
-                    .replace(Regex("\\+\\d{2}$"), "") 
+                    .replace("T", " ")
+                    .replace(Regex("Z$"), "")
+                    .replace(Regex("\\+\\d{2}:\\d{2}$"), "")
+                    .replace(Regex("\\+\\d{2}$"), "")
                     .trim()
 
                 val dt = try {

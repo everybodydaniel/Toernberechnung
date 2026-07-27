@@ -110,7 +110,8 @@ fun RevierScreen(
                             TideContent(
                                 station = selectedStation,
                                 events = tideEvents,
-                                loading = tideLoading
+                                loading = tideLoading,
+                                onStationClick = { showStationDialog = true }
                             )
                         }
                         Spacer(modifier = Modifier.height(maxOf(32.dp, bottomOverlayClearance)))
@@ -527,49 +528,124 @@ fun WindCompass(degrees: Int) {
 @Composable
 fun WindGustGraph(forecast: List<WeatherDto>) {
     val density = LocalDensity.current
-    Canvas(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-        if (forecast.isEmpty()) return@Canvas
+    val labelTextSize = with(density) { 10.sp.toPx() }
 
-        val width = size.width
-        val height = size.height
-        val padding = 20.dp.toPx()
-        val graphHeight = height - padding * 2
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .padding(start = 40.dp, end = 16.dp, bottom = 20.dp) // Adjusted padding for labels
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            if (forecast.isEmpty()) return@Canvas
 
-        val windSpeeds = forecast.map { (it.windSpeed ?: 0.0) / 1.852 }
-        val gustSpeeds = forecast.map { (it.windGustSpeed ?: 0.0) / 1.852 }
+            val width = size.width
+            val height = size.height
+            val plotPaddingTop = 10.dp.toPx()
+            val plotPaddingBottom = 20.dp.toPx()
+            val plotHeight = height - plotPaddingTop - plotPaddingBottom
+            val plotBottomY = height - plotPaddingBottom
 
-        val maxVal = (gustSpeeds.maxOrNull() ?: 10.0).coerceAtLeast(30.0).toFloat()
-        val stepX = width / (forecast.size - 1)
+            val windSpeeds = forecast.map { (it.windSpeed ?: 0.0) / 1.852 }
+            val gustSpeeds = forecast.map { (it.windGustSpeed ?: 0.0) / 1.852 }
 
-        fun y(v: Double) = height - padding - (v.toFloat() / maxVal * graphHeight)
+            val maxVal = (gustSpeeds.maxOrNull() ?: 10.0).coerceAtLeast(30.0).toFloat()
+            val stepX = width / (forecast.size - 1)
 
-        // Fill area between wind and gust
-        val fillPath = Path()
-        fillPath.moveTo(0f, y(windSpeeds[0]))
-        for (i in 1 until forecast.size) {
-            fillPath.lineTo(i * stepX, y(windSpeeds[i]))
+            fun y(v: Double) = plotBottomY - (v.toFloat() / maxVal * plotHeight)
+
+            // Grid lines and Y-axis labels (Lefthand side)
+            val gridColor = Color.White.copy(alpha = 0.1f)
+            val labelPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.WHITE
+                alpha = 140
+                textSize = labelTextSize
+                textAlign = android.graphics.Paint.Align.RIGHT
+                isAntiAlias = true
+            }
+
+            val ySteps = listOf(0f, 10f, 20f, 30f, 40f, 50f, 60f)
+            ySteps.forEach { step ->
+                if (step <= maxVal + 10) {
+                    val yPos = y(step.toDouble())
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, yPos),
+                        end = Offset(width, yPos),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                    drawContext.canvas.nativeCanvas.drawText(
+                        "${step.toInt()} kn",
+                        -8.dp.toPx(),
+                        yPos + labelTextSize / 3,
+                        labelPaint
+                    )
+                }
+            }
+
+            // Fill area between wind and gust
+            val fillPath = Path()
+            if (windSpeeds.isNotEmpty()) {
+                fillPath.moveTo(0f, y(windSpeeds[0]))
+                for (i in 1 until forecast.size) {
+                    fillPath.lineTo(i * stepX, y(windSpeeds[i]))
+                }
+                for (i in forecast.size - 1 downTo 0) {
+                    fillPath.lineTo(i * stepX, y(gustSpeeds[i]))
+                }
+                fillPath.close()
+                drawPath(fillPath, color = Color.White.copy(alpha = 0.1f))
+
+                // Wind line
+                val windPath = Path()
+                windPath.moveTo(0f, y(windSpeeds[0]))
+                for (i in 1 until forecast.size) {
+                    windPath.lineTo(i * stepX, y(windSpeeds[i]))
+                }
+                drawPath(windPath, color = Color(0xFF4FC3F7), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+
+                // Gust line
+                val gustPath = Path()
+                gustPath.moveTo(0f, y(gustSpeeds[0]))
+                for (i in 1 until forecast.size) {
+                    gustPath.lineTo(i * stepX, y(gustSpeeds[i]))
+                }
+                drawPath(
+                    gustPath,
+                    color = Color(0xFFFFB74D),
+                    style = Stroke(
+                        width = 2.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f),
+                        cap = StrokeCap.Round
+                    )
+                )
+            }
+
+            // Time labels (X-axis)
+            val timePaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.WHITE
+                alpha = 140
+                textSize = labelTextSize
+                textAlign = android.graphics.Paint.Align.CENTER
+                isAntiAlias = true
+            }
+
+            forecast.forEachIndexed { i, hour ->
+                if (i % 3 == 0) { // Every 3 hours
+                    val x = i * stepX
+                    val timeText = try {
+                        val dt = OffsetDateTime.parse(hour.timestamp).atZoneSameInstant(ZoneId.of("Europe/Berlin"))
+                        dt.format(DateTimeFormatter.ofPattern("HH:mm"))
+                    } catch (e: Exception) { "" }
+                    drawContext.canvas.nativeCanvas.drawText(
+                        timeText,
+                        x,
+                        height + 12.dp.toPx(),
+                        timePaint
+                    )
+                }
+            }
         }
-        for (i in forecast.size - 1 downTo 0) {
-            fillPath.lineTo(i * stepX, y(gustSpeeds[i]))
-        }
-        fillPath.close()
-        drawPath(fillPath, color = Color.White.copy(alpha = 0.1f))
-
-        // Wind line
-        val windPath = Path()
-        windPath.moveTo(0f, y(windSpeeds[0]))
-        for (i in 1 until forecast.size) {
-            windPath.lineTo(i * stepX, y(windSpeeds[i]))
-        }
-        drawPath(windPath, color = Color(0xFF4FC3F7), style = Stroke(width = 2.dp.toPx()))
-
-        // Gust line
-        val gustPath = Path()
-        gustPath.moveTo(0f, y(gustSpeeds[0]))
-        for (i in 1 until forecast.size) {
-            gustPath.lineTo(i * stepX, y(gustSpeeds[i]))
-        }
-        drawPath(gustPath, color = Color(0xFFFFB74D), style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)))
     }
 }
 
@@ -692,7 +768,8 @@ fun WindDetailRow(label: String, value: String) {
 fun TideContent(
     station: TideStationData?,
     events: List<TideEvent>,
-    loading: Boolean = false
+    loading: Boolean = false,
+    onStationClick: () -> Unit = {}
 ) {
     val now = LocalDateTime.now()
 
@@ -737,7 +814,10 @@ fun TideContent(
         Column(modifier = Modifier.padding(20.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onStationClick() }
+                    ) {
                         Text(
                             station?.gaugeLabel ?: station?.area ?: "Unbekannt",
                             fontSize = 24.sp,
@@ -848,7 +928,7 @@ fun TideContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .padding(horizontal = 8.dp)
+                    .padding(start = 35.dp, end = 8.dp)
             ) {
                 if (windowEvents.size < 2) {
                     Text(
@@ -887,58 +967,75 @@ private fun TideCurveCanvas(
         val plotHeight = height - plotPaddingTop - plotPaddingBottom
         val plotBottomY = height - plotPaddingBottom
 
-        val windowMinutes = java.time.Duration.between(windowStart, windowEnd).toMinutes().toDouble()
-        if (windowMinutes <= 0) return@Canvas
+            val windowMinutes = java.time.Duration.between(windowStart, windowEnd).toMinutes().toDouble()
+            if (windowMinutes <= 0) return@Canvas
 
-        val pts = events.mapNotNull { ev ->
-            try {
-                val cleanTs = ev.timestamp
-                    .replace("T", " ")
-                    .replace(Regex("Z$"), "")
-                    .replace(Regex("\\+\\d{2}:\\d{2}$"), "")
-                    .replace(Regex("\\+\\d{2}$"), "")
-                    .trim()
-                val dt = try {
-                    LocalDateTime.parse(cleanTs, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            val pts = events.mapNotNull { ev ->
+                try {
+                    val cleanTs = ev.timestamp
+                        .replace("T", " ")
+                        .replace(Regex("Z$"), "")
+                        .replace(Regex("\\+\\d{2}:\\d{2}$"), "")
+                        .replace(Regex("\\+\\d{2}$"), "")
+                        .trim()
+                    val dt = try {
+                        LocalDateTime.parse(cleanTs, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                    } catch (_: Exception) {
+                        LocalDateTime.parse(cleanTs, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    }
+                    val minutesFromStart =
+                        java.time.Duration.between(windowStart, dt).toMinutes().toDouble()
+                    Triple(minutesFromStart, ev.value ?: 0.0, ev.type)
                 } catch (_: Exception) {
-                    LocalDateTime.parse(cleanTs, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    null
                 }
-                val minutesFromStart =
-                    java.time.Duration.between(windowStart, dt).toMinutes().toDouble()
-                Triple(minutesFromStart, ev.value ?: 0.0, ev.type)
-            } catch (_: Exception) {
-                null
+            }.sortedBy { it.first }
+
+            if (pts.isEmpty()) return@Canvas
+
+            val values = pts.map { it.second }
+            val maxVal = (values.maxOrNull() ?: 4.0)
+            val minVal = (values.minOrNull() ?: 0.0)
+            val pad = ((maxVal - minVal) * 0.15).coerceAtLeast(0.3)
+            val yMax = maxVal + pad
+            val yMin = minVal - pad
+            val yRange = (yMax - yMin).coerceAtLeast(0.5)
+
+            fun yForLevel(level: Double): Float =
+                plotBottomY - ((level - yMin) / yRange * plotHeight).toFloat()
+
+            fun xForMinute(min: Double): Float =
+                (min / windowMinutes * width).toFloat()
+
+            // Grid lines & Y-axis labels
+            val gridLabelPaint = android.graphics.Paint().apply {
+                color = android.graphics.Color.WHITE
+                alpha = 100
+                textSize = labelTextSize
+                textAlign = android.graphics.Paint.Align.RIGHT
+                isAntiAlias = true
             }
-        }.sortedBy { it.first }
 
-        if (pts.isEmpty()) return@Canvas
+            val ySteps = if (yRange > 2.0) listOf(-1.0, 0.0, 1.0, 2.0, 3.0, 4.0) else listOf(0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0)
+            ySteps.forEach { step ->
+                if (step >= yMin - 0.2 && step <= yMax + 0.2) {
+                    val y = yForLevel(step)
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, y),
+                        end = Offset(width, y),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                    drawContext.canvas.nativeCanvas.drawText(
+                        "%.1f m".format(step),
+                        -5.dp.toPx(),
+                        y + labelTextSize / 3,
+                        gridLabelPaint
+                    )
+                }
+            }
 
-        val values = pts.map { it.second }
-        val maxVal = (values.maxOrNull() ?: 4.0)
-        val minVal = (values.minOrNull() ?: 0.0)
-        val pad = ((maxVal - minVal) * 0.15).coerceAtLeast(0.3)
-        val yMax = maxVal + pad
-        val yMin = minVal - pad
-        val yRange = (yMax - yMin).coerceAtLeast(0.5)
-
-        fun yForLevel(level: Double): Float =
-            plotBottomY - ((level - yMin) / yRange * plotHeight).toFloat()
-
-        fun xForMinute(min: Double): Float =
-            (min / windowMinutes * width).toFloat()
-
-        // Grid lines
-        for (frac in listOf(0f, 0.5f, 1f)) {
-            val y = plotPaddingTop + plotHeight * frac
-            drawLine(
-                color = gridColor,
-                start = Offset(0f, y),
-                end = Offset(width, y),
-                strokeWidth = 1.dp.toPx()
-            )
-        }
-
-        // Time labels
+            // Time labels
         val hourPaint = android.graphics.Paint().apply {
             color = android.graphics.Color.WHITE
             alpha = 100

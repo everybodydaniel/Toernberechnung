@@ -1,5 +1,6 @@
 package com.example.trnberechnung.ui
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9,11 +10,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -30,6 +33,7 @@ import com.example.trnberechnung.ui.theme.*
 import com.example.trnberechnung.viewmodel.TideViewModel
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import kotlin.math.sin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,9 +101,7 @@ fun TideGraphScreen(viewModel: TideViewModel) {
             fontWeight = FontWeight.Bold
         )
 
-        ExposedDropdownMenuBox(
-            expanded = stationDropdownExpanded,
-            onExpandedChange = { stationDropdownExpanded = it },
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
@@ -110,11 +112,13 @@ fun TideGraphScreen(viewModel: TideViewModel) {
                 readOnly = true,
                 label = { Text("Pegelstation", color = NauticalTextSecondary) },
                 trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = stationDropdownExpanded)
+                    IconButton(onClick = { stationDropdownExpanded = true }) {
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = NauticalPrimary)
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor(),
+                    .clickable { stationDropdownExpanded = true },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = NauticalPrimary,
                     unfocusedBorderColor = NauticalDivider,
@@ -124,12 +128,24 @@ fun TideGraphScreen(viewModel: TideViewModel) {
                     focusedTextColor = NauticalTextPrimary,
                     unfocusedTextColor = NauticalTextPrimary
                 ),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = false
             )
-            ExposedDropdownMenu(
+
+            // Clickable overlay because OutlinedTextField with enabled=false or readOnly might block clicks
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable { stationDropdownExpanded = true }
+            )
+
+            DropdownMenu(
                 expanded = stationDropdownExpanded,
                 onDismissRequest = { stationDropdownExpanded = false },
-                containerColor = NauticalSurface
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .background(NauticalSurface)
+                    .border(1.dp, NauticalDivider, RoundedCornerShape(8.dp))
             ) {
                 allStations.forEach { station ->
                     DropdownMenuItem(
@@ -153,26 +169,31 @@ fun TideGraphScreen(viewModel: TideViewModel) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(240.dp)
+                .height(260.dp)
                 .padding(bottom = 16.dp)
                 .border(1.dp, NauticalDivider, RoundedCornerShape(16.dp)),
             colors = CardDefaults.cardColors(containerColor = NauticalSurface),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             shape = RoundedCornerShape(16.dp)
         ) {
-            if (windowEvents.size < 2) {
-                Box(modifier = Modifier.padding(16.dp)) {
-                    TideCurveCanvas(emptyList(), windowStart, windowEnd, now)
-                    Text(
-                        if (tideLoading) "Lade Daten..." else "Keine Daten – bitte Station auswählen",
-                        color = NauticalTextSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-            } else {
-                Box(modifier = Modifier.padding(top = 12.dp, bottom = 8.dp, start = 32.dp, end = 12.dp)) {
-                    TideCurveCanvas(windowEvents.map { it.first }, windowStart, windowEnd, now)
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Animated Wave Background
+                TideWaveAnimation(modifier = Modifier.fillMaxSize())
+
+                if (windowEvents.size < 2) {
+                    Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                        TideCurveCanvas(emptyList(), windowStart, windowEnd, now, selectedStation)
+                        Text(
+                            if (tideLoading) "Lade Daten..." else "Keine Daten – bitte Station auswählen",
+                            color = NauticalTextSecondary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().padding(top = 20.dp, bottom = 10.dp, start = 45.dp, end = 15.dp)) {
+                        TideCurveCanvas(windowEvents.map { it.first }, windowStart, windowEnd, now, selectedStation)
+                    }
                 }
             }
         }
@@ -227,21 +248,23 @@ private fun TideCurveCanvas(
     events: List<TideEvent>,
     windowStart: LocalDateTime,
     windowEnd: LocalDateTime,
-    now: LocalDateTime
+    now: LocalDateTime,
+    station: com.example.trnberechnung.model.TideStationData?
 ) {
     val tickColor = NauticalTextSecondary
     val tideColor = NauticalTideBlue
     val gridColor = NauticalGridLine
     val nowColor = NauticalNowLine
-    val gradientColor = NauticalTideBlue.copy(alpha = 0.18f)
+    val gradientColor = NauticalTideBlue.copy(alpha = 0.15f)
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val labelTextSize = with(density) { 10.sp.toPx() }
+    val labelTextSize = with(density) { 9.sp.toPx() }
+    val axisLabelTextSize = with(density) { 10.sp.toPx() }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
-        val plotPaddingTop = 8f
-        val plotPaddingBottom = 24f
+        val plotPaddingTop = 20f
+        val plotPaddingBottom = 30f
         val plotHeight = height - plotPaddingTop - plotPaddingBottom
         val plotBottomY = height - plotPaddingBottom
 
@@ -267,12 +290,12 @@ private fun TideCurveCanvas(
         }.sortedBy { it.first }
 
         val values = pts.map { it.second }
-        val maxVal = (values.maxOrNull() ?: 4.0)
-        val minVal = (values.minOrNull() ?: 0.0)
-        val pad = ((maxVal - minVal) * 0.15).coerceAtLeast(0.3)
+        val maxVal = (values.maxOrNull() ?: 4.0).coerceAtLeast(3.5)
+        val minVal = (values.minOrNull() ?: 0.0).coerceAtMost(0.5)
+        val pad = ((maxVal - minVal) * 0.1).coerceAtLeast(0.2)
         val yMax = maxVal + pad
         val yMin = minVal - pad
-        val yRange = (yMax - yMin).coerceAtLeast(0.5)
+        val yRange = (yMax - yMin).coerceAtLeast(1.0)
 
         fun yForLevel(level: Double): Float =
             plotBottomY - ((level - yMin) / yRange * plotHeight).toFloat()
@@ -280,14 +303,45 @@ private fun TideCurveCanvas(
         fun xForMinute(min: Double): Float =
             (min / windowMinutes * width).toFloat()
 
-        for (frac in listOf(0.25f, 0.5f, 0.75f)) {
-            val y = plotPaddingTop + plotHeight * frac
-            drawLine(
-                color = gridColor.copy(alpha = 0.25f),
-                start = Offset(0f, y),
-                end = Offset(width, y),
-                strokeWidth = 1f
-            )
+        // Draw Y-Axis Labels and Grid Lines
+        val axisPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.argb(180, 122, 138, 158)
+            textSize = axisLabelTextSize
+            textAlign = android.graphics.Paint.Align.RIGHT
+            isAntiAlias = true
+        }
+
+        val step = if (yRange > 5) 1.0 else 0.5
+        var currentLevel = (yMin / step).toInt() * step
+        while (currentLevel <= yMax) {
+            if (currentLevel >= yMin) {
+                val y = yForLevel(currentLevel)
+                drawLine(
+                    color = gridColor.copy(alpha = 0.15f),
+                    start = Offset(0f, y),
+                    end = Offset(width, y),
+                    strokeWidth = 1f
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    "%.1f".format(currentLevel),
+                    -10f,
+                    y + axisLabelTextSize / 3,
+                    axisPaint
+                )
+            }
+            currentLevel += step
+        }
+
+        // Draw MHW / MNW markers if available
+        station?.meanHighWater?.let { mhw ->
+            val y = yForLevel(mhw)
+            drawLine(Color.Red.copy(alpha = 0.3f), Offset(0f, y), Offset(width, y), strokeWidth = 1f, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
+            drawContext.canvas.nativeCanvas.drawText("MHW", width + 5f, y + axisLabelTextSize / 3, axisPaint.apply { textAlign = android.graphics.Paint.Align.LEFT; color = android.graphics.Color.RED; alpha = 100 })
+        }
+        station?.meanLowWater?.let { mnw ->
+            val y = yForLevel(mnw)
+            drawLine(Color.Blue.copy(alpha = 0.3f), Offset(0f, y), Offset(width, y), strokeWidth = 1f, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
+            drawContext.canvas.nativeCanvas.drawText("MNW", width + 5f, y + axisLabelTextSize / 3, axisPaint.apply { textAlign = android.graphics.Paint.Align.LEFT; color = android.graphics.Color.BLUE; alpha = 100 })
         }
 
         val hourPaint = android.graphics.Paint().apply {
@@ -297,32 +351,32 @@ private fun TideCurveCanvas(
             isAntiAlias = true
         }
         var hourTick = windowStart.withMinute(0).withSecond(0).withNano(0)
-
-        hourTick = hourTick.plusHours(((6 - hourTick.hour % 6) % 6).toLong())
         while (!hourTick.isAfter(windowEnd)) {
             val minutes = java.time.Duration.between(windowStart, hourTick).toMinutes().toDouble()
             val x = xForMinute(minutes)
-            drawLine(
-                color = gridColor.copy(alpha = 0.2f),
-                start = Offset(x, plotPaddingTop),
-                end = Offset(x, plotBottomY),
-                strokeWidth = 1f
-            )
-            drawContext.canvas.nativeCanvas.drawText(
-                "%02d:00".format(hourTick.hour),
-                x,
-                height - 6f,
-                hourPaint
-            )
-            hourTick = hourTick.plusHours(6)
+            if (hourTick.hour % 4 == 0) {
+                drawLine(
+                    color = gridColor.copy(alpha = 0.15f),
+                    start = Offset(x, plotPaddingTop),
+                    end = Offset(x, plotBottomY),
+                    strokeWidth = 1f
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    "%02d:00".format(hourTick.hour),
+                    x,
+                    height - 6f,
+                    hourPaint
+                )
+            }
+            hourTick = hourTick.plusHours(1)
         }
 
         if (pts.size >= 2) {
             val path = Path()
             val fillPath = Path()
             var started = false
-            val step = 2
-            for (xPx in 0..width.toInt() step step) {
+            val drawStep = 2
+            for (xPx in 0..width.toInt() step drawStep) {
                 val minute = xPx.toDouble() / width * windowMinutes
                 val before = pts.lastOrNull { it.first <= minute }
                 val after = pts.firstOrNull { it.first > minute }
@@ -351,11 +405,11 @@ private fun TideCurveCanvas(
             fillPath.lineTo(width, plotBottomY)
             fillPath.close()
 
-            drawPath(fillPath, color = gradientColor)
+            drawPath(fillPath, brush = Brush.verticalGradient(listOf(gradientColor, Color.Transparent), startY = plotPaddingTop, endY = plotBottomY))
             drawPath(
                 path = path,
                 color = tideColor,
-                style = Stroke(width = 4f, cap = StrokeCap.Round)
+                style = Stroke(width = 6f, cap = StrokeCap.Round)
             )
 
             for ((minutes, level, type) in pts) {
@@ -364,12 +418,12 @@ private fun TideCurveCanvas(
                 val cy = yForLevel(level)
                 drawCircle(
                     color = if (type == "HW") NauticalPrimary else NauticalSecondary,
-                    radius = 5f,
+                    radius = 6f,
                     center = Offset(cx, cy)
                 )
                 drawCircle(
                     color = androidx.compose.ui.graphics.Color.White,
-                    radius = 2f,
+                    radius = 2.5f,
                     center = Offset(cx, cy)
                 )
             }
@@ -382,7 +436,8 @@ private fun TideCurveCanvas(
                 color = nowColor,
                 start = Offset(nowX, plotPaddingTop),
                 end = Offset(nowX, plotBottomY),
-                strokeWidth = 2f
+                strokeWidth = 3f,
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(15f, 10f))
             )
             val nowPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.argb(255, 255, 82, 82)
@@ -391,8 +446,53 @@ private fun TideCurveCanvas(
                 isAntiAlias = true
                 isFakeBoldText = true
             }
-            drawContext.canvas.nativeCanvas.drawText("JETZT", nowX, plotPaddingTop - 1f, nowPaint)
+            drawContext.canvas.nativeCanvas.drawText("JETZT", nowX, plotPaddingTop - 5f, nowPaint)
         }
+    }
+}
+
+@Composable
+fun TideWaveAnimation(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "wave")
+    val phase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * Math.PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val waveColor = NauticalTideBlue.copy(alpha = 0.05f)
+        val path = Path()
+
+        val baseHeight = height * 0.7f
+        val amplitude = 20f
+
+        path.moveTo(0f, height)
+        for (x in 0..width.toInt() step 5) {
+            val y = baseHeight + sin(x * 0.01f + phase) * amplitude
+            path.lineTo(x.toFloat(), y)
+        }
+        path.lineTo(width, height)
+        path.close()
+
+        drawPath(path, color = waveColor)
+
+        // Second wave
+        val path2 = Path()
+        path2.moveTo(0f, height)
+        for (x in 0..width.toInt() step 5) {
+            val y = baseHeight + amplitude * 0.5f + sin(x * 0.015f - phase * 0.8f) * amplitude * 1.2f
+            path2.lineTo(x.toFloat(), y)
+        }
+        path2.lineTo(width, height)
+        path2.close()
+        drawPath(path2, color = waveColor.copy(alpha = 0.03f))
     }
 }
 

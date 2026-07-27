@@ -17,6 +17,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -100,15 +103,35 @@ class TideViewModel(
                     LOCAL_HARBOURS
                 }
 
-                // Fetch weather for all stations
-                val stationsWithWeather = stationsToUpdate.map { station ->
-                    val weather = repository.getWeatherData(station.latitude, station.longitude)
-                    station.copy(
-                        temperature = weather?.temperature,
-                        windSpeed = weather?.windSpeed,
-                        windGustSpeed = weather?.windGustSpeed,
-                        windDirection = weather?.windDirection
-                    )
+                // Fetch weather and forecast for all stations in parallel
+                val stationsWithWeather = coroutineScope {
+                    stationsToUpdate.map { station ->
+                        async {
+                            val weather = repository.getWeatherData(station.latitude, station.longitude)
+
+                            val today = LocalDate.now()
+                            val endDate = today.plusDays(3) // 3 days is enough for the wind map
+                            val fmt = DateTimeFormatter.ISO_LOCAL_DATE
+                            val forecast = try {
+                                repository.getForecastData(
+                                    station.latitude,
+                                    station.longitude,
+                                    today.format(fmt),
+                                    endDate.format(fmt)
+                                )
+                            } catch (e: Exception) {
+                                emptyList()
+                            }
+
+                            station.copy(
+                                temperature = weather?.temperature,
+                                windSpeed = weather?.windSpeed,
+                                windGustSpeed = weather?.windGustSpeed,
+                                windDirection = weather?.windDirection,
+                                weatherForecast = forecast
+                            )
+                        }
+                    }.awaitAll()
                 }
                 _allStations.value = stationsWithWeather
 

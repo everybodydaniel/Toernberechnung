@@ -1,24 +1,18 @@
 package com.example.trnberechnung.ui
 
 import android.util.Log
-import android.widget.FrameLayout
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.trnberechnung.dto.WeatherDto
 import com.example.trnberechnung.model.TideStationData
-import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import android.graphics.Bitmap
@@ -36,91 +30,92 @@ fun WindMapComponent(
     stations: List<TideStationData>,
     currentWeather: WeatherDto?
 ) {
-    val context = LocalContext.current
-    val mapView = remember { MapView(context) }
     var symbolManager by remember { mutableStateOf<SymbolManager?>(null) }
 
     Box(modifier = modifier.clip(RoundedCornerShape(12.dp))) {
         AndroidView(
             factory = { ctx ->
-                val frameLayout = FrameLayout(ctx)
-                frameLayout.addView(mapView)
+                MapView(ctx).apply {
+                    onCreate(null)
+                    getMapAsync { map ->
+                        map.uiSettings.isZoomGesturesEnabled = true
+                        map.uiSettings.isScrollGesturesEnabled = true
+                        map.uiSettings.isRotateGesturesEnabled = false
+                        map.uiSettings.isTiltGesturesEnabled = false
 
-                mapView.onCreate(null)
-                mapView.getMapAsync { map ->
-                    map.uiSettings.isZoomGesturesEnabled = false
-                    map.uiSettings.isScrollGesturesEnabled = false
-                    map.uiSettings.isRotateGesturesEnabled = false
-                    map.uiSettings.isTiltGesturesEnabled = false
+                        map.cameraPosition = CameraPosition.Builder()
+                            .target(LatLng(53.7, 7.5))
+                            .zoom(8.0)
+                            .build()
 
-                    map.cameraPosition = CameraPosition.Builder()
-                        .target(LatLng(53.7, 7.5))
-                        .zoom(7.5)
-                        .build()
-
-                    map.setStyle(
-                        Style.Builder().fromJson(
-                            """
-                            {
-                              "version": 8,
-                              "sources": {
-                                "osm": {
-                                  "type": "raster",
-                                  "tiles": ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"],
-                                  "tileSize": 256,
-                                  "attribution": "&copy; OpenStreetMap contributors"
+                        map.setStyle(
+                            Style.Builder().fromJson(
+                                """
+                                {
+                                  "version": 8,
+                                  "glyphs": "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+                                  "sources": {
+                                    "osm": {
+                                      "type": "raster",
+                                      "tiles": ["https://tile.openstreetmap.de/{z}/{x}/{y}.png"],
+                                      "tileSize": 256,
+                                      "attribution": "&copy; OpenStreetMap contributors"
+                                    }
+                                  },
+                                  "layers": [
+                                    {"id": "osm-layer", "type": "raster", "source": "osm"}
+                                  ]
                                 }
-                              },
-                              "layers": [
-                                {"id": "osm-layer", "type": "raster", "source": "osm"}
-                              ]
-                            }
-                            """.trimIndent()
-                        )
-                    ) { style ->
-                        // Add wind arrow icon to style
-                        val drawable = ContextCompat.getDrawable(ctx, R.drawable.ic_wind_arrow)
-                        drawable?.let {
-                            val bitmap = Bitmap.createBitmap(
-                                it.intrinsicWidth,
-                                it.intrinsicHeight,
-                                Bitmap.Config.ARGB_8888
+                                """.trimIndent()
                             )
-                            val canvas = Canvas(bitmap)
-                            it.setBounds(0, 0, canvas.width, canvas.height)
-                            it.draw(canvas)
-                            style.addImage("wind-arrow", bitmap)
+                        ) { style ->
+                            Log.d("WindMapComponent", "Style loaded successfully")
+
+                            val drawable = ContextCompat.getDrawable(ctx, R.drawable.ic_wind_arrow)
+                            drawable?.let {
+                                val bitmap = Bitmap.createBitmap(
+                                    48, 48,
+                                    Bitmap.Config.ARGB_8888
+                                )
+                                val canvas = Canvas(bitmap)
+                                it.setBounds(0, 0, 48, 48)
+                                it.draw(canvas)
+                                style.addImage("wind-arrow", bitmap)
+                                Log.d("WindMapComponent", "wind-arrow icon added to style")
+                            }
+
+                            val sm = SymbolManager(this, map, style)
+                            sm.iconAllowOverlap = true
+                            sm.iconIgnorePlacement = true
+                            sm.textAllowOverlap = true
+                            sm.textIgnorePlacement = true
+
+                            symbolManager = sm
+
+                            updateWindMarkers(sm, stations, currentWeather)
                         }
-
-                        val sm = SymbolManager(mapView, map, style)
-                        sm.iconAllowOverlap = true
-                        sm.textAllowOverlap = true
-                        symbolManager = sm
-
-                        updateWindMarkers(sm, stations, currentWeather)
                     }
                 }
-                frameLayout
             },
-            modifier = Modifier.fillMaxSize()
+            update = { _ ->
+                // Basic view updates handled by LaunchedEffect
+            },
+            modifier = Modifier.fillMaxSize(),
+            onRelease = { view ->
+                try {
+                    view.onPause()
+                    view.onStop()
+                    view.onDestroy()
+                } catch (e: Exception) {
+                    Log.e("WindMapComponent", "Error during map cleanup", e)
+                }
+            }
         )
     }
 
     LaunchedEffect(stations, currentWeather, symbolManager) {
         symbolManager?.let { sm ->
             updateWindMarkers(sm, stations, currentWeather)
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            try {
-                mapView.onPause()
-                mapView.onStop()
-                mapView.onDestroy()
-            } catch (e: Exception) {
-                Log.e("WindMapComponent", "Error during map cleanup", e)
-            }
         }
     }
 }
@@ -130,34 +125,53 @@ private fun updateWindMarkers(
     stations: List<TideStationData>,
     currentWeather: WeatherDto?
 ) {
+    Log.d("WindMapComponent", "updateWindMarkers: count=${stations.size}")
     symbolManager.deleteAll()
 
     stations.forEach { station ->
-        // Use station-specific weather if available, otherwise fallback to current location weather
-        val ws = station.windSpeed ?: currentWeather?.windSpeed
-        val gs = station.windGustSpeed ?: currentWeather?.windGustSpeed
-        val wd = station.windDirection ?: currentWeather?.windDirection ?: 0
+        val isLive = currentWeather?.timestamp.isNullOrBlank()
+
+        val ws: Double?
+        val gs: Double?
+        val wd: Int?
+
+        if (isLive) {
+            // Priority for Live: Station's own live data -> fallback to global selected station
+            ws = station.windSpeed ?: currentWeather?.windSpeed
+            gs = station.windGustSpeed ?: currentWeather?.windGustSpeed
+            wd = station.windDirection ?: currentWeather?.windDirection ?: 0
+        } else {
+            // Priority for Forecast: Station's matching timestamp -> fallback to global selected station's forecast hour
+            val forecastMatch = station.weatherForecast.find { it.timestamp == currentWeather?.timestamp }
+            ws = forecastMatch?.windSpeed ?: currentWeather?.windSpeed
+            gs = forecastMatch?.windGustSpeed ?: currentWeather?.windGustSpeed
+            wd = forecastMatch?.windDirection ?: currentWeather?.windDirection ?: 0
+        }
 
         val windSpeedKn = (ws?.div(1.852))?.toInt() ?: 0
         val gustSpeedKn = (gs?.div(1.852))?.toInt() ?: 0
-        val dirText = windDirectionToText(wd)
+        val dirText = getWindDirection16Point(wd)
 
-        if (windSpeedKn > 0) {
-            symbolManager.create(
-                SymbolOptions()
-                    .withLatLng(LatLng(station.latitude, station.longitude))
-                    .withIconImage("wind-arrow")
-                    .withIconRotate(wd.toFloat() + 180f)
-                    .withIconSize(0.8f)
-                    .withTextField("$windSpeedKn/$gustSpeedKn\n$dirText")
-                    .withTextSize(10f)
-                    .withTextFont(arrayOf("Open Sans Bold", "Arial Unicode MS Bold"))
-                    .withTextColor(ColorUtils.colorToRgbaString(AndroidColor.WHITE))
-                    .withTextHaloColor(ColorUtils.colorToRgbaString(AndroidColor.parseColor("#263238")))
-                    .withTextHaloWidth(2f)
-                    .withTextOffset(arrayOf(0f, 1.2f))
-                    .withTextJustify("center")
-            )
-        }
+        symbolManager.create(
+            SymbolOptions()
+                .withLatLng(LatLng(station.latitude, station.longitude))
+                .withIconImage("wind-arrow")
+                .withIconRotate(wd.toFloat() + 180f)
+                .withIconSize(0.85f)
+                .withTextField("$windSpeedKn/$gustSpeedKn\n$dirText")
+                .withTextSize(12.5f)
+                .withTextFont(arrayOf("Open Sans Regular", "Arial Unicode MS Regular"))
+                .withTextColor(ColorUtils.colorToRgbaString(AndroidColor.WHITE))
+                .withTextHaloColor(ColorUtils.colorToRgbaString(AndroidColor.BLACK))
+                .withTextHaloWidth(3.0f)
+                .withTextOffset(arrayOf(0f, 1.6f))
+                .withTextJustify("center")
+        )
     }
+}
+
+private fun getWindDirection16Point(degrees: Int): String {
+    val directions = arrayOf("N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW")
+    val index = ((degrees + 11.25) / 22.5).toInt() % 16
+    return directions[index]
 }

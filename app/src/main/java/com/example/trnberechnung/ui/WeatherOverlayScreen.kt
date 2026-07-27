@@ -1,5 +1,7 @@
 package com.example.trnberechnung.ui
 
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,15 +9,21 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -28,6 +36,8 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.cos
+import kotlin.math.sin
 
 private val weatherStations = listOf(
     "Cuxhaven" to Pair(53.87, 8.70),
@@ -173,7 +183,8 @@ fun WeatherOverlayScreen(viewModel: TideViewModel) {
                     modifier = Modifier.weight(1f),
                     icon = "≈", label = "WIND",
                     value = "${windKn ?: "-"} kn",
-                    subValue = "Bft ${kmhToBeaufort(w.windSpeed ?: 0.0)} · ${windDirectionToText(w.windDirection ?: 0)}"
+                    subValue = "Bft ${kmhToBeaufort(w.windSpeed ?: 0.0)} · ${windDirectionToText(w.windDirection ?: 0)}",
+                    windDir = w.windDirection
                 )
                 DetailTile(
                     modifier = Modifier.weight(1f),
@@ -279,45 +290,148 @@ private fun HeroWeatherCard(
     dailyForecast: List<DailyForecast>,
     modifier: Modifier = Modifier
 ) {
-    val gradient = Brush.linearGradient(colors = listOf(Color(0xFF1A6B9E), Color(0xFF1B8A7E)))
+    val condition = weather.icon ?: weather.condition
+    val bgGradient = when {
+        condition?.contains("clear") == true -> Brush.verticalGradient(listOf(Color(0xFF4A90E2), Color(0xFF87CEEB)))
+        condition?.contains("cloudy") == true -> Brush.verticalGradient(listOf(Color(0xFF757F9A), Color(0xFFD7DDE8)))
+        condition?.contains("rain") == true -> Brush.verticalGradient(listOf(Color(0xFF4B6CB7), Color(0xFF182848)))
+        condition?.contains("thunder") == true -> Brush.verticalGradient(listOf(Color(0xFF0F2027), Color(0xFF203A43)))
+        else -> Brush.linearGradient(colors = listOf(Color(0xFF1A6B9E), Color(0xFF1B8A7E)))
+    }
+
     val today = dailyForecast.firstOrNull()
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(gradient)
-            .padding(20.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(bgGradient)
+            .height(200.dp)
     ) {
-        Column {
+        // Animated Background Elements
+        WeatherAnimationLayer(condition)
+
+        Column(modifier = Modifier.padding(20.dp).fillMaxSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Text(stationName, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color.White)
-                Text(iconToEmoji(weather.icon ?: weather.condition), fontSize = 42.sp)
+                Column {
+                    Text(stationName, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Color.White)
+                    Text(
+                        translateCondition(condition),
+                        fontWeight = FontWeight.Medium, fontSize = 16.sp, color = Color.White.copy(alpha = 0.9f)
+                    )
+                }
+                Text(iconToEmoji(condition), fontSize = 48.sp)
             }
-            Spacer(modifier = Modifier.height(8.dp))
+
+            Spacer(modifier = Modifier.weight(1f))
+
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     "${weather.temperature?.let { "%.0f".format(it) } ?: "-"}°",
-                    fontWeight = FontWeight.Bold, fontSize = 52.sp, color = Color.White
+                    fontWeight = FontWeight.Bold, fontSize = 64.sp, color = Color.White
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.padding(bottom = 8.dp)) {
-                    Text(
-                        translateCondition(weather.icon ?: weather.condition),
-                        fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.White
-                    )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.padding(bottom = 12.dp)) {
                     if (today != null) {
                         Text(
-                            "H: ${today.highTemp}°  T: ${today.lowTemp}°",
-                            color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp
+                            "H: ${today.highTemp}°  L: ${today.lowTemp}°",
+                            color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp, fontWeight = FontWeight.Bold
                         )
                     }
+                    Text(
+                        "Wind: ${weather.windDirection?.let { windDirectionToText(it) } ?: "-"} ${weather.windSpeed?.let { (it/1.852).toInt() } ?: "-"} kn",
+                        color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+fun WeatherAnimationLayer(condition: String?) {
+    when {
+        condition?.contains("clear") == true -> SunAnimation()
+        condition?.contains("cloudy") == true -> CloudAnimation()
+        condition?.contains("rain") == true -> RainAnimation()
+        condition?.contains("thunder") == true -> ThunderAnimation()
+    }
+}
+
+@Composable
+fun SunAnimation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "sun")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing)), label = "rotation"
+    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .offset(x = 20.dp, y = (-20).dp)
+                .size(150.dp)
+                .align(Alignment.TopEnd)
+                .rotate(rotation)
+                .alpha(0.2f)
+                .background(Color.Yellow, CircleShape)
+        )
+    }
+}
+
+@Composable
+fun CloudAnimation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "clouds")
+    val offsetX by infiniteTransition.animateFloat(
+        initialValue = -100f, targetValue = 400f,
+        animationSpec = infiniteRepeatable(tween(15000, easing = LinearEasing)), label = "x"
+    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Text("☁️", fontSize = 60.sp, modifier = Modifier.offset(x = offsetX.dp, y = 20.dp).alpha(0.3f))
+        Text("☁️", fontSize = 40.sp, modifier = Modifier.offset(x = (offsetX - 150).dp, y = 80.dp).alpha(0.2f))
+    }
+}
+
+@Composable
+fun RainAnimation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "rain")
+    val offsetY by infiniteTransition.animateFloat(
+        initialValue = -20f, targetValue = 200f,
+        animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing)), label = "y"
+    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        repeat(5) { i ->
+            val xPos = (20 + i * 60).dp
+            val yPos = ((offsetY + i * 30) % 200).dp
+            Box(
+                modifier = Modifier
+                    .offset(x = xPos, y = yPos)
+                    .size(2.dp, 15.dp)
+                    .background(Color.White.copy(alpha = 0.4f), RoundedCornerShape(1.dp))
+            )
+        }
+    }
+}
+
+@Composable
+fun ThunderAnimation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "thunder")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 3000
+                0f at 0
+                0f at 2500
+                1f at 2600
+                0f at 2700
+                1f at 2800
+                0f at 2900
+            }
+        ), label = "alpha"
+    )
+    Box(modifier = Modifier.fillMaxSize().alpha(alpha * 0.2f).background(Color.White))
 }
 
 @Composable
@@ -360,7 +474,7 @@ private fun HourlyForecastRow(forecastData: List<WeatherDto>, currentWeather: We
 }
 
 @Composable
-private fun DetailTile(modifier: Modifier = Modifier, icon: String, label: String, value: String, subValue: String) {
+private fun DetailTile(modifier: Modifier = Modifier, icon: String, label: String, value: String, subValue: String, windDir: Int? = null) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = NauticalSurface),
@@ -374,7 +488,20 @@ private fun DetailTile(modifier: Modifier = Modifier, icon: String, label: Strin
                 Text(label, color = NauticalTextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(value, color = NauticalPrimary, fontWeight = FontWeight.Bold, fontSize = 26.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(value, color = NauticalPrimary, fontWeight = FontWeight.Bold, fontSize = 26.sp)
+                if (windDir != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = NauticalPrimary,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .rotate(windDir.toFloat() + 180f) // Arrow points TO direction, DWD gives FROM. +180 to show where it blows.
+                    )
+                }
+            }
             Text(subValue, color = NauticalTextSecondary, fontSize = 11.sp)
         }
     }

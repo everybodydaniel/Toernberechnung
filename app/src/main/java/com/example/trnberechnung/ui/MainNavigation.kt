@@ -64,6 +64,7 @@ fun MainAppScreen(
     crewspaceViewModelFactory: CrewspaceViewModelFactory? = null,
     authRepo: AuthRepository? = null,
     onNavigateToLogin: () -> Unit = {},
+    onLogout: () -> Unit = {},
     onToggleDarkMode: (Boolean) -> Unit = {}
 ) {
     val navController = rememberNavController()
@@ -171,6 +172,7 @@ fun MainAppScreen(
                 DashboardScreen(
                     authRepo = authRepo,
                     onNavigateToLogin = onNavigateToLogin,
+                    onLogout = onLogout,
                     onStartNavigation = {
                         navController.navigate(Screen.MapRoute.route)
                     },

@@ -16,5 +16,6 @@ data class TideStationData(
     val windSpeed: Double? = null,
     val windGustSpeed: Double? = null,
     val windDirection: Int? = null,
+    val weatherForecast: List<com.example.trnberechnung.dto.WeatherDto> = emptyList(),
     val events: List<TideEvent>
 )

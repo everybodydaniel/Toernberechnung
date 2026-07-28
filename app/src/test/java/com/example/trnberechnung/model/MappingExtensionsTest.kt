@@ -48,9 +48,9 @@ class MappingExtensionsTest {
             )
         )
         val model = dto.toModel()
-        model.waterLevel shouldBe 2.5
-        model.meanHighWater shouldBe 3.0
-        model.meanLowWater shouldBe 1.0
+        model.waterLevel shouldBe 2.0
+        model.meanHighWater shouldBe 2.5
+        model.meanLowWater shouldBe 0.5
         model.events.size shouldBe 1
         model.events[0].value shouldBe 4.0
     }

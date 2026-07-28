@@ -6,7 +6,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.trnberechnung.dto.WeatherDto
@@ -17,8 +16,14 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
 import androidx.core.content.ContextCompat
 import com.example.trnberechnung.R
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.delay
 import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
 import org.maplibre.android.utils.ColorUtils
@@ -28,15 +33,39 @@ import android.graphics.Color as AndroidColor
 fun WindMapComponent(
     modifier: Modifier = Modifier,
     stations: List<TideStationData>,
-    currentWeather: WeatherDto?
+    currentWeather: WeatherDto?,
+    isLive: Boolean = false
 ) {
     var symbolManager by remember { mutableStateOf<SymbolManager?>(null) }
+    var mapView by remember { mutableStateOf<MapView?>(null) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, mapView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> mapView?.onStart()
+                Lifecycle.Event.ON_RESUME -> mapView?.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView?.onPause()
+                Lifecycle.Event.ON_STOP -> mapView?.onStop()
+                Lifecycle.Event.ON_DESTROY -> mapView?.onDestroy()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Box(modifier = modifier.clip(RoundedCornerShape(12.dp))) {
         AndroidView(
             factory = { ctx ->
                 MapView(ctx).apply {
+                    mapView = this
                     onCreate(null)
+                    onStart()
+                    onResume()
+
                     getMapAsync { map ->
                         map.uiSettings.isZoomGesturesEnabled = true
                         map.uiSettings.isScrollGesturesEnabled = true
@@ -71,28 +100,22 @@ fun WindMapComponent(
                         ) { style ->
                             Log.d("WindMapComponent", "Style loaded successfully")
 
-                            val drawable = ContextCompat.getDrawable(ctx, R.drawable.ic_wind_arrow)
-                            drawable?.let {
-                                val bitmap = Bitmap.createBitmap(
-                                    48, 48,
-                                    Bitmap.Config.ARGB_8888
-                                )
-                                val canvas = Canvas(bitmap)
-                                it.setBounds(0, 0, 48, 48)
-                                it.draw(canvas)
-                                style.addImage("wind-arrow", bitmap)
-                                Log.d("WindMapComponent", "wind-arrow icon added to style")
+                            // Generate 16 wind tiles (rounded box + arrow) as background icons
+                            val directions = arrayOf("N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW")
+                            directions.forEachIndexed { index, dir ->
+                                val rotation = index * 22.5f
+                                val tileBitmap = createWindTileBitmap(ctx, rotation)
+                                style.addImage("wind-tile-$dir", tileBitmap)
                             }
 
-                            val sm = SymbolManager(this, map, style)
+                            val sm = SymbolManager(this@apply, map, style)
                             sm.iconAllowOverlap = true
                             sm.iconIgnorePlacement = true
                             sm.textAllowOverlap = true
                             sm.textIgnorePlacement = true
 
                             symbolManager = sm
-
-                            updateWindMarkers(sm, stations, currentWeather)
+                            Log.d("WindMapComponent", "SymbolManager initialized")
                         }
                     }
                 }
@@ -101,77 +124,131 @@ fun WindMapComponent(
                 // Basic view updates handled by LaunchedEffect
             },
             modifier = Modifier.fillMaxSize(),
-            onRelease = { view ->
-                try {
-                    view.onPause()
-                    view.onStop()
-                    view.onDestroy()
-                } catch (e: Exception) {
-                    Log.e("WindMapComponent", "Error during map cleanup", e)
-                }
+            onRelease = { _ ->
+                // Lifecycle managed by DisposableEffect
             }
         )
     }
 
-    LaunchedEffect(stations, currentWeather, symbolManager) {
+    LaunchedEffect(stations, currentWeather, symbolManager, isLive) {
         symbolManager?.let { sm ->
-            updateWindMarkers(sm, stations, currentWeather)
+            // Small delay to ensure MapLibre surface is fully initialized
+            delay(100)
+            updateWindMarkers(sm, stations, currentWeather, isLive)
         }
+    }
+}
+
+private fun findNearestForecast(forecast: List<WeatherDto>, targetTimestamp: String?): WeatherDto? {
+    if (targetTimestamp == null || forecast.isEmpty()) return null
+    val exact = forecast.find { it.timestamp == targetTimestamp }
+    if (exact != null) return exact
+
+    return try {
+        val targetTime = java.time.OffsetDateTime.parse(targetTimestamp).toInstant().toEpochMilli()
+        forecast.minByOrNull {
+            val time = java.time.OffsetDateTime.parse(it.timestamp ?: "").toInstant().toEpochMilli()
+            Math.abs(time - targetTime)
+        }
+    } catch (e: Exception) {
+        null
     }
 }
 
 private fun updateWindMarkers(
     symbolManager: SymbolManager,
     stations: List<TideStationData>,
-    currentWeather: WeatherDto?
+    currentWeather: WeatherDto?,
+    isLive: Boolean
 ) {
-    Log.d("WindMapComponent", "updateWindMarkers: count=${stations.size}")
+    Log.d("WindMapComponent", "updateWindMarkers: count=${stations.size}, live=$isLive")
     symbolManager.deleteAll()
 
-    stations.forEach { station ->
-        val isLive = currentWeather?.timestamp.isNullOrBlank()
+    val targetTimestamp = currentWeather?.timestamp
 
+    stations.forEach { station ->
         val ws: Double?
         val gs: Double?
         val wd: Int?
 
-        if (isLive) {
-            // Priority for Live: Station's own live data -> fallback to global selected station
-            ws = station.windSpeed ?: currentWeather?.windSpeed
-            gs = station.windGustSpeed ?: currentWeather?.windGustSpeed
-            wd = station.windDirection ?: currentWeather?.windDirection ?: 0
+        if (isLive && station.windSpeed != null && station.windDirection != null) {
+            // Priority: Station's own live data
+            ws = station.windSpeed
+            gs = station.windGustSpeed
+            wd = station.windDirection
         } else {
-            // Priority for Forecast: Station's matching timestamp -> fallback to global selected station's forecast hour
-            val forecastMatch = station.weatherForecast.find { it.timestamp == currentWeather?.timestamp }
-            ws = forecastMatch?.windSpeed ?: currentWeather?.windSpeed
-            gs = forecastMatch?.windGustSpeed ?: currentWeather?.windGustSpeed
-            wd = forecastMatch?.windDirection ?: currentWeather?.windDirection ?: 0
+            // Fallback to forecast if live data missing or not in live mode
+            val searchTs = if (isLive) {
+                java.time.ZonedDateTime.now(java.time.ZoneId.of("Europe/Berlin")).format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+            } else {
+                targetTimestamp
+            }
+            val forecastMatch = findNearestForecast(station.weatherForecast, searchTs)
+            ws = forecastMatch?.windSpeed
+            gs = forecastMatch?.windGustSpeed
+            wd = forecastMatch?.windDirection
         }
 
-        val windSpeedKn = (ws?.div(1.852))?.toInt() ?: 0
-        val gustSpeedKn = (gs?.div(1.852))?.toInt() ?: 0
+        // Skip stations that don't have enough data to be meaningful
+        if (ws == null || wd == null) return@forEach
+
+        val finalGs = gs ?: ws // Fallback gust to wind speed if missing
+        val windSpeedKn = (ws / 1.852).toInt()
+        val gustSpeedKn = (finalGs / 1.852).toInt()
         val dirText = getWindDirection16Point(wd)
 
         symbolManager.create(
             SymbolOptions()
                 .withLatLng(LatLng(station.latitude, station.longitude))
-                .withIconImage("wind-arrow")
-                .withIconRotate(wd.toFloat() + 180f)
-                .withIconSize(0.85f)
+                .withIconImage("wind-tile-$dirText")
+                .withIconSize(0.7f)
                 .withTextField("$windSpeedKn/$gustSpeedKn\n$dirText")
-                .withTextSize(12.5f)
-                .withTextFont(arrayOf("Open Sans Regular", "Arial Unicode MS Regular"))
+                .withTextSize(10f)
                 .withTextColor(ColorUtils.colorToRgbaString(AndroidColor.WHITE))
-                .withTextHaloColor(ColorUtils.colorToRgbaString(AndroidColor.BLACK))
-                .withTextHaloWidth(3.0f)
-                .withTextOffset(arrayOf(0f, 1.6f))
+                .withTextOffset(arrayOf(0f, 1.4f))
+                .withTextAnchor("center")
                 .withTextJustify("center")
         )
+        Log.d("WindMapComponent", "Created marker for ${station.gaugeLabel}: $windSpeedKn kn")
     }
+}
+
+private fun createWindTileBitmap(context: android.content.Context, rotation: Float): Bitmap {
+    // A tile that accommodates an arrow at the top and 2 lines of text below
+    // Increased width for longer direction strings like "WSW"
+    val width = 130
+    val height = 155
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    // Dark rounded background box
+    val paint = Paint().apply {
+        color = AndroidColor.parseColor("#1B2A39")
+        isAntiAlias = true
+    }
+    val rect = RectF(0f, 0f, width.toFloat(), height.toFloat())
+    canvas.drawRoundRect(rect, 16f, 16f, paint)
+
+    // Draw the white arrow at the top
+    val drawable = ContextCompat.getDrawable(context, R.drawable.ic_wind_arrow)?.mutate()
+    drawable?.let {
+        it.setTint(AndroidColor.WHITE)
+        canvas.save()
+        // Rotate around the center of the arrow's area (top part of the tile)
+        // Icon center at 40 for the taller box.
+        canvas.rotate(rotation + 180f, width / 2f, 40f)
+        val arrowSize = 44
+        it.setBounds(width / 2 - arrowSize / 2, 18, width / 2 + arrowSize / 2, 18 + arrowSize)
+        it.draw(canvas)
+        canvas.restore()
+    }
+
+    return bitmap
 }
 
 private fun getWindDirection16Point(degrees: Int): String {
     val directions = arrayOf("N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW")
-    val index = ((degrees + 11.25) / 22.5).toInt() % 16
+    // Ensure the index is positive even for negative degrees
+    val index = (((degrees.toDouble() + 11.25) / 22.5).toInt() % 16 + 16) % 16
     return directions[index]
 }

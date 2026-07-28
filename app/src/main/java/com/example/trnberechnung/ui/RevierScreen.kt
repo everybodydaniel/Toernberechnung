@@ -75,11 +75,10 @@ fun RevierScreen(
             )
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Custom Header
-            RevierHeader(onRefresh = { viewModel.loadData() })
-
-            // Tab Switcher
+            // Header Area (Removed redundant RevierHeader, now handled by MainNavigation)
+            Spacer(modifier = Modifier.height(12.dp))
             RevierTabSwitcher(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
+            Spacer(modifier = Modifier.height(12.dp))
 
             Box(modifier = Modifier.fillMaxSize()) {
                 AnimatedContent(
@@ -130,64 +129,6 @@ fun RevierScreen(
                 viewModel.selectStation(it)
                 showStationDialog = false
             }
-        )
-    }
-}
-
-@Composable
-fun RevierHeader(onRefresh: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                modifier = Modifier.size(36.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = Color.White.copy(alpha = 0.2f)
-            ) {
-                Icon(
-                    Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.padding(6.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                "TideNode",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            HeaderIconButton(Icons.Default.Notifications, {})
-            Spacer(modifier = Modifier.width(8.dp))
-            HeaderIconButton(Icons.Default.Refresh, onRefresh)
-            Spacer(modifier = Modifier.width(8.dp))
-            HeaderIconButton(Icons.Default.Settings, {})
-        }
-    }
-}
-
-@Composable
-fun HeaderIconButton(icon: ImageVector, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.size(36.dp),
-        shape = CircleShape,
-        color = Color.White.copy(alpha = 0.2f)
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.padding(8.dp)
         )
     }
 }
@@ -252,6 +193,22 @@ fun WeatherContent(
     onStationClick: () -> Unit,
     viewModel: TideViewModel
 ) {
+    val nowBerlin = remember { LocalDateTime.now(ZoneId.of("Europe/Berlin")) }
+    val filteredForecast = remember(forecast) {
+        val now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Europe/Berlin"))
+        forecast.filter {
+            try {
+                val timestampStr = it.timestamp?.replace(" ", "T") ?: ""
+                val dt = if (timestampStr.contains("+") || timestampStr.endsWith("Z")) {
+                    java.time.OffsetDateTime.parse(timestampStr).atZoneSameInstant(java.time.ZoneId.of("Europe/Berlin"))
+                } else {
+                    java.time.LocalDateTime.parse(timestampStr).atZone(java.time.ZoneId.of("Europe/Berlin"))
+                }
+                dt.isAfter(now.minusMinutes(30))
+            } catch (e: Exception) { true }
+        }.sortedBy { it.timestamp }
+    }
+
     // Hero Weather
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -308,7 +265,7 @@ fun WeatherContent(
             }
             Spacer(modifier = Modifier.height(12.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                items(forecast.take(24)) { hour ->
+                items(filteredForecast.take(24)) { hour ->
                     val time = try {
                         OffsetDateTime.parse(hour.timestamp).atZoneSameInstant(ZoneId.of("Europe/Berlin")).format(DateTimeFormatter.ofPattern("HH:mm"))
                     } catch (e: Exception) { "--:--" }
@@ -367,13 +324,19 @@ fun WeatherContent(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 items(12) { i ->
-                    val forecastItem = forecast.getOrNull(i)
+                    val forecastItem = if (i == 0) null else filteredForecast.getOrNull(i - 1)
                     val time = if (i == 0) "Jetzt" else try {
                         OffsetDateTime.parse(forecastItem?.timestamp).atZoneSameInstant(ZoneId.of("Europe/Berlin")).format(DateTimeFormatter.ofPattern("HH:mm"))
                     } catch (e: Exception) { "--:--" }
-                    val day = try {
-                        OffsetDateTime.parse(forecastItem?.timestamp).atZoneSameInstant(ZoneId.of("Europe/Berlin")).format(DateTimeFormatter.ofPattern("EEE"))
-                    } catch (e: Exception) { "" }
+                    val day = if (i == 0) {
+                        try {
+                            OffsetDateTime.now(ZoneId.of("Europe/Berlin")).format(DateTimeFormatter.ofPattern("EEE"))
+                        } catch (e: Exception) { "" }
+                    } else {
+                        try {
+                            OffsetDateTime.parse(forecastItem?.timestamp).atZoneSameInstant(ZoneId.of("Europe/Berlin")).format(DateTimeFormatter.ofPattern("EEE"))
+                        } catch (e: Exception) { "" }
+                    }
 
                     Column(
                         modifier = Modifier
@@ -398,33 +361,15 @@ fun WeatherContent(
                     .background(Color.White.copy(alpha = 0.05f)),
                 contentAlignment = Alignment.Center
             ) {
-                val displayWeather = if (selectedWindHour == 0) weather else forecast.getOrNull(selectedWindHour)
+                val displayWeather = if (selectedWindHour == 0) weather else filteredForecast.getOrNull(selectedWindHour - 1)
                 WindMapComponent(
                     modifier = Modifier.fillMaxSize(),
                     stations = allStations,
-                    currentWeather = displayWeather
+                    currentWeather = displayWeather,
+                    isLive = selectedWindHour == 0
                 )
 
-                // Overlay information
-                if (selectedWindHour == 0) {
-                    Column(
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                        horizontalAlignment = Alignment.End
-                    ) {
-                        Surface(
-                            color = Color.Black.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                "LIVE",
-                                color = Color.Red,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
+                // Overlay information removed
             }
         }
     }
@@ -437,13 +382,16 @@ fun WeatherContent(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("WIND UND BÖEN", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.padding(start = 40.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Text("● GRUNDWIND", color = Color(0xFF4FC3F7), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Text("● BÖEN", color = Color(0xFFFFB74D), fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            WindGustGraph(forecast.take(12))
+            Spacer(modifier = Modifier.height(24.dp))
+            WindGustGraph(filteredForecast.take(12))
         }
     }
 
@@ -549,7 +497,7 @@ fun WindGustGraph(forecast: List<WeatherDto>) {
             val windSpeeds = forecast.map { (it.windSpeed ?: 0.0) / 1.852 }
             val gustSpeeds = forecast.map { (it.windGustSpeed ?: 0.0) / 1.852 }
 
-            val maxVal = (gustSpeeds.maxOrNull() ?: 10.0).coerceAtLeast(30.0).toFloat()
+            val maxVal = (gustSpeeds.maxOrNull() ?: 10.0).coerceAtLeast(40.0).toFloat()
             val stepX = width / (forecast.size - 1)
 
             fun y(v: Double) = plotBottomY - (v.toFloat() / maxVal * plotHeight)
@@ -564,9 +512,9 @@ fun WindGustGraph(forecast: List<WeatherDto>) {
                 isAntiAlias = true
             }
 
-            val ySteps = listOf(0f, 10f, 20f, 30f, 40f, 50f, 60f)
+            val ySteps = listOf(0f, 10f, 20f, 30f, 40f)
             ySteps.forEach { step ->
-                if (step <= maxVal + 10) {
+                if (step <= maxVal) {
                     val yPos = y(step.toDouble())
                     drawLine(
                         color = gridColor,
@@ -871,8 +819,20 @@ fun TideContent(
     }
 
     val windowStart = now.minusHours(12)
-    val windowEnd = now.plusHours(12)
-    val windowEvents = eventsWithTime.filter { (_, dt) -> !dt.isBefore(windowStart) && !dt.isAfter(windowEnd) }
+    val windowEnd = now.plusHours(60)
+
+    // Include one event before and one event after the window for smooth interpolation
+    val windowEvents = remember(eventsWithTime, windowStart, windowEnd) {
+        val inWindow = eventsWithTime.filter { (_, dt) -> !dt.isBefore(windowStart) && !dt.isAfter(windowEnd) }
+        val before = eventsWithTime.lastOrNull { it.second.isBefore(windowStart) }
+        val after = eventsWithTime.firstOrNull { it.second.isAfter(windowEnd) }
+
+        val result = mutableListOf<Pair<TideEvent, LocalDateTime>>()
+        before?.let { result.add(it) }
+        result.addAll(inWindow)
+        after?.let { result.add(it) }
+        result.distinctBy { it.second }.sortedBy { it.second }
+    }
 
     // Astronomische Gezeiten (Horizontal Cards)
     GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -907,9 +867,12 @@ fun TideContent(
             }
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TideBasisTile("MHW", station?.meanHighWater?.let { "%.2f m".format(it) } ?: "3.10 m")
-                TideBasisTile("MNW", station?.meanLowWater?.let { "%.2f m".format(it) } ?: "0.67 m")
-                TideBasisTile("MTH", "2.43 m")
+                TideBasisTile("MHW", station?.meanHighWater?.let { "%.2f m".format(it) } ?: "-- m")
+                TideBasisTile("MNW", station?.meanLowWater?.let { "%.2f m".format(it) } ?: "-- m")
+                val mth = if (station?.meanHighWater != null && station.meanLowWater != null) {
+                    "%.2f m".format(station.meanHighWater - station.meanLowWater)
+                } else "-- m"
+                TideBasisTile("MTH", mth)
             }
         }
     }
@@ -927,8 +890,8 @@ fun TideContent(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
-                    .padding(start = 35.dp, end = 8.dp)
+                    .height(220.dp)
+                    .padding(horizontal = 4.dp)
             ) {
                 if (windowEvents.size < 2) {
                     Text(
@@ -938,7 +901,14 @@ fun TideContent(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 } else {
-                    TideCurveCanvas(windowEvents.map { it.first }, windowStart, windowEnd, now)
+                    TideCurveCanvas(
+                        windowEvents.map { it.first },
+                        windowStart,
+                        windowEnd,
+                        now,
+                        station?.meanHighWater,
+                        station?.meanLowWater
+                    )
                 }
             }
         }
@@ -950,191 +920,196 @@ private fun TideCurveCanvas(
     events: List<TideEvent>,
     windowStart: LocalDateTime,
     windowEnd: LocalDateTime,
-    now: LocalDateTime
+    now: LocalDateTime,
+    mhw: Double? = null,
+    mnw: Double? = null
 ) {
-    val tideColor = Color(0xFF4FC3F7)
+    val futureColor = Color(0xFF4FC3F7)
+    val pastColor = Color.White
     val gridColor = Color.White.copy(alpha = 0.1f)
-    val nowColor = Color(0xFFFF5252)
-    val gradientColor = Color(0xFF4FC3F7).copy(alpha = 0.15f)
+    val nowColor = Color(0xFFFFA726)
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val labelTextSize = with(density) { 10.sp.toPx() }
+    val labelTextSize = with(density) { 9.sp.toPx() }
+    val dateTextSize = with(density) { 10.sp.toPx() }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
-        val plotPaddingTop = 15.dp.toPx()
-        val plotPaddingBottom = 25.dp.toPx()
-        val plotHeight = height - plotPaddingTop - plotPaddingBottom
-        val plotBottomY = height - plotPaddingBottom
+        val paddingLeft = 35.dp.toPx()
+        val paddingRight = 35.dp.toPx()
+        val paddingTop = 20.dp.toPx()
+        val paddingBottom = 55.dp.toPx()
 
-            val windowMinutes = java.time.Duration.between(windowStart, windowEnd).toMinutes().toDouble()
-            if (windowMinutes <= 0) return@Canvas
+        val drawWidth = width - paddingLeft - paddingRight
+        val drawHeight = height - paddingTop - paddingBottom
+        val plotBottomY = height - paddingBottom
 
-            val pts = events.mapNotNull { ev ->
-                try {
-                    val cleanTs = ev.timestamp
-                        .replace("T", " ")
-                        .replace(Regex("Z$"), "")
-                        .replace(Regex("\\+\\d{2}:\\d{2}$"), "")
-                        .replace(Regex("\\+\\d{2}$"), "")
-                        .trim()
-                    val dt = try {
-                        LocalDateTime.parse(cleanTs, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                    } catch (_: Exception) {
-                        LocalDateTime.parse(cleanTs, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                    }
-                    val minutesFromStart =
-                        java.time.Duration.between(windowStart, dt).toMinutes().toDouble()
-                    Triple(minutesFromStart, ev.value ?: 0.0, ev.type)
+        val windowMinutes = java.time.Duration.between(windowStart, windowEnd).toMinutes().toDouble()
+        if (windowMinutes <= 0) return@Canvas
+
+        val pts = events.mapNotNull { ev ->
+            try {
+                val cleanTs = ev.timestamp
+                    .replace("T", " ")
+                    .replace(Regex("Z$"), "")
+                    .replace(Regex("\\+\\d{2}:\\d{2}$"), "")
+                    .replace(Regex("\\+\\d{2}$"), "")
+                    .trim()
+                val dt = try {
+                    LocalDateTime.parse(cleanTs, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                 } catch (_: Exception) {
-                    null
+                    LocalDateTime.parse(cleanTs, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                 }
-            }.sortedBy { it.first }
+                val minutesFromStart = java.time.Duration.between(windowStart, dt).toMinutes().toDouble()
+                Triple(minutesFromStart, ev.value ?: 0.0, ev.type)
+            } catch (_: Exception) { null }
+        }.sortedBy { it.first }
 
-            if (pts.isEmpty()) return@Canvas
+        if (pts.isEmpty()) return@Canvas
 
-            val values = pts.map { it.second }
-            val maxVal = (values.maxOrNull() ?: 4.0)
-            val minVal = (values.minOrNull() ?: 0.0)
-            val pad = ((maxVal - minVal) * 0.15).coerceAtLeast(0.3)
-            val yMax = maxVal + pad
-            val yMin = minVal - pad
-            val yRange = (yMax - yMin).coerceAtLeast(0.5)
+        val yMax = (pts.maxOf { it.second } + 0.4).coerceAtLeast(3.2)
+        val yMin = (pts.minOf { it.second } - 0.4).coerceAtMost(0.2)
+        val yRange = yMax - yMin
 
-            fun yForLevel(level: Double): Float =
-                plotBottomY - ((level - yMin) / yRange * plotHeight).toFloat()
+        fun yForLevel(level: Double): Float =
+            plotBottomY - ((level - yMin) / yRange * drawHeight).toFloat()
 
-            fun xForMinute(min: Double): Float =
-                (min / windowMinutes * width).toFloat()
+        fun xForMinute(min: Double): Float =
+            paddingLeft + (min / windowMinutes * drawWidth).toFloat()
 
-            // Grid lines & Y-axis labels
-            val gridLabelPaint = android.graphics.Paint().apply {
-                color = android.graphics.Color.WHITE
-                alpha = 100
-                textSize = labelTextSize
-                textAlign = android.graphics.Paint.Align.RIGHT
-                isAntiAlias = true
-            }
-
-            val ySteps = if (yRange > 2.0) listOf(-1.0, 0.0, 1.0, 2.0, 3.0, 4.0) else listOf(0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0)
-            ySteps.forEach { step ->
-                if (step >= yMin - 0.2 && step <= yMax + 0.2) {
-                    val y = yForLevel(step)
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(0f, y),
-                        end = Offset(width, y),
-                        strokeWidth = 1.dp.toPx()
-                    )
-                    drawContext.canvas.nativeCanvas.drawText(
-                        "%.1f m".format(step),
-                        -5.dp.toPx(),
-                        y + labelTextSize / 3,
-                        gridLabelPaint
-                    )
-                }
-            }
-
-            // Time labels
-        val hourPaint = android.graphics.Paint().apply {
+        // Y-Axis Labels & Grid
+        val axisPaint = android.graphics.Paint().apply {
             color = android.graphics.Color.WHITE
             alpha = 100
             textSize = labelTextSize
-            textAlign = android.graphics.Paint.Align.CENTER
             isAntiAlias = true
         }
-        var hourTick = windowStart.withMinute(0).withSecond(0).withNano(0)
-        hourTick = hourTick.plusHours(((6 - hourTick.hour % 6) % 6).toLong())
-        while (!hourTick.isAfter(windowEnd)) {
-            val minutes = java.time.Duration.between(windowStart, hourTick).toMinutes().toDouble()
-            val x = xForMinute(minutes)
-            drawContext.canvas.nativeCanvas.drawText(
-                "%02d:00".format(hourTick.hour),
-                x,
-                height - 5.dp.toPx(),
-                hourPaint
-            )
-            hourTick = hourTick.plusHours(6)
+
+        listOf(0.0, 1.0, 2.0, 3.0, 4.0).forEach { step ->
+            if (step in yMin..yMax) {
+                val y = yForLevel(step)
+                drawLine(gridColor, Offset(paddingLeft, y), Offset(width - paddingRight, y))
+                drawContext.canvas.nativeCanvas.drawText("%.0f m".format(step), paddingLeft - 5.dp.toPx(), y + labelTextSize/3, axisPaint.apply { textAlign = android.graphics.Paint.Align.RIGHT })
+            }
         }
 
-        // Curve
-        if (pts.size >= 2) {
-            val path = Path()
-            val fillPath = Path()
-            var started = false
-            val step = 4
-            for (xPx in 0..width.toInt() step step) {
-                val minute = xPx.toDouble() / width * windowMinutes
-                val before = pts.lastOrNull { it.first <= minute }
-                val after = pts.firstOrNull { it.first > minute }
-                val level: Double = when {
-                    before != null && after != null -> {
-                        val span = after.first - before.first
-                        val progress = if (span > 0.0) ((minute - before.first) / span) else 0.0
-                        val cosInterp = (1 - kotlin.math.cos(progress * Math.PI)) / 2.0
-                        before.second + (after.second - before.second) * cosInterp
-                    }
-                    before != null -> before.second
-                    after != null -> after.second
-                    else -> (yMax + yMin) / 2.0
-                }
-                val yPos = yForLevel(level)
-                if (!started) {
-                    path.moveTo(xPx.toFloat(), yPos)
-                    fillPath.moveTo(xPx.toFloat(), plotBottomY)
-                    fillPath.lineTo(xPx.toFloat(), yPos)
-                    started = true
-                } else {
-                    path.lineTo(xPx.toFloat(), yPos)
-                    fillPath.lineTo(xPx.toFloat(), yPos)
+        // MHW / MNW Reference Lines
+        mhw?.let {
+            val y = yForLevel(it)
+            drawLine(Color.White.copy(alpha = 0.3f), Offset(paddingLeft, y), Offset(width - paddingRight, y), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
+            drawContext.canvas.nativeCanvas.drawText("MHW", 2.dp.toPx(), y - 4.dp.toPx(), axisPaint.apply { alpha = 180; textAlign = android.graphics.Paint.Align.LEFT })
+            drawContext.canvas.nativeCanvas.drawText("%.2f m".format(it), width - 2.dp.toPx(), y - 4.dp.toPx(), axisPaint.apply { textAlign = android.graphics.Paint.Align.RIGHT })
+        }
+        mnw?.let {
+            val y = yForLevel(it)
+            drawLine(Color.White.copy(alpha = 0.3f), Offset(paddingLeft, y), Offset(width - paddingRight, y), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
+            drawContext.canvas.nativeCanvas.drawText("MNW", 2.dp.toPx(), y + labelTextSize + 2.dp.toPx(), axisPaint.apply { textAlign = android.graphics.Paint.Align.LEFT })
+            drawContext.canvas.nativeCanvas.drawText("%.2f m".format(it), width - 2.dp.toPx(), y + labelTextSize + 2.dp.toPx(), axisPaint.apply { textAlign = android.graphics.Paint.Align.RIGHT })
+        }
+
+        // X-Axis (Time & Date)
+        val hourPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            alpha = 150
+            textSize = labelTextSize
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        val datePaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            alpha = 220
+            textSize = dateTextSize
+            textAlign = android.graphics.Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+
+        var tick = windowStart.withMinute(0).withSecond(0).withNano(0)
+        while (tick.isBefore(windowStart)) tick = tick.plusHours(1)
+
+        var lastDate: LocalDate? = null
+        while (!tick.isAfter(windowEnd)) {
+            val minutes = java.time.Duration.between(windowStart, tick).toMinutes().toDouble()
+            val x = xForMinute(minutes)
+
+            if (tick.hour % 4 == 0) {
+                drawLine(gridColor, Offset(x, paddingTop), Offset(x, plotBottomY))
+                drawContext.canvas.nativeCanvas.drawText(tick.format(DateTimeFormatter.ofPattern("HH")), x, plotBottomY + 16.dp.toPx(), hourPaint)
+
+                if (lastDate == null || tick.toLocalDate() != lastDate) {
+                    drawContext.canvas.nativeCanvas.drawText(tick.format(DateTimeFormatter.ofPattern("dd.MM.")), x, plotBottomY + 34.dp.toPx(), datePaint)
+                    lastDate = tick.toLocalDate()
                 }
             }
-            fillPath.lineTo(width, plotBottomY)
-            fillPath.close()
+            tick = tick.plusHours(1)
+        }
 
-            drawPath(fillPath, color = gradientColor)
-            drawPath(
-                path = path,
-                color = tideColor,
-                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-            )
+        drawContext.canvas.nativeCanvas.drawText("Gesetzliche Zeit", width/2, height - 5.dp.toPx(), hourPaint.apply { alpha = 80 })
 
-            // Points
-            for ((minutes, level, type) in pts) {
-                if (minutes < 0 || minutes > windowMinutes) continue
-                val cx = xForMinute(minutes)
-                val cy = yForLevel(level)
-                drawCircle(
-                    color = if (type == "HW") Color(0xFF4FC3F7) else Color(0xFFFFB74D),
-                    radius = 4.dp.toPx(),
-                    center = Offset(cx, cy)
-                )
-                drawCircle(
-                    color = Color.White,
-                    radius = 2.dp.toPx(),
-                    center = Offset(cx, cy)
-                )
+        // The Curve
+        val nowMinutes = java.time.Duration.between(windowStart, now).toMinutes().toDouble()
+        val step = 2
+        val pastPath = Path()
+        val futurePath = Path()
+
+        fun getLevelAt(min: Double): Double {
+            val beforeIdx = pts.indexOfLast { it.first <= min }
+            return if (beforeIdx != -1 && beforeIdx < pts.size - 1) {
+                val before = pts[beforeIdx]
+                val after = pts[beforeIdx + 1]
+                val progress = (min - before.first) / (after.first - before.first)
+                val cosInterp = (1 - kotlin.math.cos(progress * Math.PI)) / 2.0
+                before.second + (after.second - before.second) * cosInterp
+            } else if (beforeIdx != -1) pts[beforeIdx].second else pts.firstOrNull()?.second ?: 0.0
+        }
+
+        // Draw past segment
+        val pastPixels = (nowMinutes / windowMinutes * drawWidth).toInt().coerceIn(0, drawWidth.toInt())
+        if (nowMinutes > 0) {
+            for (xPx in 0..pastPixels step step) {
+                val minute = (xPx.toDouble() / drawWidth) * windowMinutes
+                val xPos = paddingLeft + xPx.toFloat()
+                val yPos = yForLevel(getLevelAt(minute))
+                if (xPx == 0) pastPath.moveTo(xPos, yPos) else pastPath.lineTo(xPos, yPos)
             }
+            // Ensure path reaches exactly the 'now' point
+            val yNow = yForLevel(getLevelAt(nowMinutes.coerceIn(0.0, windowMinutes)))
+            pastPath.lineTo(xForMinute(nowMinutes.coerceIn(0.0, windowMinutes)), yNow)
+        }
+
+        // Draw future segment
+        if (nowMinutes < windowMinutes) {
+            val yNow = yForLevel(getLevelAt(nowMinutes.coerceIn(0.0, windowMinutes)))
+            futurePath.moveTo(xForMinute(nowMinutes.coerceIn(0.0, windowMinutes)), yNow)
+
+            // Adjust loop start to avoid overlap and gaps
+            val startFutureMin = nowMinutes.coerceAtLeast(0.0)
+            val startX = (startFutureMin / windowMinutes * drawWidth).toInt()
+            for (xPx in startX..drawWidth.toInt() step step) {
+                val minute = (xPx.toDouble() / drawWidth) * windowMinutes
+                if (minute <= nowMinutes) continue
+                val xPos = paddingLeft + xPx.toFloat()
+                val yPos = yForLevel(getLevelAt(minute))
+                futurePath.lineTo(xPos, yPos)
+            }
+            // Ensure path reaches exactly the end
+            futurePath.lineTo(paddingLeft + drawWidth, yForLevel(getLevelAt(windowMinutes)))
+        }
+
+        drawPath(pastPath, pastColor, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+        drawPath(futurePath, futureColor, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+
+        // Points
+        for ((minutes, level, type) in pts) {
+            if (minutes < 0 || minutes > windowMinutes) continue
+            val cx = xForMinute(minutes)
+            val cy = yForLevel(level)
+            drawCircle(if (minutes <= nowMinutes) pastColor else futureColor, 4.dp.toPx(), Offset(cx, cy))
+            drawCircle(Color(0xFF1B4E7A), 2.dp.toPx(), Offset(cx, cy))
         }
 
         // Now line
-        val nowMinutes = java.time.Duration.between(windowStart, now).toMinutes().toDouble()
         if (nowMinutes in 0.0..windowMinutes) {
             val nowX = xForMinute(nowMinutes)
-            drawLine(
-                color = nowColor,
-                start = Offset(nowX, plotPaddingTop),
-                end = Offset(nowX, plotBottomY),
-                strokeWidth = 2.dp.toPx()
-            )
-            val nowPaint = android.graphics.Paint().apply {
-                color = android.graphics.Color.RED
-                textSize = labelTextSize
-                textAlign = android.graphics.Paint.Align.CENTER
-                isAntiAlias = true
-                isFakeBoldText = true
-            }
-            drawContext.canvas.nativeCanvas.drawText("JETZT", nowX, plotPaddingTop - 5.dp.toPx(), nowPaint)
+            drawLine(nowColor, Offset(nowX, paddingTop), Offset(nowX, plotBottomY), strokeWidth = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f)))
         }
     }
 }

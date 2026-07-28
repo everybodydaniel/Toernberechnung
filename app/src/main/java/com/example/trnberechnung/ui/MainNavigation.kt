@@ -2,8 +2,10 @@ package com.example.trnberechnung.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
@@ -11,11 +13,11 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Sailing
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Chat
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -75,30 +77,100 @@ fun MainAppScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.LocationOn,
-                            contentDescription = "Logo",
-                            tint = NauticalPrimary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(NauticalSurface.copy(alpha = 0.6f))
+                            .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(NauticalPrimary, NauticalSecondary)
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = "Logo",
+                                tint = NauticalTextOnPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            "TÖRNCALCULATOR",
+                            "TideNode",
                             fontWeight = FontWeight.ExtraBold,
                             color = NauticalTextPrimary,
                             fontSize = 20.sp,
-                            letterSpacing = 1.sp
+                            letterSpacing = (-0.5).sp
                         )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.loadData() }) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = NauticalPrimary)
+                    IconButton(
+                        onClick = {
+                            navController.navigate(Screen.Crew.route) {
+                                popUpTo(navController.graph.startDestinationId) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(NauticalSurface.copy(alpha = 0.6f))
+                            .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = "Notifications",
+                            tint = NauticalTextPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
+
+                    IconButton(
+                        onClick = { viewModel.loadData() },
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(NauticalSurface.copy(alpha = 0.6f))
+                            .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = NauticalTextPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
                     Box {
-                        IconButton(onClick = { expandedMenu = true }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = NauticalTextSecondary)
+                        IconButton(
+                            onClick = { expandedMenu = true },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(NauticalSurface.copy(alpha = 0.6f))
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = NauticalTextPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                         DropdownMenu(
                             expanded = expandedMenu,
@@ -123,17 +195,12 @@ fun MainAppScreen(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = NauticalBackground
                 ),
-                modifier = Modifier
-                    .shadow(elevation = 4.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(NauticalBackground, NauticalSurface)
-                        )
-                    )
+                modifier = Modifier.shadow(elevation = 0.dp)
             )
         },
         bottomBar = {

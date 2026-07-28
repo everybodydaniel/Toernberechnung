@@ -11,7 +11,7 @@ fun HighLowWaterDto.toModel(latOffsetM: Double = 0.0): TideEvent {
     return TideEvent(
         timestamp = eventTimestamp,
         type = event,
-        value = rawValueM?.let { it - latOffsetM } 
+        value = rawValueM?.let { it - latOffsetM }
     )
 }
 
@@ -24,9 +24,9 @@ fun WaterLevelItemDto.toModel(): TideStationData {
         region = region,
         latitude = latitude,
         longitude = longitude,
-        waterLevel = water_level?.toDoubleOrNull()?.let { it / 100.0 },
-        meanHighWater = mean_high_water?.toDoubleOrNull()?.let { it / 100.0 },
-        meanLowWater = mean_low_water?.toDoubleOrNull()?.let { it / 100.0 },
+        waterLevel = water_level?.toDoubleOrNull()?.let { (it / 100.0) - latOffsetM },
+        meanHighWater = mean_high_water?.toDoubleOrNull()?.let { (it / 100.0) - latOffsetM },
+        meanLowWater = mean_low_water?.toDoubleOrNull()?.let { (it / 100.0) - latOffsetM },
         gaugeLabel = gauge_label,
         gaugeZeroNhn = gaugezero_relative_to_nhn?.toDoubleOrNull()?.let { it / 100.0 },
         chartDatumGauge = latOffsetM,

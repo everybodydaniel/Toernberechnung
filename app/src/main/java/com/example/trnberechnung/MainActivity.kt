@@ -87,6 +87,7 @@ class MainActivity : ComponentActivity() {
                 db.checklistDao(),
                 db.plannerEventDao(),
                 db.seafarerMessageDao(),
+                tideNodeApplication.maritimeNoticeRepository,
             )
         val factory = TideViewModelFactory(repository)
 
@@ -175,6 +176,9 @@ class MainActivity : ComponentActivity() {
                                 onToggleDarkMode = { mode ->
                                     isDarkMode = mode
                                     authRepo.isDarkMode = mode
+                                },
+                                onReplayOnboarding = {
+                                    onboardingCompleted = false
                                 }
                             )
                         }

@@ -125,6 +125,20 @@ class CrewspaceViewModel(
         _uiState.update { it.copy(searchQuery = query) }
     }
 
+    /**
+     * Refresh hook used by the single app header. Room-backed UI stays intact
+     * while the remote conversation/event state is synchronized.
+     */
+    fun refresh() {
+        viewModelScope.launch {
+            runCatching { chatRepository.activate() }
+                .onFailure { showChatError(it) }
+            runCatching { chatRepository.syncConversations() }
+                .onFailure { showChatError(it) }
+            runCatching { repository.syncRemoteEvents(authRepo.getIdToken()) }
+        }
+    }
+
     // ══════════════════════════════════════════════════════════════
     // Chats
     // ══════════════════════════════════════════════════════════════
@@ -439,37 +453,4 @@ class CrewspaceViewModel(
         }
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // AI Assistent (Gemini 2.5 Flash)
-    // ══════════════════════════════════════════════════════════════
-
-    fun updateAiInput(text: String) {
-        _uiState.update { it.copy(aiInput = text) }
-    }
-
-    fun sendAiMessage() {
-        val state = _uiState.value
-        val text = state.aiInput.trim()
-        if (text.isBlank() || state.aiIsLoading) return
-
-        val userMessage = AiChatMessage(content = text, isFromUser = true)
-        _uiState.update {
-            it.copy(
-                aiMessages = it.aiMessages + userMessage,
-                aiInput = "",
-                aiIsLoading = true
-            )
-        }
-
-        viewModelScope.launch {
-            val response = com.example.trnberechnung.network.GeminiHelper.askQuestion(text)
-            val aiMessage = AiChatMessage(content = response, isFromUser = false)
-            _uiState.update {
-                it.copy(
-                    aiMessages = it.aiMessages + aiMessage,
-                    aiIsLoading = false
-                )
-            }
-        }
-    }
 }

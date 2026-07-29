@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -51,6 +52,7 @@ import kotlin.math.sin
 @Composable
 fun RevierScreen(
     viewModel: TideViewModel,
+    topOverlayClearance: Dp = 0.dp,
     bottomOverlayClearance: Dp = 0.dp
 ) {
     var selectedTab by remember { mutableStateOf(0) } // 0 = Wetter, 1 = Gezeiten
@@ -65,18 +67,21 @@ fun RevierScreen(
 
     val dailyForecast = remember(forecast) { aggregateToDays(forecast) }
 
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val revierBgGradient = if (isDarkTheme) {
+        Brush.verticalGradient(colors = listOf(Color(0xFF0F172A), Color(0xFF020617)))
+    } else {
+        Brush.verticalGradient(colors = listOf(Color(0xFF3A8DBC), Color(0xFF1B4E7A)))
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF3A8DBC), Color(0xFF1B4E7A))
-                )
-            )
+            .testTag("screen_revier")
+            .background(revierBgGradient)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header Area (Removed redundant RevierHeader, now handled by MainNavigation)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(topOverlayClearance + 6.dp))
             RevierTabSwitcher(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
             Spacer(modifier = Modifier.height(12.dp))
 

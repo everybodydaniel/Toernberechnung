@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -58,21 +59,44 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
+import androidx.compose.ui.graphics.luminance
+
 // ══════════════════════════════════════════════════════════════
-// Crewspace Farbpalette (helles Design, wie in den Screenshots)
+// Crewspace Farbpalette (dynamisch an Dark & Light Mode angepasst)
 // ══════════════════════════════════════════════════════════════
-private val CrewspaceBg = Color(0xFFF2F2F7)             // iOS-artiger Hintergrund
-private val CrewspaceSurface = Color.White
-private val CrewspacePrimary = Color(0xFF1B3A5C)         // Dunkles Marineblau (Titel)
-private val CrewspaceAccent = Color(0xFF2563EB)          // Kräftiges Blau (Buttons, aktiver Tab)
-private val CrewspaceTextPrimary = Color(0xFF1C1C1E)     // Fast-Schwarz
-private val CrewspaceTextSecondary = Color(0xFF8E8E93)   // Grau
-private val CrewspaceTabBg = Color(0xFFE5E5EA)           // Tab-Hintergrund (inaktiv)
-private val CrewspaceTabActive = Color(0xFF1B3A5C)       // Aktiver Tab (dunkel)
-private val CrewspaceTabActiveText = Color.White
-private val CrewspaceTabInactiveText = Color(0xFF6B7280)
-private val CrewspaceDivider = Color(0xFFE5E5EA)
-private val CrewspaceCardBg = Color(0xFFF8F8FA)          // Leicht getönter Card-Hintergrund
+private val CrewspaceBg: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF0D1B2A) else Color(0xFFF2F2F7)
+
+private val CrewspaceSurface: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E2838) else Color.White
+
+private val CrewspacePrimary: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF93C5FD) else Color(0xFF1B3A5C)
+
+private val CrewspaceAccent: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF60A5FA) else Color(0xFF2563EB)
+
+private val CrewspaceTextPrimary: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFFF8FAFC) else Color(0xFF1C1C1E)
+
+private val CrewspaceTextSecondary: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF94A3B8) else Color(0xFF8E8E93)
+
+private val CrewspaceTabBg: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E293B) else Color(0xFFE5E5EA)
+
+private val CrewspaceTabActive: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF2563EB) else Color(0xFF1B3A5C)
+
+private val CrewspaceTabActiveText: Color = Color.White
+
+private val CrewspaceTabInactiveText: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF94A3B8) else Color(0xFF6B7280)
+
+private val CrewspaceDivider: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF334155) else Color(0xFFE5E5EA)
+private val CrewspaceCardBg: Color
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E293B) else Color(0xFFF8F8FA)
 private val CrewspaceUnreadBadge = Color(0xFF2563EB)
 
 /**
@@ -84,6 +108,7 @@ fun CrewspaceScreen(
     viewModel: CrewspaceViewModel,
     authRepo: AuthRepository? = null,
     onNavigateToLogin: () -> Unit = {},
+    topOverlayClearance: Dp = 0.dp,
     bottomOverlayClearance: Dp = 0.dp
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -114,9 +139,11 @@ fun CrewspaceScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .testTag("screen_crewspace")
             .background(CrewspaceBg)
             .padding(bottom = bottomOverlayClearance)
     ) {
+        Spacer(modifier = Modifier.height(topOverlayClearance + 4.dp))
         // ── Header ──
         CrewspaceHeader()
 
@@ -159,9 +186,6 @@ fun CrewspaceScreen(
                 CrewspaceTab.CREW -> {
                     CrewTabContent(uiState = uiState, viewModel = viewModel)
                 }
-                CrewspaceTab.AI_ASSISTENT -> {
-                    AiAssistentTabContent(uiState = uiState, viewModel = viewModel)
-                }
             }
         }
     }
@@ -171,8 +195,6 @@ fun CrewspaceScreen(
         NewConversationBottomSheet(uiState = uiState, viewModel = viewModel)
     }
 }
-
-// ══════════════════════════════════════════════════════════════
 // Header: "Crewspace" Titel + Untertitel + Edit-Button
 // ══════════════════════════════════════════════════════════════
 
@@ -199,24 +221,6 @@ private fun CrewspaceHeader() {
                 color = CrewspaceTextSecondary
             )
         }
-
-        // Edit-Button (oben rechts)
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(CrewspaceSurface)
-                .border(1.dp, CrewspaceDivider, CircleShape)
-                .clickable { /* Bearbeiten-Aktion */ },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.Edit,
-                contentDescription = "Bearbeiten",
-                tint = CrewspacePrimary,
-                modifier = Modifier.size(18.dp)
-            )
-        }
     }
 }
 
@@ -234,7 +238,6 @@ private val tabItems = listOf(
     TabItem(CrewspaceTab.CHATS, Icons.AutoMirrored.Outlined.Chat, "Chats"),
     TabItem(CrewspaceTab.PLANUNG, Icons.Outlined.DateRange, "Planung"),
     TabItem(CrewspaceTab.CREW, Icons.Outlined.Groups, "Crew"),
-    TabItem(CrewspaceTab.AI_ASSISTENT, Icons.Default.Star, "AI")
 )
 
 @Composable
@@ -2315,300 +2318,3 @@ private fun CrewspaceTextField(
 }
 
 // ══════════════════════════════════════════════════════════════
-// AI Assistent Tab – Gemini 2.5 Flash Chat
-// ══════════════════════════════════════════════════════════════
-
-private val AiAccentColor = Color(0xFF8B5CF6)    // Lila-Akzent für AI
-private val AiBubbleUser = Color(0xFF2563EB)      // Blau (User)
-private val AiBubbleAi = Color(0xFFF3F0FF)        // Helles Lila (AI)
-private val AiTextOnBubbleAi = Color(0xFF1C1C1E)  // Dunkel auf hellem Hintergrund
-
-@Composable
-fun AiAssistentTabContent(
-    uiState: CrewspaceUiState,
-    viewModel: CrewspaceViewModel
-) {
-    val listState = rememberLazyListState()
-    val focusManager = LocalFocusManager.current
-
-    // Auto-scroll wenn neue Nachricht kommt
-    LaunchedEffect(uiState.aiMessages.size) {
-        if (uiState.aiMessages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.aiMessages.size - 1)
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(CrewspaceBg)
-    ) {
-        // ── Willkommens-Header ──
-        if (uiState.aiMessages.isEmpty()) {
-            AiWelcomeHeader()
-        }
-
-        // ── Nachrichten-Liste ──
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 12.dp)
-        ) {
-            items(uiState.aiMessages) { message ->
-                AiChatBubble(message = message)
-            }
-
-            // Loading-Indikator
-            if (uiState.aiIsLoading) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Start
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(AiBubbleAi)
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = AiAccentColor,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Denkt nach…",
-                                color = CrewspaceTextSecondary,
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // ── Schnellvorschläge (wenn noch keine Nachrichten) ──
-        if (uiState.aiMessages.isEmpty() && !uiState.aiIsLoading) {
-            AiQuickSuggestions(onSuggestionClick = { suggestion ->
-                viewModel.updateAiInput(suggestion)
-                viewModel.sendAiMessage()
-            })
-        }
-
-        // ── Input-Leiste ──
-        AiInputBar(
-            input = uiState.aiInput,
-            isLoading = uiState.aiIsLoading,
-            onInputChange = { viewModel.updateAiInput(it) },
-            onSend = {
-                viewModel.sendAiMessage()
-                focusManager.clearFocus()
-            }
-        )
-    }
-}
-
-@Composable
-private fun AiWelcomeHeader() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(AiAccentColor.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.Star,
-                contentDescription = "AI",
-                tint = AiAccentColor,
-                modifier = Modifier.size(28.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "Törn-Assistent",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = CrewspacePrimary
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Powered by Gemini 2.5 Flash",
-            fontSize = 12.sp,
-            color = AiAccentColor,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Frag mich alles rund ums Segeln, Navigation,\nWetter, Gezeiten und Revierplanung!",
-            fontSize = 14.sp,
-            color = CrewspaceTextSecondary,
-            textAlign = TextAlign.Center,
-            lineHeight = 20.sp
-        )
-    }
-}
-
-@Composable
-private fun AiQuickSuggestions(onSuggestionClick: (String) -> Unit) {
-    val suggestions = listOf(
-        "⛵ Wie bereite ich mich auf eine Nordsee-Überfahrt vor?",
-        "🌊 Erkläre mir die Gezeitenberechnung",
-        "☀️ Tipps für Segeln bei Starkwind",
-        "🗺️ Beste Segelreviere in der Ostsee"
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        suggestions.forEach { suggestion ->
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSuggestionClick(suggestion) },
-                shape = RoundedCornerShape(12.dp),
-                color = CrewspaceSurface,
-                border = androidx.compose.foundation.BorderStroke(1.dp, CrewspaceDivider)
-            ) {
-                Text(
-                    text = suggestion,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    fontSize = 13.sp,
-                    color = CrewspaceTextPrimary
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AiChatBubble(message: AiChatMessage) {
-    val isUser = message.isFromUser
-    val alignment = if (isUser) Arrangement.End else Arrangement.Start
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = alignment
-    ) {
-        if (!isUser) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(AiAccentColor.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = "AI",
-                    tint = AiAccentColor,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(6.dp))
-        }
-
-        Box(
-            modifier = Modifier
-                .widthIn(max = 280.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (isUser) 18.dp else 4.dp,
-                        bottomEnd = if (isUser) 4.dp else 18.dp
-                    )
-                )
-                .background(if (isUser) AiBubbleUser else AiBubbleAi)
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            Text(
-                text = message.content,
-                color = if (isUser) Color.White else AiTextOnBubbleAi,
-                fontSize = 14.sp,
-                lineHeight = 20.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun AiInputBar(
-    input: String,
-    isLoading: Boolean,
-    onInputChange: (String) -> Unit,
-    onSend: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = CrewspaceSurface,
-        shadowElevation = 8.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = input,
-                onValueChange = onInputChange,
-                placeholder = {
-                    Text("Frag den Törn-Assistenten…", color = CrewspaceTextSecondary, fontSize = 14.sp)
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(24.dp),
-                singleLine = false,
-                maxLines = 4,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { onSend() }),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AiAccentColor,
-                    unfocusedBorderColor = CrewspaceDivider,
-                    focusedContainerColor = CrewspaceCardBg,
-                    unfocusedContainerColor = CrewspaceCardBg,
-                    cursorColor = AiAccentColor,
-                    focusedTextColor = CrewspaceTextPrimary,
-                    unfocusedTextColor = CrewspaceTextPrimary
-                )
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
-                onClick = onSend,
-                enabled = input.isNotBlank() && !isLoading,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (input.isNotBlank() && !isLoading) AiAccentColor
-                        else CrewspaceDivider
-                    )
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Senden",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}

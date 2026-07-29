@@ -29,10 +29,14 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -117,7 +121,7 @@ fun OnboardingScreen(onCompleted: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White, disabledContainerColor = accent.copy(alpha = .35f), disabledContentColor = Color.White.copy(alpha = .75f))
             ) {
                 Text(stringResource(if (pagerState.currentPage == OnboardingState.LAST_PAGE) R.string.onboarding_start else R.string.onboarding_continue), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
-                Icon(if (pagerState.currentPage == OnboardingState.LAST_PAGE) Icons.Default.Check else Icons.Default.LocationOn, null)
+                Icon(if (pagerState.currentPage == OnboardingState.LAST_PAGE) Icons.Default.Check else Icons.AutoMirrored.Filled.ArrowForward, null)
             }
             Spacer(Modifier.height(10.dp))
         }
@@ -127,8 +131,13 @@ fun OnboardingScreen(onCompleted: () -> Unit) {
 @Composable
 private fun OnboardingBrand() =
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        TideNodeMark(Modifier.size(44.dp))
-        Spacer(Modifier.width(8.dp))
+        androidx.compose.foundation.Image(
+            painter = painterResource(R.drawable.tidenode_mark),
+            contentDescription = "TideNode Logo",
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)),
+        )
+        Spacer(Modifier.width(10.dp))
         Text(
             text = stringResource(R.string.onboarding_brand),
             color = TideNodeNavy,
@@ -192,7 +201,25 @@ private fun IllustrationCard(page: Int) =
 
 @Composable private fun RouteIllustration() {
     val transition = rememberInfiniteTransition(label = "route")
-    val boatOffset by transition.animateFloat(0f, 8f, infiniteRepeatable(tween(1700), RepeatMode.Reverse), label = "boat")
+    val boatBob by transition.animateFloat(
+        initialValue = -5f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse),
+        label = "boatBob"
+    )
+    val dashPhase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = -120f,
+        animationSpec = infiniteRepeatable(tween(3000), RepeatMode.Restart),
+        label = "dashPhase"
+    )
+    val waveOffset by transition.animateFloat(
+        initialValue = -8f,
+        targetValue = 8f,
+        animationSpec = infiniteRepeatable(tween(2600), RepeatMode.Reverse),
+        label = "waveOffset"
+    )
+
     Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(30.dp))) {
         val scale = size.minDimension
         drawRoundRect(
@@ -202,10 +229,11 @@ private fun IllustrationCard(page: Int) =
         repeat(3) { index ->
             val top = size.height * (.47f + index * .15f)
             val waveDepth = scale * (.030f + index * .003f)
+            val shift = if (index % 2 == 0) waveOffset else -waveOffset
             val path = Path().apply {
-                moveTo(0f, top)
-                cubicTo(size.width * .22f, top - waveDepth, size.width * .44f, top + waveDepth, size.width * .64f, top + waveDepth * .14f)
-                cubicTo(size.width * .82f, top - waveDepth * .74f, size.width, top + waveDepth * .54f, size.width, top + waveDepth * .54f)
+                moveTo(0f, top + shift * 0.3f)
+                cubicTo(size.width * .22f + shift, top - waveDepth, size.width * .44f, top + waveDepth, size.width * .64f + shift, top + waveDepth * .14f)
+                cubicTo(size.width * .82f, top - waveDepth * .74f, size.width, top + waveDepth * .54f + shift * 0.3f, size.width, top + waveDepth * .54f)
                 lineTo(size.width, size.height)
                 lineTo(0f, size.height)
                 close()
@@ -219,7 +247,7 @@ private fun IllustrationCard(page: Int) =
         }
 
         val start = Offset(size.width * .14f, size.height * .70f)
-        val boat = Offset(size.width * .83f, size.height * .33f + boatOffset)
+        val boat = Offset(size.width * .83f, size.height * .33f + boatBob)
         val markerRadius = scale * .043f
         val completeRoute = Path().apply {
             moveTo(start.x, start.y)
@@ -239,16 +267,18 @@ private fun IllustrationCard(page: Int) =
         )
         drawPath(
             path = visibleRoute,
-            color = Color.White.copy(alpha = .88f),
+            color = Color.White.copy(alpha = .92f),
             style = Stroke(
-                width = scale * .0135f,
+                width = scale * .014f,
                 cap = StrokeCap.Round,
                 pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
                     floatArrayOf(scale * .034f, scale * .024f),
+                    phase = dashPhase
                 ),
             ),
         )
 
+        drawCircle(Color.White.copy(alpha = 0.35f), radius = markerRadius * 1.4f, center = start)
         drawCircle(Color.White, radius = markerRadius, center = start)
         val pinHeight = markerRadius * 1.24f
         val pinWidth = pinHeight * .68f
@@ -332,7 +362,27 @@ private fun IllustrationCard(page: Int) =
 }
 
 @Composable
-private fun WeatherIllustration() =
+private fun WeatherIllustration() {
+    val transition = rememberInfiniteTransition(label = "weather")
+    val sunRotate by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(14000), RepeatMode.Restart),
+        label = "sunRotate"
+    )
+    val sunPulse by transition.animateFloat(
+        initialValue = 0.90f,
+        targetValue = 1.10f,
+        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse),
+        label = "sunPulse"
+    )
+    val cardFloat by transition.animateFloat(
+        initialValue = -3f,
+        targetValue = 3f,
+        animationSpec = infiniteRepeatable(tween(2400), RepeatMode.Reverse),
+        label = "cardFloat"
+    )
+
     Box(
         Modifier
             .fillMaxSize()
@@ -362,10 +412,20 @@ private fun WeatherIllustration() =
                     )
                 }
                 Spacer(Modifier.weight(1f))
-                Text("☀", color = Color(0xFFFFC400), fontSize = 46.sp)
+                Text(
+                    "☀",
+                    color = Color(0xFFFFC400),
+                    fontSize = 46.sp,
+                    modifier = Modifier
+                        .scale(sunPulse)
+                        .graphicsLayer(rotationZ = sunRotate)
+                )
             }
             Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                modifier = Modifier.graphicsLayer(translationY = cardFloat)
+            ) {
                 Text(
                     stringResource(R.string.onboarding_weather_temperature),
                     color = Color.White,
@@ -392,6 +452,7 @@ private fun WeatherIllustration() =
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer(translationY = -cardFloat * 0.5f)
                     .clip(RoundedCornerShape(22.dp))
                     .background(Color.White.copy(alpha = .16f))
                     .padding(vertical = 8.dp),
@@ -431,24 +492,51 @@ private fun WeatherIllustration() =
             )
         }
     }
+}
 
 @Composable
-private fun CrewIllustration() =
+private fun CrewIllustration() {
+    val transition = rememberInfiniteTransition(label = "crew")
+    val avatarBob1 by transition.animateFloat(
+        initialValue = -4f,
+        targetValue = 4f,
+        animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse),
+        label = "avatarBob1"
+    )
+    val avatarBob2 by transition.animateFloat(
+        initialValue = 4f,
+        targetValue = -4f,
+        animationSpec = infiniteRepeatable(tween(2400), RepeatMode.Reverse),
+        label = "avatarBob2"
+    )
+    val dashPhase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = -60f,
+        animationSpec = infiniteRepeatable(tween(2500), RepeatMode.Restart),
+        label = "cDash"
+    )
+
     Column(
         Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Box(Modifier.fillMaxWidth().height(168.dp), contentAlignment = Alignment.BottomCenter) {
-            CrewConnectionLine(Modifier.fillMaxSize())
+            CrewConnectionLine(Modifier.fillMaxSize(), dashPhase = dashPhase)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Bottom,
             ) {
-                Box(Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) {
+                Box(
+                    Modifier.weight(1f).graphicsLayer(translationY = avatarBob1),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
                     CrewAvatar(OnboardingBrandBlue, stringResource(R.string.onboarding_crew_question))
                 }
-                Box(Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) {
+                Box(
+                    Modifier.weight(1f).graphicsLayer(translationY = avatarBob2),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
                     CrewAvatar(OnboardingTeal, stringResource(R.string.onboarding_crew_reply))
                 }
             }
@@ -469,10 +557,11 @@ private fun CrewIllustration() =
             }
         }
     }
+}
 
 /** The light dashed arch visually connects the two crew members, as in the iOS card. */
 @Composable
-private fun CrewConnectionLine(modifier: Modifier = Modifier) =
+private fun CrewConnectionLine(modifier: Modifier = Modifier, dashPhase: Float = 0f) =
     Canvas(modifier) {
         val leftCenterX = size.width * .25f
         val rightCenterX = size.width * .75f
@@ -498,6 +587,7 @@ private fun CrewConnectionLine(modifier: Modifier = Modifier) =
                 cap = StrokeCap.Round,
                 pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
                     floatArrayOf(7.dp.toPx(), 5.dp.toPx()),
+                    phase = dashPhase
                 ),
             ),
         )

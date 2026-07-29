@@ -16,6 +16,28 @@ object NauticalRouterV2 {
 
     private const val DEPTH_SAMPLE_M = 250.0
 
+    /**
+     * Result used by new planning code that must never mistake a visual
+     * straight-line fallback for a calculated sea route.
+     *
+     * [calculateRoute] intentionally keeps its legacy fallback behaviour for
+     * the existing screens. New callers should use [calculateRouteResult].
+     */
+    sealed interface RouteResult {
+        data class Success(val points: List<LatLng>) : RouteResult
+
+        data class Incomplete(
+            val reason: FailureReason,
+            val message: String,
+        ) : RouteResult
+    }
+
+    enum class FailureReason {
+        SEA_MASK_NOT_READY,
+        NO_SEA_PATH,
+        INVALID_PATH,
+    }
+
     private val pathfinder = AStarPathfinder()
 
     private data class BridgeRule(val harbor: LatLng, val via: List<LatLng>, val matchRadiusM: Double)
@@ -91,18 +113,81 @@ object NauticalRouterV2 {
         return emptyList()
     }
 
-    fun calculateRoute(start: LatLng, end: LatLng): List<LatLng> {
+    fun calculateRouteResult(start: LatLng, end: LatLng): RouteResult {
         if (!SeaMask.ready) {
-            RouterLog.w(TAG, "SeaMask not ready, falling back to straight line ${start} → ${end}")
-            return listOf(start, end)
+            val message = "SeaMask ist noch nicht bereit."
+            RouterLog.w(TAG, "$message ${start} → ${end}")
+            return RouteResult.Incomplete(FailureReason.SEA_MASK_NOT_READY, message)
         }
-        val raw = pathfinder.findPath(start, end) ?: run {
-            RouterLog.w(TAG, "A* found no path ${start} → ${end} — fallback to straight line")
-            return listOf(start, end)
-        }
+
+        val raw = pathfinder.findPath(start, end)
+            ?: run {
+                val message = "Für diesen Abschnitt wurde kein Seeweg gefunden."
+                RouterLog.w(TAG, "$message ${start} → ${end}")
+                return RouteResult.Incomplete(FailureReason.NO_SEA_PATH, message)
+            }
         val smoothed = PathSmoother.smooth(raw)
-        BuoyValidator.validate(smoothed) 
-        return smoothed
+        if (smoothed.size < 2) {
+            val message = "Der berechnete Seeweg enthält zu wenige Punkte."
+            RouterLog.w(TAG, "$message ${start} → ${end}")
+            return RouteResult.Incomplete(FailureReason.INVALID_PATH, message)
+        }
+
+        BuoyValidator.validate(smoothed)
+        return RouteResult.Success(smoothed)
+    }
+
+    /**
+     * Safe equivalent of [calculateSegmentedRoute] for consumers that need
+     * geometry without depth classification. Harbour bridge waypoints are
+     * retained, but any missing A* leg makes the complete result incomplete.
+     */
+    fun calculateBridgedRouteResult(start: LatLng, end: LatLng): RouteResult {
+        val startBridges = bridgeForPoint(start)
+        val endBridges = bridgeForPoint(end).reversed()
+        val viaPoints =
+            buildList {
+                add(start)
+                addAll(startBridges)
+                for (point in endBridges) {
+                    if (none { it == point }) add(point)
+                }
+                add(end)
+            }
+        val completeRoute = mutableListOf<LatLng>()
+        for ((from, to) in viaPoints.zipWithNext()) {
+            when (val result = calculateRouteResult(from, to)) {
+                is RouteResult.Incomplete -> return result
+                is RouteResult.Success -> {
+                    if (completeRoute.isEmpty()) {
+                        completeRoute += result.points
+                    } else {
+                        completeRoute += result.points.drop(1)
+                    }
+                }
+            }
+        }
+        return if (completeRoute.size >= 2) {
+            RouteResult.Success(completeRoute)
+        } else {
+            RouteResult.Incomplete(
+                FailureReason.INVALID_PATH,
+                "Der berechnete Seeweg enthält zu wenige Punkte.",
+            )
+        }
+    }
+
+    fun calculateRoute(start: LatLng, end: LatLng): List<LatLng> {
+        return when (val result = calculateRouteResult(start, end)) {
+            is RouteResult.Success -> result.points
+            is RouteResult.Incomplete -> {
+                RouterLog.w(
+                    TAG,
+                    "${result.message} Legacy-Ansicht verwendet eine unbewertete Gerade.",
+                )
+                listOf(start, end)
+            }
+        }
     }
 
     fun calculateSegmentedRoute(

@@ -25,8 +25,12 @@ class TideRepository(
     private val crewMemberDao: CrewMemberDao,
     private val checklistDao: ChecklistDao,
     private val plannerEventDao: PlannerEventDao,
-    private val seafarerMessageDao: SeafarerMessageDao? = null
+    private val seafarerMessageDao: SeafarerMessageDao? = null,
+    private val maritimeNoticeRepository: MaritimeNoticeRepository? = null,
 ) {
+    private val noticeRepository: MaritimeNoticeRepository? by lazy {
+        maritimeNoticeRepository
+    }
 
     suspend fun getDataFromApi(): List<TideStationData> {
         return try {
@@ -190,77 +194,23 @@ class TideRepository(
         seafarerMessageDao?.search(query) ?: kotlinx.coroutines.flow.flowOf(emptyList())
 
     suspend fun markMessageAsRead(messageId: String) {
-        seafarerMessageDao?.markAsRead(messageId)
+        noticeRepository?.markRead(messageId) ?: seafarerMessageDao?.markAsRead(messageId)
     }
 
     suspend fun markAllMessagesAsRead() {
-        seafarerMessageDao?.markAllAsRead()
+        noticeRepository?.markAllRead() ?: seafarerMessageDao?.markAllAsRead()
     }
 
     suspend fun archiveMessage(messageId: String) {
-        seafarerMessageDao?.archive(messageId)
+        noticeRepository?.archiveLocally(messageId) ?: seafarerMessageDao?.archive(messageId)
     }
 
-    /**
-     * Fetch nautical warnings from BSH ELWIS API and store in local database.
-     */
-    suspend fun syncSeafarerMessages() {
-        try {
-            val response = RetrofitInstance.elwisApi.getNauticalWarnings(limit = 100)
-            if (response.isSuccessful) {
-                val features = response.body()?.features ?: emptyList()
-                val entities = features.mapNotNull { feature ->
-                    val props = feature.properties ?: return@mapNotNull null
-                    val id = feature.id ?: props.warningNumber ?: return@mapNotNull null
-
-                    // Parse coordinates if available
-                    var lat: Double? = null
-                    var lon: Double? = null
-                    feature.geometry?.coordinates?.let { coords ->
-                        if (coords.size >= 2) {
-                            try {
-                                lon = (coords[0] as? Number)?.toDouble()
-                                lat = (coords[1] as? Number)?.toDouble()
-                            } catch (_: Exception) { }
-                        }
-                    }
-
-                    // Parse dates
-                    val publishedAt = try {
-                        props.dateFrom?.let {
-                            java.time.OffsetDateTime.parse(it).toInstant().toEpochMilli()
-                        } ?: System.currentTimeMillis()
-                    } catch (_: Exception) { System.currentTimeMillis() }
-
-                    val expiresAt = try {
-                        props.dateTo?.let {
-                            java.time.OffsetDateTime.parse(it).toInstant().toEpochMilli()
-                        }
-                    } catch (_: Exception) { null }
-
-                    SeafarerMessageEntity(
-                        id = id,
-                        title = props.subject ?: props.warningType ?: "Nautische Warnung",
-                        area = props.areaDescription ?: "Nordsee",
-                        category = props.warningType ?: "NfS",
-                        content = props.text ?: "",
-                        publishedAt = publishedAt,
-                        expiresAt = expiresAt,
-                        source = props.authority ?: "BSH",
-                        bfsNumber = props.warningNumber ?: "",
-                        latitude = lat,
-                        longitude = lon
-                    )
-                }
-                if (entities.isNotEmpty()) {
-                    seafarerMessageDao?.insertAll(entities)
-                }
-                android.util.Log.d("ELWIS", "Synced ${entities.size} nautical warnings")
-            } else {
-                android.util.Log.e("ELWIS", "API error: ${response.code()}")
+    suspend fun syncSeafarerMessages(force: Boolean = false) {
+        val repository = noticeRepository ?: return
+        runCatching { repository.refresh(force) }
+            .onFailure { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                android.util.Log.e("ELWIS", "Sync error: ${error.message}", error)
             }
-        } catch (e: Exception) {
-            android.util.Log.e("ELWIS", "Sync error: ${e.message}", e)
-        }
     }
 }

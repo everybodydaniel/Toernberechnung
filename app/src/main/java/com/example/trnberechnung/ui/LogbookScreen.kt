@@ -68,6 +68,7 @@ internal const val CHECKLIST_SIZE = 15
 @Composable
 fun LogbookScreen(
     viewModel: TideViewModel,
+    topOverlayClearance: Dp = 0.dp,
     bottomOverlayClearance: Dp = 0.dp
 ) {
     val logs by viewModel.allLogs.collectAsState()
@@ -103,20 +104,18 @@ fun LogbookScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(NauticalBackground)
+            .testTag("screen_logbook")
+            .background(MaterialTheme.colorScheme.background)
     ) {
+        Spacer(modifier = Modifier.height(topOverlayClearance + 4.dp))
         Text(
             "LOGBUCH",
             modifier = Modifier
                 .padding(start = 16.dp, top = 8.dp, bottom = 4.dp)
                 .testTag("screen_header_logbook"),
             style = MaterialTheme.typography.labelMedium,
-            color = NauticalTextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 1.sp
-        )
-
-        DebugLogCard(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
         )
 
         if (logs.isEmpty()) {
@@ -130,12 +129,12 @@ fun LogbookScreen(
                     Text(
                         "Noch keine Törns gespeichert",
                         style = MaterialTheme.typography.titleMedium,
-                        color = NauticalTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         "Berechne einen Törn im Karte-Tab",
                         style = MaterialTheme.typography.bodySmall,
-                        color = NauticalTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -531,129 +530,6 @@ private fun formatStatus(status: String): String = when {
     status.contains("GO ✓") || status == "GO" -> "Befahrbar"
     status.contains("NO-GO") -> "Nicht befahrbar"
     else -> status
-}
-
-@Composable
-private fun DebugLogCard(modifier: Modifier = Modifier) {
-    val logs by com.example.trnberechnung.logic.RouterLog.logs.collectAsState()
-    val context = LocalContext.current
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = LogbookCardBg),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = !expanded }
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("🐛", fontSize = 16.sp)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "DEBUG-LOG",
-                color = NauticalTextSecondary,
-                letterSpacing = 1.sp,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                "${logs.size}",
-                color = NauticalTextSecondary,
-                fontSize = 12.sp
-            )
-            Spacer(Modifier.width(8.dp))
-            Icon(
-                if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = null,
-                tint = NauticalTextSecondary
-            )
-        }
-
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
-                if (logs.isEmpty()) {
-                    Text(
-                        "Noch keine Log-Einträge.\nRoute berechnen, dann erscheint hier was.",
-                        color = NauticalTextSecondary,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                } else {
-
-                    val scrollState = rememberScrollState()
-                    LaunchedEffect(logs.size) {
-
-                        scrollState.scrollTo(scrollState.maxValue)
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(240.dp)
-                            .background(LogbookSubCardBg, RoundedCornerShape(8.dp))
-                            .border(1.dp, LogbookFieldBorder, RoundedCornerShape(8.dp))
-                            .verticalScroll(scrollState)
-                            .padding(8.dp)
-                    ) {
-                        logs.forEach { line ->
-                            val color = when {
-                                " W/" in line || " E/" in line -> NauticalNoGo
-                                " I/" in line -> NauticalPrimary
-                                else -> NauticalTextPrimary
-                            }
-                            Text(
-                                line,
-                                color = color,
-                                fontSize = 10.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                lineHeight = 13.sp
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                                        as? android.content.ClipboardManager
-                                clipboard?.setPrimaryClip(
-                                    android.content.ClipData.newPlainText(
-                                        "Debug-Log",
-                                        logs.joinToString("\n")
-                                    )
-                                )
-                                android.widget.Toast.makeText(
-                                    context, "Log in Zwischenablage kopiert",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) { Text("Kopieren", fontSize = 12.sp) }
-
-                        OutlinedButton(
-                            onClick = { com.example.trnberechnung.logic.RouterLog.clear() },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = NauticalNoGo
-                            )
-                        ) { Text("Leeren", fontSize = 12.sp) }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-            }
-        }
-    }
 }
 
 internal data class LogbookDetails(

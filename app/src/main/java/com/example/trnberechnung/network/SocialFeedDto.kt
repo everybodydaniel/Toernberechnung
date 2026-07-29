@@ -284,10 +284,10 @@ data class ApiPresignUploadResponse(
 )
 
 // ══════════════════════════════════════════════════════════════
-// Maritime Notices (schema: maritime_notices)
+// Maritime Notices (Go social-feed wire contract)
 // ══════════════════════════════════════════════════════════════
 
-data class ApiMaritimeNotice(
+data class MaritimeNoticeSummaryDto(
     val id: String,
     @SerializedName("bfs_number") val bfsNumber: String,
     @SerializedName("is_temporary") val isTemporary: Boolean = false,
@@ -295,14 +295,66 @@ data class ApiMaritimeNotice(
     val title: String,
     @SerializedName("region_path") val regionPath: String,
     val location: String? = null,
-    val body: String,
     @SerializedName("published_at") val publishedAt: String? = null,
     @SerializedName("valid_from") val validFrom: String? = null,
     @SerializedName("valid_until") val validUntil: String? = null,
     @SerializedName("publication_state") val publicationState: String,
     val revision: Int,
-    @SerializedName("source_url") val sourceUrl: String? = null
+    @SerializedName("updated_at") val updatedAt: String,
+    @SerializedName("source_url") val sourceUrl: String? = null,
+    @SerializedName("parse_status") val parseStatus: String,
 )
+
+data class MaritimeNoticeDetailDto(
+    val id: String,
+    @SerializedName("bfs_number") val bfsNumber: String,
+    @SerializedName("is_temporary") val isTemporary: Boolean = false,
+    val publisher: String,
+    val title: String,
+    @SerializedName("region_path") val regionPath: String,
+    val location: String? = null,
+    val body: String = "",
+    @SerializedName("published_at") val publishedAt: String? = null,
+    @SerializedName("valid_from") val validFrom: String? = null,
+    @SerializedName("valid_until") val validUntil: String? = null,
+    @SerializedName("publication_state") val publicationState: String,
+    val revision: Int,
+    @SerializedName("updated_at") val updatedAt: String,
+    @SerializedName("source_url") val sourceUrl: String? = null,
+    @SerializedName("chart_references") private val wireChartReferences: List<String>? = null,
+    @SerializedName("coordinates") private val wireCoordinates: List<MaritimeNoticeCoordinateDto>? = null,
+    @SerializedName("previous_notices") private val wirePreviousNotices: List<String>? = null,
+    @SerializedName("parse_status") val parseStatus: String,
+) {
+    val chartReferences: List<String>
+        get() = wireChartReferences.orEmpty()
+
+    val coordinates: List<MaritimeNoticeCoordinateDto>
+        get() = wireCoordinates.orEmpty()
+
+    val previousNotices: List<String>
+        get() = wirePreviousNotices.orEmpty()
+}
+
+data class MaritimeNoticeCoordinateDto(
+    val latitude: Double,
+    val longitude: Double,
+    val label: String? = null,
+)
+
+data class MaritimeNoticeListResponseDto(
+    @SerializedName("notices") private val wireNotices: List<MaritimeNoticeSummaryDto>? = null,
+    @SerializedName("next_cursor") val nextCursor: String? = null,
+    @SerializedName("last_ingested_at") val lastIngestedAt: String? = null,
+    @SerializedName("is_stale") val isStale: Boolean = false,
+) {
+    val notices: List<MaritimeNoticeSummaryDto>
+        get() = wireNotices.orEmpty()
+}
+
+/** @deprecated Use [MaritimeNoticeDetailDto]. */
+@Deprecated("Use MaritimeNoticeDetailDto")
+typealias ApiMaritimeNotice = MaritimeNoticeDetailDto
 
 // ══════════════════════════════════════════════════════════════
 // Backwards-compatible alias (used in existing code)

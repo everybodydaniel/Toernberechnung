@@ -17,6 +17,12 @@ object NauticalRouter {
 
     data class WP(val id: String, val lat: Double, val lon: Double, val chartDepth: Double = 5.0)
 
+    sealed interface FairwayPathResult {
+        data class Success(val waypoints: List<WP>) : FairwayPathResult
+
+        data class Incomplete(val reason: String) : FairwayPathResult
+    }
+
     // ── Real Fairway Waypoints (from OpenSeaMap & Emden Plantabelle) ───────────────────
     // Every point is verified to be IN WATER on the nautical chart.
 
@@ -360,6 +366,36 @@ object NauticalRouter {
     }
 
     /**
+     * Strict Dijkstra result for safety calculations and GPS navigation.
+     * Unlike the legacy [calculateRoute], a disconnected graph is never
+     * represented by a direct fallback segment.
+     */
+    fun calculateFairwayPathResult(
+        start: LatLng,
+        end: LatLng,
+    ): FairwayPathResult {
+        val startWaypoint = findNearest(start)
+        val endWaypoint = findNearest(end)
+        if (startWaypoint.id == endWaypoint.id) {
+            return FairwayPathResult.Success(listOf(startWaypoint))
+        }
+        val ids =
+            dijkstraOrNull(startWaypoint.id, endWaypoint.id)
+                ?: return FairwayPathResult.Incomplete(
+                    "Im Fahrwassernetz wurde kein zusammenhängender Weg gefunden.",
+                )
+        val snapshot = waypointMap
+        val path = ids.mapNotNull(snapshot::get)
+        return if (path.size >= 2) {
+            FairwayPathResult.Success(path)
+        } else {
+            FairwayPathResult.Incomplete(
+                "Der berechnete Fahrwasserweg enthält zu wenige Punkte.",
+            )
+        }
+    }
+
+    /**
      * Calculates a route between multiple stops (e.g. all islands)
      */
     fun calculateMultiStopRoute(
@@ -518,7 +554,10 @@ object NauticalRouter {
 
     // ── Dijkstra ───────────────────────────────────────────────────
 
-    private fun dijkstra(startId: String, endId: String): List<String> {
+    private fun dijkstra(startId: String, endId: String): List<String> =
+        dijkstraOrNull(startId, endId) ?: listOf(startId, endId)
+
+    private fun dijkstraOrNull(startId: String, endId: String): List<String>? {
         // Lokale Snapshots — verhindert, dass adjacency/waypointMap pro Iteration neu berechnet wird
         val adj = adjacency
         val wpMap = waypointMap
@@ -543,7 +582,21 @@ object NauticalRouter {
                 if (visited.contains(neighbor)) continue
                 val neighborWP = wpMap[neighbor] ?: continue
                 val edgeDist = haversineNm(currentWP.lat, currentWP.lon, neighborWP.lat, neighborWP.lon)
-                val newDist = currentDist + edgeDist
+                // Match the current iOS graph policy: legacy Leybucht and
+                // non-precise harbour shortcuts remain available only as a
+                // heavily penalised last resort.
+                val isLegacyShortcut =
+                    current.contains("leybucht") ||
+                        neighbor.contains("leybucht") ||
+                        current == "norddeich_appr" ||
+                        neighbor == "norddeich_appr" ||
+                        current == "juist_hbr" ||
+                        neighbor == "juist_hbr" ||
+                        current == "norderney_hbr" ||
+                        neighbor == "norderney_hbr" ||
+                        current == "borkum_hbr" ||
+                        neighbor == "borkum_hbr"
+                val newDist = currentDist + edgeDist * if (isLegacyShortcut) 10_000.0 else 1.0
                 if (newDist < (dist[neighbor] ?: Double.MAX_VALUE)) {
                     dist[neighbor] = newDist
                     prev[neighbor] = current
@@ -558,7 +611,7 @@ object NauticalRouter {
             path.add(0, node)
             node = prev[node]
         }
-        return if (path.firstOrNull() == startId) path else listOf(startId, endId)
+        return path.takeIf { it.firstOrNull() == startId && dist[endId] != null }
     }
 
     // ── Helpers ────────────────────────────────────────────────────

@@ -1,14 +1,22 @@
 package com.example.trnberechnung.network
 
 import retrofit2.Response
-import retrofit2.http.*
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
+import retrofit2.http.Header
+import retrofit2.http.Headers
+import retrofit2.http.PATCH
+import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 // ══════════════════════════════════════════════════════════════
 // Social Feed API. Crewspace uses the dedicated CrewspaceApiService.
 // ══════════════════════════════════════════════════════════════
 
 interface SocialFeedApiService {
-
     // ── Health ──
     @GET("healthz")
     suspend fun healthCheck(): Response<Unit>
@@ -106,14 +114,17 @@ interface SocialFeedApiService {
     // Maritime Notices
     // ══════════════════════════════════════════════════════════
 
+    @Headers("Accept: application/json")
     @GET("maritime-notices")
     suspend fun listMaritimeNotices(
-        @Query("state") state: String? = null,
-        @Query("limit") limit: Int? = null
-    ): Response<List<ApiMaritimeNotice>>
+        @Query("status") status: String = "all",
+        @Query("limit") limit: Int = 100,
+        @Header("If-None-Match") ifNoneMatch: String? = null,
+    ): Response<MaritimeNoticeListResponseDto>
 
+    @Headers("Accept: application/json")
     @GET("maritime-notices/{id}")
     suspend fun getMaritimeNotice(
-        @Path("id") noticeId: String
-    ): Response<ApiMaritimeNotice>
+        @Path("id") noticeId: String,
+    ): Response<MaritimeNoticeDetailDto>
 }

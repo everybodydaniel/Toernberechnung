@@ -1,37 +1,143 @@
 package com.example.trnberechnung.ui
 
+import android.Manifest
 import android.content.Context
-import androidx.compose.ui.test.*
+import android.os.Build
+import android.os.ParcelFileDescriptor
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.trnberechnung.MainActivity
-import org.junit.Before
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestRule
+import org.junit.runner.Description
+import org.junit.runners.model.Statement
 
 /**
- * Vollständiger UI-Test der App (End-to-End).
- * Dieser Test startet die MainActivity und navigiert durch die verschiedenen Bereiche.
+ * End-to-end smoke test for the four-tab shell and the map overlays. Network
+ * data is deliberately not required; the UI must remain usable offline.
  */
 class FullAppUiTest {
+    @get:Rule(order = 0)
+    val cleanAppStateRule =
+        TestRule { base: Statement, _: Description ->
+            object : Statement() {
+                override fun evaluate() {
+                    val instrumentation = InstrumentationRegistry.getInstrumentation()
+                    val context = instrumentation.targetContext
+                    context
+                        .getSharedPreferences("onboarding_preferences", Context.MODE_PRIVATE)
+                        .edit()
+                        .clear()
+                        .commit()
+                    context
+                        .getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("is_skipped", true)
+                        .commit()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        ParcelFileDescriptor.AutoCloseInputStream(
+                            instrumentation.uiAutomation.executeShellCommand(
+                                "pm grant ${context.packageName} " +
+                                    Manifest.permission.POST_NOTIFICATIONS,
+                            ),
+                        ).use { it.readBytes() }
+                    }
+                    base.evaluate()
+                }
+            }
+        }
 
-    @get:Rule
+    @get:Rule(order = 1)
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
-    @Before
-    fun resetOnboardingState() {
-        composeTestRule.activity
-            .getSharedPreferences("onboarding_preferences", Context.MODE_PRIVATE)
-            .edit()
-            .clear()
-            .commit()
-        composeTestRule.activityRule.scenario.recreate()
+    @Test
+    fun fullMapShellPlannerNautiNoticesSettingsAndTabs() {
+        completeOnboarding()
+
+        composeTestRule.onNodeWithTag("nav_map_route").assertIsSelected()
+        composeTestRule.onAllNodesWithTag("global_app_header").assertCountEquals(1)
+        composeTestRule.onNodeWithTag("full_bleed_map_tab").assertIsDisplayed()
+        composeTestRule.waitUntil(timeoutMillis = 15_000) {
+            composeTestRule
+                .onAllNodesWithTag("maplibre_surface_ready")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag("maplibre_surface_ready").assertExists()
+        composeTestRule.onNodeWithTag("route_planning_pill").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("NautiInlinePanel").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("NautiInlineChat").assertDoesNotExist()
+
+        // The planner is a full-height sheet and can be dismissed without
+        // clearing its long-lived ViewModel state.
+        composeTestRule.onNodeWithTag("route_planning_pill").performClick()
+        composeTestRule.onNodeWithTag("route_planner_sheet").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("route_start_selector").assertExists()
+        composeTestRule.onNodeWithTag("route_destination_selector").assertExists()
+        composeTestRule.onNodeWithTag("route_planner_close").performClick()
         composeTestRule.waitForIdle()
+
+        // Nauti lives only on the map and exposes chat plus history.
+        composeTestRule.onNodeWithTag("NautiInlinePanel").performClick()
+        composeTestRule.onNodeWithTag("NautiInlineChat").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Verlauf").performClick()
+        composeTestRule.onNodeWithTag("NautiInlineHistory").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Zurück zum Chat").performClick()
+        composeTestRule.onNodeWithContentDescription("Chat einklappen").performClick()
+
+        // The bell opens the anchored preview and the full notice modal even
+        // when the offline cache is empty.
+        composeTestRule.onNodeWithTag("app_header_notifications").performClick()
+        composeTestRule.onNodeWithTag("maritime_notice_quicklook").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Mehr anzeigen").performClick()
+        composeTestRule.onNodeWithTag("maritime_notice_sheet").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Fertig").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("nav_revier").performClick()
+        composeTestRule.onNodeWithTag("nav_revier").assertIsSelected()
+        composeTestRule.onNodeWithTag("screen_revier").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag("global_app_header").assertCountEquals(1)
+        assertTabSurfaceFitsBetweenOverlays("screen_revier")
+
+        composeTestRule.onNodeWithTag("nav_crew").performClick()
+        composeTestRule.onNodeWithTag("nav_crew").assertIsSelected()
+        composeTestRule.onNodeWithTag("screen_crewspace").assertIsDisplayed()
+        composeTestRule.onNodeWithText("KI-Assistent").assertDoesNotExist()
+        assertTabSurfaceFitsBetweenOverlays("screen_crewspace")
+
+        composeTestRule.onNodeWithTag("nav_logbook").performClick()
+        composeTestRule.onNodeWithTag("nav_logbook").assertIsSelected()
+        composeTestRule.onNodeWithTag("screen_header_logbook").assertIsDisplayed()
+        assertTabSurfaceFitsBetweenOverlays("screen_logbook")
+
+        // Settings opens directly; there is no intermediate menu.
+        composeTestRule.onNodeWithTag("app_header_settings").performClick()
+        composeTestRule.onNodeWithTag("boat_name_input").assertIsDisplayed()
+        val newBoatName = "Flying Dutchman"
+        composeTestRule.onNodeWithTag("boat_name_input").performTextReplacement(newBoatName)
+        composeTestRule.onNodeWithTag("boat_name_headline").assertTextEquals(newBoatName)
+        composeTestRule.onNodeWithTag("settings_back").performClick()
+        composeTestRule.onNodeWithTag("nav_map_route").assertIsSelected()
+        composeTestRule.onAllNodesWithTag("global_app_header").assertCountEquals(1)
     }
 
-    @Test
-    fun testFullAppNavigationFlow() {
-        // A fresh installation must complete all onboarding pages and accept the
-        // nautical disclaimer before entering the main application.
+    private fun completeOnboarding() {
         repeat(2) {
             composeTestRule.onNodeWithTag("onboarding_continue")
                 .assertIsEnabled()
@@ -46,56 +152,35 @@ class FullAppUiTest {
         composeTestRule.onNodeWithTag("onboarding_continue")
             .assertIsEnabled()
             .performClick()
-
-        // 1. Start auf der Karte (MapRoute ist Start-Destination)
-        // Wir warten kurz, bis die Karte geladen ist (Semantics check)
-        composeTestRule.onNodeWithTag("nav_map_route").assertIsSelected()
-
-        // The completed state must survive the next Activity start.
-        composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("onboarding_screen").assertDoesNotExist()
-        composeTestRule.onNodeWithTag("nav_map_route").assertIsSelected()
+    }
 
-        // 2. Wechsel zu Wetter
-        composeTestRule.onNodeWithTag("nav_weather").performClick()
-        composeTestRule.onNodeWithTag("nav_weather").assertIsSelected()
-        // Wir suchen per Tag, um Verwechslung mit der Nav-Bar zu vermeiden
-        composeTestRule.onNodeWithTag("screen_header_weather").assertExists()
+    private fun assertTabSurfaceFitsBetweenOverlays(screenTag: String) {
+        composeTestRule.waitForIdle()
+        val headerBounds =
+            composeTestRule
+                .onNodeWithTag("global_app_header")
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val tabBounds =
+            composeTestRule
+                .onNodeWithTag(screenTag)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val navigationBounds =
+            composeTestRule
+                .onNodeWithTag("global_bottom_navigation")
+                .fetchSemanticsNode()
+                .boundsInRoot
 
-        // 3. Wechsel zu Gezeiten
-        composeTestRule.onNodeWithTag("nav_tides").performClick()
-        composeTestRule.onNodeWithTag("nav_tides").assertIsSelected()
-        composeTestRule.onNodeWithTag("screen_header_tides").assertExists()
-
-        // 4. Wechsel zu Crew
-        composeTestRule.onNodeWithTag("nav_crew").performClick()
-        composeTestRule.onNodeWithTag("nav_crew").assertIsSelected()
-        composeTestRule.onNodeWithTag("screen_header_crew").assertExists()
-
-        // 5. Wechsel zu Logbuch
-        composeTestRule.onNodeWithTag("nav_logbook").performClick()
-        composeTestRule.onNodeWithTag("nav_logbook").assertIsSelected()
-        composeTestRule.onNodeWithTag("screen_header_logbook").assertExists()
-
-        // 6. Navigation zu den Einstellungen (Bootsprofil) via TopBar
-        // Der stabile Test-Tag löst die direkte Navigation mit einem Klick aus.
-        composeTestRule.onNodeWithTag("topbar_settings").performClick()
-
-        // Wir sollten jetzt im Dashboard sein
-        composeTestRule.onNodeWithTag("boat_name_input").assertExists()
-
-        // Bootsprofil bearbeiten
-        val newBoatName = "Flying Dutchman"
-        composeTestRule.onNodeWithTag("boat_name_input").performTextReplacement(newBoatName)
-
-        // Prüfen ob Headline im Dashboard aktualisiert wurde
-        composeTestRule.onNodeWithTag("boat_name_headline").assertTextEquals(newBoatName)
-
-        // 7. Zurück zur Karte via Button im Dashboard
-        composeTestRule.onNodeWithTag("navigation_button").performScrollTo().performClick()
-
-        // Prüfen ob wir wieder auf der Karte sind
-        composeTestRule.onNodeWithTag("nav_map_route").assertIsSelected()
+        assertTrue(
+            "$screenTag must start below the shared header",
+            tabBounds.top >= headerBounds.bottom - 1f,
+        )
+        assertTrue(
+            "$screenTag must draw behind the floating bottom navigation",
+            tabBounds.bottom >= navigationBounds.bottom,
+        )
     }
 }

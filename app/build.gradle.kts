@@ -35,6 +35,15 @@ android {
                 .orElse("https://example.invalid/")
                 .get()
         buildConfigField("String", "CREWSPACE_BASE_URL", "\"$crewspaceBaseUrl\"")
+
+        val geminiApiKey =
+            providers
+                .gradleProperty("GEMINI_API_KEY")
+                .orElse("")
+                .get()
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     }
 
     buildTypes {
@@ -68,6 +77,10 @@ android {
         }
     }
 
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
     packaging {
         resources {
             excludes.add("/META-INF/{AL2.0,LGPL2.1,LICENSE.md,LICENSE-notice.md}")
@@ -84,6 +97,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -95,6 +109,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
     implementation("androidx.navigation:navigation-compose:2.7.7")

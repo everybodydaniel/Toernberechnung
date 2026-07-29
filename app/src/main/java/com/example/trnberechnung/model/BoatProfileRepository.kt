@@ -14,6 +14,10 @@ class BoatProfileRepository(context: Context) {
         get() = prefs.getString("boat_type", "") ?: ""
         set(value) = prefs.edit().putString("boat_type", value).apply()
 
+    var callSign: String
+        get() = prefs.getString("call_sign", "") ?: ""
+        set(value) = prefs.edit().putString("call_sign", value).apply()
+
     var manufacturer: String
         get() = prefs.getString("manufacturer", "") ?: ""
         set(value) = prefs.edit().putString("manufacturer", value).apply()
@@ -31,7 +35,7 @@ class BoatProfileRepository(context: Context) {
         set(value) = prefs.edit().putFloat("beam", value).apply()
 
     var draft: Float
-        get() = prefs.getFloat("draft", 1.5f)
+        get() = prefs.getFloat("draft", 1.1f)
         set(value) = prefs.edit().putFloat("draft", value).apply()
 
     var displacement: Float
@@ -39,11 +43,11 @@ class BoatProfileRepository(context: Context) {
         set(value) = prefs.edit().putFloat("displacement", value).apply()
 
     var speed: Float
-        get() = prefs.getFloat("speed", 5.0f)
+        get() = prefs.getFloat("speed", 6.0f)
         set(value) = prefs.edit().putFloat("speed", value).apply()
 
     var safetyMargin: Float
-        get() = prefs.getFloat("safety_margin", 0.5f)
+        get() = prefs.getFloat("safety_margin", 0.0f)
         set(value) = prefs.edit().putFloat("safety_margin", value).apply()
 
     var fuelCapacity: Float

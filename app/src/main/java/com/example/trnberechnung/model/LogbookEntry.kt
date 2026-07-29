@@ -11,5 +11,12 @@ data class LogbookEntry(
     val distance: String,
     val duration: String,
     val status: String,
-    val details: String 
+    val details: String,
+    val voyageId: String? = null,
+    val startedAt: Long? = null,
+    val endedAt: Long? = null,
+    val actualDistanceMeters: Double? = null,
+    val averageSogKnots: Double? = null,
+    val maxSogKnots: Double? = null,
+    val gpsTrackJson: String? = null,
 )

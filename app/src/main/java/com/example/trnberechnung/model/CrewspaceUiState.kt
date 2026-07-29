@@ -9,7 +9,6 @@ enum class CrewspaceTab(val label: String) {
     CHATS("Chats"),
     PLANUNG("Planung"),
     CREW("Crew"),
-    AI_ASSISTENT("AI")
 }
 
 /**
@@ -56,23 +55,8 @@ data class CrewspaceUiState(
     val addPhone: String = "",
     val addMedicalNotes: String = "",
 
-    // ── AI Assistent ──
-    val aiMessages: List<AiChatMessage> = emptyList(),
-    val aiInput: String = "",
-    val aiIsLoading: Boolean = false,
-
     // ── Profil / Einstellungen ──
     val ownSkipperId: String = "",
     val ownDisplayName: String = "",
     val ownEmail: String = ""
-)
-
-/**
- * Einzelne Nachricht im AI-Chat.
- */
-data class AiChatMessage(
-    val id: String = java.util.UUID.randomUUID().toString(),
-    val content: String,
-    val isFromUser: Boolean,
-    val timestamp: Long = System.currentTimeMillis()
 )

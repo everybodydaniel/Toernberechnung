@@ -7,14 +7,14 @@ package com.example.trnberechnung.ui
  */
 class AppRefreshCoordinator(
     private val refreshMap: () -> Unit,
-    private val refreshRegion: () -> Unit,
+    private val refreshWeather: () -> Unit,
     private val refreshCrewspace: () -> Unit,
     private val refreshLogbook: () -> Unit,
 ) {
     fun refresh(route: String?) {
         when (route) {
             Screen.MapRoute.route -> refreshMap()
-            Screen.Revier.route -> refreshRegion()
+            Screen.Revier.route -> refreshWeather()
             Screen.Crew.route -> refreshCrewspace()
             Screen.Logbook.route -> refreshLogbook()
         }

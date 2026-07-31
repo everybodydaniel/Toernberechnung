@@ -84,7 +84,7 @@ sealed class Screen(
 ) {
     data object MapRoute : Screen("map_route", "Karte", Icons.Default.Map)
 
-    data object Revier : Screen("revier", "Revier", Icons.Default.Cloud)
+    data object Revier : Screen("revier", "Wetter", Icons.Default.Cloud)
 
     data object Crew : Screen("crew", "Crewspace", Icons.Default.People)
 
@@ -175,7 +175,7 @@ fun MainAppScreen(
                     routePlanningViewModel.refresh()
                     routePlanningViewModel.refreshPassageWindow()
                 },
-                refreshRegion = viewModel::loadData,
+                refreshWeather = viewModel::loadData,
                 refreshCrewspace = { crewspaceViewModel?.refresh() },
                 refreshLogbook = viewModel::loadData,
             )
@@ -207,7 +207,7 @@ fun MainAppScreen(
                     locationProvider = application.navigationLocationProvider,
                     topOverlayClearance = topClearance,
                     bottomOverlayClearance = mapBottomClearance,
-                    onOpenRevier = {
+                    onOpenWeather = {
                         navController.navigateMainTab(Screen.Revier.route)
                     },
                     onOpenNavigation = {
@@ -219,7 +219,7 @@ fun MainAppScreen(
             }
             composable(Screen.Revier.route) {
                 MainTabContent {
-                    RevierScreen(
+                    WeatherScreen(
                         viewModel = viewModel,
                         topOverlayClearance = topClearance,
                         bottomOverlayClearance = bottomOverlayClearance,
@@ -434,7 +434,7 @@ private fun TideNodeBottomNavigation(
                     imageVector = screen.icon,
                     contentDescription = screen.title,
                     tint = if (selected) TideNodeBlue else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(25.dp),
+                    modifier = Modifier.size(25.dp).testTag("nav_icon_${screen.route}"),
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
@@ -442,6 +442,7 @@ private fun TideNodeBottomNavigation(
                     color = if (selected) TideNodeBlue else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp,
                     fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    modifier = Modifier.testTag("nav_text_${screen.route}")
                 )
             }
         }

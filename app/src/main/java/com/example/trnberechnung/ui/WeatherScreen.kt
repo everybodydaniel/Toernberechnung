@@ -1,8 +1,7 @@
 package com.example.trnberechnung.ui
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -19,7 +18,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -50,7 +51,7 @@ import kotlin.math.sin
 
 
 @Composable
-fun RevierScreen(
+fun WeatherScreen(
     viewModel: TideViewModel,
     topOverlayClearance: Dp = 0.dp,
     bottomOverlayClearance: Dp = 0.dp
@@ -77,12 +78,12 @@ fun RevierScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .testTag("screen_revier")
+            .testTag("screen_weather")
             .background(revierBgGradient)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(topOverlayClearance + 6.dp))
-            RevierTabSwitcher(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
+            WeatherTabSwitcher(selectedTab = selectedTab, onTabSelected = { selectedTab = it })
             Spacer(modifier = Modifier.height(12.dp))
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -93,32 +94,44 @@ fun RevierScreen(
                     },
                     label = "TabTransition"
                 ) { targetTab ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(scrollState)
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
                         if (targetTab == 0) {
-                            WeatherContent(
-                                stationName = selectedStation?.gaugeLabel ?: "Standort wählen",
-                                weather = weather,
-                                forecast = forecast,
-                                dailyForecast = dailyForecast,
-                                onStationClick = { showStationDialog = true },
-                                viewModel = viewModel
-                            )
-                        } else {
-                            val tideLoading by viewModel.tideLoading.collectAsState()
-                            TideContent(
-                                station = selectedStation,
-                                events = tideEvents,
-                                loading = tideLoading,
-                                onStationClick = { showStationDialog = true }
-                            )
+                            val animCond = "${weather?.icon} ${weather?.condition}"
+                            WeatherAnimationLayer(animCond)
                         }
-                        Spacer(modifier = Modifier.height(maxOf(32.dp, bottomOverlayClearance)))
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(scrollState)
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            if (targetTab == 0) {
+                                val isLoading by viewModel.weatherLoading.collectAsState()
+                                if (isLoading) {
+                                    WeatherSkeleton()
+                                } else {
+                                    WeatherContent(
+                                        stationName = selectedStation?.gaugeLabel ?: "Standort wählen",
+                                        weather = weather,
+                                        forecast = forecast,
+                                        dailyForecast = dailyForecast,
+                                        onStationClick = { showStationDialog = true },
+                                        viewModel = viewModel
+                                    )
+                                }
+                            } else {
+                                val tideLoading by viewModel.tideLoading.collectAsState()
+                                TideContent(
+                                    station = selectedStation,
+                                    events = tideEvents,
+                                    loading = tideLoading,
+                                    onStationClick = { showStationDialog = true }
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(maxOf(32.dp, bottomOverlayClearance)))
+                        }
                     }
                 }
             }
@@ -139,7 +152,7 @@ fun RevierScreen(
 }
 
 @Composable
-fun RevierTabSwitcher(selectedTab: Int, onTabSelected: (Int) -> Unit) {
+fun WeatherTabSwitcher(selectedTab: Int, onTabSelected: (Int) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -222,13 +235,15 @@ fun WeatherContent(
         ) {
             Row(
                 modifier = Modifier.clickable(onClick = onStationClick),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
             ) {
                 Text(
                     stationName,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = Color.White,
+                    textAlign = TextAlign.Center
                 )
                 Icon(
                     Icons.Default.KeyboardArrowDown,
@@ -238,24 +253,38 @@ fun WeatherContent(
             }
             Text(
                 "${weather?.temperature?.toInt() ?: "--"}°",
-                fontSize = 72.sp,
-                fontWeight = FontWeight.Light,
-                color = Color.White
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = 86.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White,
+                textAlign = TextAlign.Center
             )
             Text(
                 translateCondition(weather?.condition),
-                fontSize = 20.sp,
-                color = Color.White.copy(alpha = 0.9f)
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.95f),
+                textAlign = TextAlign.Center
             )
             val today = dailyForecast.firstOrNull()
             if (today != null) {
-                Text("H: ${today.highTemp}°  T: ${today.lowTemp}°", color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp)
+                Text(
+                    "H: ${today.highTemp}°  L: ${today.lowTemp}°",
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 15.sp,
+                    textAlign = TextAlign.Center
+                )
             }
             Text(
                 "Gefühlt ${weather?.dewPoint?.toInt() ?: "--"}° · Aktualisiert vor 5 Min.",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = 12.sp,
-                modifier = Modifier.padding(top = 8.dp)
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -311,7 +340,6 @@ fun WeatherContent(
     }
 
     // Wind Karte
-    val allStations by viewModel.allStations.collectAsState()
     var selectedWindHour by remember { mutableStateOf(0) }
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -369,7 +397,7 @@ fun WeatherContent(
                 val displayWeather = if (selectedWindHour == 0) weather else filteredForecast.getOrNull(selectedWindHour - 1)
                 WindMapComponent(
                     modifier = Modifier.fillMaxSize(),
-                    stations = allStations,
+                    stations = viewModel.allStations.collectAsState().value,
                     currentWeather = displayWeather,
                     isLive = selectedWindHour == 0
                 )
@@ -414,7 +442,7 @@ fun WeatherContent(
                 val weekMax = dailyForecast.maxOf { it.highTemp }
                 dailyForecast.forEachIndexed { index, day ->
                     if (index > 0) HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 0.5.dp)
-                    RevierWeekForecastRow(day = day, weekMin = weekMin, weekMax = weekMax)
+                    WeatherWeekForecastRow(day = day, weekMin = weekMin, weekMax = weekMax)
                 }
             }
         }
@@ -603,7 +631,7 @@ fun WindGustGraph(forecast: List<WeatherDto>) {
 }
 
 @Composable
-fun RevierWeekForecastRow(day: DailyForecast, weekMin: Int, weekMax: Int) {
+fun WeatherWeekForecastRow(day: DailyForecast, weekMin: Int, weekMax: Int) {
     var expanded by remember { mutableStateOf(false) }
     val range = (weekMax - weekMin).coerceAtLeast(1).toFloat()
     val startFrac = ((day.lowTemp - weekMin) / range).coerceIn(0f, 1f)
@@ -764,61 +792,67 @@ fun TideContent(
 
     // Hero Tide Card (Screenshot 3 style)
     GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Column {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { onStationClick() }
-                    ) {
-                        Text(
-                            station?.gaugeLabel ?: station?.area ?: "Unbekannt",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
-                    }
-                    Text(
-                        "BSH ${station?.gaugeLabel?.take(4) ?: "PEGEL"}",
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.6f)
-                    )
-                }
-
-                // Tide Arrow Icon
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.clickable { onStationClick() }
                 ) {
-                    Icon(
-                        if (isRising) Icons.Default.ArrowOutward else Icons.Default.SouthEast,
-                        null,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
+                    Text(
+                        station?.gaugeLabel ?: station?.area ?: "Unbekannt",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
                     )
+                    Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
                 }
+                Text(
+                    "BSH ${station?.gaugeLabel?.take(4) ?: "PEGEL"}",
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
+                )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-                Column {
-                    Text(statusText, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Text(nextEventLabel, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        nextEventPair?.second?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "--:--",
-                        color = Color.White,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(countdownText, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
-                }
+            // Tide Arrow Icon
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (isRising) Icons.Default.ArrowOutward else Icons.Default.SouthEast,
+                    null,
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(statusText, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+                Text(nextEventLabel, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, textAlign = TextAlign.Center)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    nextEventPair?.second?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "--:--",
+                    color = Color.White,
+                    fontSize = 36.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Text(countdownText, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, textAlign = TextAlign.Center)
             }
         }
     }
@@ -1161,6 +1195,52 @@ fun TideEventTile(type: String, time: String, height: String, diff: String) {
 }
 
 @Composable
+fun WeatherSkeleton() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth().alpha(alpha),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Hero Card Skeleton
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.White.copy(alpha = 0.12f))
+        )
+
+        // Hourly Forecast Skeleton
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.White.copy(alpha = 0.12f))
+        )
+
+        // Wind Map Skeleton
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color.White.copy(alpha = 0.12f))
+        )
+    }
+}
+
+@Composable
 fun GlassCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Surface(
         modifier = modifier,
@@ -1184,7 +1264,7 @@ fun StationSelectionDialog(
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column {
-                        Text("Revier auswählen", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("Standort auswählen", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         Text("Ostfriesische Inseln", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
                     }
                     IconButton(onClick = onDismiss) {

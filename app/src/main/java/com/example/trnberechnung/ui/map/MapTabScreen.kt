@@ -82,7 +82,7 @@ fun MapTabScreen(
     locationProvider: FusedLocationProvider,
     topOverlayClearance: Dp,
     bottomOverlayClearance: Dp,
-    onOpenRevier: () -> Unit,
+    onOpenWeather: () -> Unit,
     onOpenNavigation: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -239,15 +239,15 @@ fun MapTabScreen(
                 }
                 is NautiAction.ShowWeather -> {
                     selectNautiStation(action.harbourId, stations, tideViewModel)
-                    onOpenRevier()
+                    onOpenWeather()
                 }
                 is NautiAction.ShowTides -> {
                     selectNautiStation(action.harbourId, stations, tideViewModel)
-                    onOpenRevier()
+                    onOpenWeather()
                 }
                 is NautiAction.ShowBshWaterLevel -> {
                     selectNautiStation(action.harbourId, stations, tideViewModel)
-                    onOpenRevier()
+                    onOpenWeather()
                 }
             }
         }

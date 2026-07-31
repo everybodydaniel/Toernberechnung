@@ -111,9 +111,9 @@ class FullAppUiTest {
 
         composeTestRule.onNodeWithTag("nav_revier").performClick()
         composeTestRule.onNodeWithTag("nav_revier").assertIsSelected()
-        composeTestRule.onNodeWithTag("screen_revier").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("screen_weather").assertIsDisplayed()
         composeTestRule.onAllNodesWithTag("global_app_header").assertCountEquals(1)
-        assertTabSurfaceFitsBetweenOverlays("screen_revier")
+        assertTabSurfaceFitsBetweenOverlays("screen_weather")
 
         composeTestRule.onNodeWithTag("nav_crew").performClick()
         composeTestRule.onNodeWithTag("nav_crew").assertIsSelected()

@@ -21,8 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -56,7 +58,6 @@ private val weatherStations = listOf(
     "Dangast" to Pair(53.45, 8.11)
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeatherOverlayScreen(viewModel: TideViewModel) {
     val weather by viewModel.currentWeather.collectAsState()
@@ -73,179 +74,181 @@ fun WeatherOverlayScreen(viewModel: TideViewModel) {
 
     val scrollState = rememberScrollState()
     val dailyForecast = remember(forecast) { aggregateToDays(forecast) }
+    val weatherData = weather
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(NauticalBackground)
-            .verticalScroll(scrollState)
-    ) {
-
-        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) {
-            Text(
-                "WETTER",
-                modifier = Modifier.testTag("screen_header_weather"),
-                style = MaterialTheme.typography.labelSmall,
-                color = NauticalTextSecondary,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-            Text(
-                "DWD-WETTER NORDSEE",
-                style = MaterialTheme.typography.labelSmall,
-                color = NauticalTextSecondary,
-                fontSize = 10.sp,
-                letterSpacing = 1.sp
-            )
+    Box(modifier = Modifier.fillMaxSize().background(NauticalBackground)) {
+        // Global Weather Animation Layer
+        if (weatherData != null) {
+            val animCond = "${weatherData.icon} ${weatherData.condition}"
+            WeatherAnimationLayer(animCond)
         }
 
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-        ) {
-            items(weatherStations) { (name, coords) ->
-                LocationChip(
-                    name = name,
-                    isSelected = name == selectedStationName,
-                    weather = if (name == selectedStationName) weather else null,
-                    onClick = {
-                        selectedStationName = name
-                        viewModel.loadWeatherForLocation(coords.first, coords.second)
-                    }
-                )
-            }
-        }
-
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NauticalPrimary)
-            }
-            return@Column
-        }
-
-        if (error != null) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                colors = CardDefaults.cardColors(containerColor = NauticalNoGoBg)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(error ?: "", color = NauticalNoGo)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { viewModel.loadWeatherForLocation() },
-                        colors = ButtonDefaults.buttonColors(containerColor = NauticalPrimary)
-                    ) { Text("Erneut laden", color = NauticalTextOnPrimary) }
-                }
-            }
-            return@Column
-        }
-
-        val w = weather ?: return@Column
-
-        HeroWeatherCard(
-            stationName = selectedStationName,
-            weather = w,
-            dailyForecast = dailyForecast,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp)
-        )
-
-        if (forecast.isNotEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp),
-                colors = CardDefaults.cardColors(containerColor = NauticalSurface),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "⏰  STÜNDLICHE VORHERSAGE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = NauticalTextSecondary,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    HourlyForecastRow(forecastData = forecast, currentWeather = w)
-                }
-            }
-        }
-
-        val windKn = w.windSpeed?.let { (it / 1.852).toInt() }
-        val gustKn = w.windGustSpeed?.let { (it / 1.852).toInt() }
-        val visKm = w.visibility?.let { it / 1000.0 }
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                DetailTile(
-                    modifier = Modifier.weight(1f),
-                    icon = "≈", label = "WIND",
-                    value = "${windKn ?: "-"} kn",
-                    subValue = "Bft ${kmhToBeaufort(w.windSpeed ?: 0.0)} · ${windDirectionToText(w.windDirection ?: 0)}",
-                    windDir = w.windDirection
-                )
-                DetailTile(
-                    modifier = Modifier.weight(1f),
-                    icon = "◎", label = "BÖEN",
-                    value = "${gustKn ?: "-"} kn",
-                    subValue = gustCategory(w.windGustSpeed)
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                DetailTile(
-                    modifier = Modifier.weight(1f),
-                    icon = "🌡", label = "GEFÜHLT",
-                    value = "${w.dewPoint?.let { "%.0f".format(it) } ?: "-"}°C",
-                    subValue = "Feuchte ${w.relativeHumidity ?: "-"}%"
-                )
-                DetailTile(
-                    modifier = Modifier.weight(1f),
-                    icon = "⏱", label = "LUFTDRUCK",
-                    value = "${w.pressureMsl?.let { "%.0f".format(it) } ?: "-"} hPa",
-                    subValue = "Taupunkt ${w.dewPoint?.let { "%.1f".format(it) } ?: "-"}°C"
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                DetailTile(
-                    modifier = Modifier.weight(1f),
-                    icon = "👁", label = "SICHTWEITE",
-                    value = "${visKm?.let { "%.0f".format(it) } ?: "-"} km",
-                    subValue = visibilityCategory(w.visibility)
-                )
-                DetailTile(
-                    modifier = Modifier.weight(1f),
-                    icon = "☁", label = "BEWÖLKUNG",
-                    value = "${w.cloudCover ?: "-"}%",
-                    subValue = cloudCoverText(w.cloudCover)
-                )
-            }
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
+            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) {
+                Text(
+                    "WETTER",
+                    modifier = Modifier.testTag("screen_header_weather"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NauticalTextSecondary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    "DWD-WETTER NORDSEE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NauticalTextSecondary,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.sp
+                )
+            }
 
-        if (dailyForecast.isNotEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 32.dp),
-                colors = CardDefaults.cardColors(containerColor = NauticalSurface),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "📅  7-TAGE-VORHERSAGE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = NauticalTextSecondary,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                items(weatherStations) { (name, coords) ->
+                    LocationChip(
+                        name = name,
+                        isSelected = name == selectedStationName,
+                        weather = if (name == selectedStationName) weather else null,
+                        onClick = {
+                            selectedStationName = name
+                            viewModel.loadWeatherForLocation(coords.first, coords.second)
+                        }
                     )
-                    val weekMin = dailyForecast.minOf { it.lowTemp }
-                    val weekMax = dailyForecast.maxOf { it.highTemp }
-                    dailyForecast.forEachIndexed { index, day ->
-                        if (index > 0) HorizontalDivider(color = NauticalDivider, thickness = 0.5.dp)
-                        WeekForecastRow(day = day, weekMin = weekMin, weekMax = weekMax)
+                }
+            }
+
+            if (isLoading) {
+                WeatherSkeletonLoader()
+            } else if (error != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = NauticalNoGoBg)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(error ?: "", color = NauticalNoGo)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { viewModel.loadWeatherForLocation() },
+                            colors = ButtonDefaults.buttonColors(containerColor = NauticalPrimary)
+                        ) { Text("Erneut laden", color = NauticalTextOnPrimary) }
+                    }
+                }
+            } else {
+                val w = weather ?: return@Column
+
+                HeroWeatherCard(
+                    stationName = selectedStationName,
+                    weather = w,
+                    dailyForecast = dailyForecast,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp)
+                )
+
+                if (forecast.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 16.dp),
+                        colors = CardDefaults.cardColors(containerColor = NauticalSurface),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "⏰  STÜNDLICHE VORHERSAGE",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = NauticalTextSecondary,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            HourlyForecastRow(forecastData = forecast, currentWeather = w)
+                        }
+                    }
+                }
+
+                val windKn = w.windSpeed?.let { (it / 1.852).toInt() }
+                val gustKn = w.windGustSpeed?.let { (it / 1.852).toInt() }
+                val visKm = w.visibility?.let { it / 1000.0 }
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        DetailTile(
+                            modifier = Modifier.weight(1f),
+                            icon = "≈", label = "WIND",
+                            value = "${windKn ?: "-"} kn",
+                            subValue = "Bft ${kmhToBeaufort(w.windSpeed ?: 0.0)} · ${windDirectionToText(w.windDirection ?: 0)}",
+                            windDir = w.windDirection
+                        )
+                        DetailTile(
+                            modifier = Modifier.weight(1f),
+                            icon = "◎", label = "BÖEN",
+                            value = "${gustKn ?: "-"} kn",
+                            subValue = gustCategory(w.windGustSpeed)
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        DetailTile(
+                            modifier = Modifier.weight(1f),
+                            icon = "🌡", label = "GEFÜHLT",
+                            value = "${w.dewPoint?.let { "%.0f".format(it) } ?: "-"}°C",
+                            subValue = "Feuchte ${w.relativeHumidity ?: "-"}%"
+                        )
+                        DetailTile(
+                            modifier = Modifier.weight(1f),
+                            icon = "⏱", label = "LUFTDRUCK",
+                            value = "${w.pressureMsl?.let { "%.0f".format(it) } ?: "-"} hPa",
+                            subValue = "Taupunkt ${w.dewPoint?.let { "%.1f".format(it) } ?: "-"}°C"
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        DetailTile(
+                            modifier = Modifier.weight(1f),
+                            icon = "👁", label = "SICHTWEITE",
+                            value = "${visKm?.let { "%.0f".format(it) } ?: "-"} km",
+                            subValue = visibilityCategory(w.visibility)
+                        )
+                        DetailTile(
+                            modifier = Modifier.weight(1f),
+                            icon = "☁", label = "BEWÖLKUNG",
+                            value = "${w.cloudCover ?: "-"}%",
+                            subValue = cloudCoverText(w.cloudCover)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                if (dailyForecast.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 32.dp),
+                        colors = CardDefaults.cardColors(containerColor = NauticalSurface),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "📅  7-TAGE-VORHERSAGE",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = NauticalTextSecondary,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            val weekMin = dailyForecast.minOf { it.lowTemp }
+                            val weekMax = dailyForecast.maxOf { it.highTemp }
+                            dailyForecast.forEachIndexed { index, day ->
+                                if (index > 0) HorizontalDivider(color = NauticalDivider, thickness = 0.5.dp)
+                                WeekForecastRow(day = day, weekMin = weekMin, weekMax = weekMax)
+                            }
+                        }
                     }
                 }
             }
@@ -293,6 +296,7 @@ private fun HeroWeatherCard(
     val condition = weather.icon ?: weather.condition
     val bgGradient = when {
         condition?.contains("clear") == true -> Brush.verticalGradient(listOf(Color(0xFF4A90E2), Color(0xFF87CEEB)))
+        condition?.contains("dry") == true -> Brush.verticalGradient(listOf(Color(0xFF4A90E2), Color(0xFF87CEEB)))
         condition?.contains("cloudy") == true -> Brush.verticalGradient(listOf(Color(0xFF757F9A), Color(0xFFD7DDE8)))
         condition?.contains("rain") == true -> Brush.verticalGradient(listOf(Color(0xFF4B6CB7), Color(0xFF182848)))
         condition?.contains("thunder") == true -> Brush.verticalGradient(listOf(Color(0xFF0F2027), Color(0xFF203A43)))
@@ -306,44 +310,98 @@ private fun HeroWeatherCard(
             .background(bgGradient)
             .height(200.dp)
     ) {
-        // Animated Background Elements
-        WeatherAnimationLayer(condition)
+        Column(
+            modifier = Modifier.padding(20.dp).fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(stationName, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Color.White, textAlign = TextAlign.Center)
+            Text(
+                translateCondition(condition),
+                fontWeight = FontWeight.Medium, fontSize = 16.sp, color = Color.White.copy(alpha = 0.9f), textAlign = TextAlign.Center
+            )
 
-        Column(modifier = Modifier.padding(20.dp).fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column {
-                    Text(stationName, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Color.White)
-                    Text(
-                        translateCondition(condition),
-                        fontWeight = FontWeight.Medium, fontSize = 16.sp, color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-                Text(iconToEmoji(condition), fontSize = 48.sp)
-            }
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                "${weather.temperature?.let { "%.0f".format(it) } ?: "-"}°",
+                fontWeight = FontWeight.Bold, fontSize = 64.sp, color = Color.White,
+                textAlign = TextAlign.Center
+            )
 
-            Row(verticalAlignment = Alignment.Bottom) {
+            if (today != null) {
                 Text(
-                    "${weather.temperature?.let { "%.0f".format(it) } ?: "-"}°",
-                    fontWeight = FontWeight.Bold, fontSize = 64.sp, color = Color.White
+                    "H: ${today.highTemp}°  L: ${today.lowTemp}°",
+                    color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.padding(bottom = 12.dp)) {
-                    if (today != null) {
-                        Text(
-                            "H: ${today.highTemp}°  L: ${today.lowTemp}°",
-                            color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp, fontWeight = FontWeight.Bold
-                        )
+            }
+            Text(
+                "Wind: ${weather.windDirection?.let { windDirectionToText(it) } ?: "-"} ${weather.windSpeed?.let { (it/1.852).toInt() } ?: "-"} kn",
+                color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun WeatherSkeletonLoader() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .alpha(alpha),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Hero Card Skeleton
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(NauticalSurface)
+        )
+
+        // Hourly Forecast Skeleton
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = NauticalSurface),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                repeat(5) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(modifier = Modifier.size(30.dp, 12.dp).background(NauticalDivider, RoundedCornerShape(4.dp)))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(modifier = Modifier.size(24.dp).background(NauticalDivider, CircleShape))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(modifier = Modifier.size(30.dp, 12.dp).background(NauticalDivider, RoundedCornerShape(4.dp)))
                     }
-                    Text(
-                        "Wind: ${weather.windDirection?.let { windDirectionToText(it) } ?: "-"} ${weather.windSpeed?.let { (it/1.852).toInt() } ?: "-"} kn",
-                        color = Color.White.copy(alpha = 0.85f), fontSize = 14.sp
-                    )
+                }
+            }
+        }
+
+        // Details Grid Skeleton
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            repeat(3) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(modifier = Modifier.weight(1f).height(90.dp).background(NauticalSurface, RoundedCornerShape(16.dp)))
+                    Box(modifier = Modifier.weight(1f).height(90.dp).background(NauticalSurface, RoundedCornerShape(16.dp)))
                 }
             }
         }
@@ -352,11 +410,16 @@ private fun HeroWeatherCard(
 
 @Composable
 fun WeatherAnimationLayer(condition: String?) {
+    val cond = condition?.lowercase() ?: ""
     when {
-        condition?.contains("clear") == true -> SunAnimation()
-        condition?.contains("cloudy") == true -> CloudAnimation()
-        condition?.contains("rain") == true -> RainAnimation()
-        condition?.contains("thunder") == true -> ThunderAnimation()
+        cond.contains("thunder") || cond.contains("gewitter") -> ThunderAnimation()
+        cond.contains("snow") || cond.contains("schnee") || cond.contains("sleet") || cond.contains("hail") || cond.contains("hagel") -> SnowAnimation()
+        cond.contains("rain") || cond.contains("regen") || cond.contains("showers") || cond.contains("niederschlag") || cond.contains("schauer") -> RainAnimation()
+        cond.contains("fog") || cond.contains("nebel") -> FogAnimation()
+        cond.contains("cloudy") || cond.contains("bewölkt") || cond.contains("wolken") || cond.contains("bedeckt") || cond.contains("trüb") -> CloudAnimation()
+        cond.contains("clear") || cond.contains("dry") || cond.contains("sun") || cond.contains("klar") || cond.contains("sonne") || cond.contains("heiter") -> SunAnimation()
+        cond.contains("wind") || cond.contains("sturm") || cond.contains("stürmisch") -> WindAnimation()
+        else -> SunAnimation() // Default
     }
 }
 
@@ -365,18 +428,81 @@ fun SunAnimation() {
     val infiniteTransition = rememberInfiniteTransition(label = "sun")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing)), label = "rotation"
+        animationSpec = infiniteRepeatable(tween(30000, easing = LinearEasing)), label = "rotation"
+    )
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(tween(5000, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+        label = "scale"
     )
     Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .offset(x = 20.dp, y = (-20).dp)
-                .size(150.dp)
-                .align(Alignment.TopEnd)
-                .rotate(rotation)
-                .alpha(0.2f)
-                .background(Color.Yellow, CircleShape)
-        )
+        Canvas(modifier = Modifier
+            .offset(x = 40.dp, y = (-40).dp)
+            .size(220.dp)
+            .align(Alignment.TopEnd)
+            .graphicsLayer(scaleX = scale, scaleY = scale, rotationZ = rotation)
+            .alpha(0.18f)
+        ) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFFE082), Color(0xFFFFB300).copy(alpha = 0.3f), Color.Transparent),
+                    center = center,
+                    radius = size.minDimension / 1.1f
+                )
+            )
+        }
+    }
+}
+
+@Composable
+fun RainAnimation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "rain")
+    // Sehr ruhige Geschwindigkeit für angenehmen Hintergrund-Effekt
+    val progress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "progress"
+    )
+
+    // Weniger, dezentere Tropfen für den Hintergrund
+    val dropData = remember {
+        List(40) {
+            // Triple(X-Position, Y-Offset, Geschwindigkeitsmultiplikator)
+            Triple(Math.random().toFloat(), Math.random().toFloat(), 0.8f + Math.random().toFloat() * 0.5f)
+        }
+    }
+
+    // Ganz leichte Abdunklung des Hintergrunds für Atmosphäre
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.1f)))
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        if (w <= 0 || h <= 0) return@Canvas
+
+        val dropLength = 25.dp.toPx()
+        val strokeWidth = 1.2.dp.toPx()
+        val dropColor = Color(0xFFB0C4DE).copy(alpha = 0.3f)
+
+        dropData.forEach { (relX, relY, speedMult) ->
+            // Die X-Koordinate wird EINMAL berechnet und bleibt während des Falls STARR
+            val x = relX * w
+
+            // Die Y-Koordinate animiert basierend auf dem globalen Fortschritt und dem individuellen Offset
+            val y = ((progress * speedMult + relY) % 1f) * (h + dropLength * 2) - dropLength
+
+            drawLine(
+                color = dropColor,
+                start = Offset(x, y),
+                end = Offset(x, y + dropLength), // x Start = x Ende -> GARANTIERTER vertikaler Fall
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round
+            )
+        }
     }
 }
 
@@ -384,31 +510,99 @@ fun SunAnimation() {
 fun CloudAnimation() {
     val infiniteTransition = rememberInfiniteTransition(label = "clouds")
     val offsetX by infiniteTransition.animateFloat(
-        initialValue = -100f, targetValue = 400f,
-        animationSpec = infiniteRepeatable(tween(15000, easing = LinearEasing)), label = "x"
+        initialValue = -400f, targetValue = 1200f,
+        animationSpec = infiniteRepeatable(tween(45000, easing = LinearEasing)), label = "x"
     )
+
+    // Sehr dezenter grauer Schleier
+    Box(modifier = Modifier.fillMaxSize().alpha(0.1f).background(Color(0xFF4A4A4A)))
+
     Box(modifier = Modifier.fillMaxSize()) {
-        Text("☁️", fontSize = 60.sp, modifier = Modifier.offset(x = offsetX.dp, y = 20.dp).alpha(0.3f))
-        Text("☁️", fontSize = 40.sp, modifier = Modifier.offset(x = (offsetX - 150).dp, y = 80.dp).alpha(0.2f))
+        repeat(12) { i ->
+            val xBase = (i * 250) % 1400 - 500
+            val yPos = (i * 120) % 1000 + 20
+            val size = 70 + (i * 15) % 80
+            val speedFactor = 0.4f + (i % 3) * 0.15f
+            val alpha = 0.05f + (i % 4) * 0.02f
+
+            Text(
+                "☁️",
+                fontSize = size.sp,
+                modifier = Modifier
+                    .offset(x = (offsetX * speedFactor + xBase).dp, y = yPos.dp)
+                    .alpha(alpha)
+            )
+        }
     }
 }
 
 @Composable
-fun RainAnimation() {
-    val infiniteTransition = rememberInfiniteTransition(label = "rain")
-    val offsetY by infiniteTransition.animateFloat(
-        initialValue = -20f, targetValue = 200f,
-        animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing)), label = "y"
+fun SnowAnimation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "snow")
+    val progress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "progress"
+    )
+
+    val snowflakes = remember {
+        List(40) {
+            Offset(Math.random().toFloat(), Math.random().toFloat())
+        }
+    }
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        if (w <= 0 || h <= 0) return@Canvas
+
+        snowflakes.forEach { flake ->
+            val x = flake.x * w
+            // Weicher Fall von oben nach unten
+            val y = ((progress + flake.y) % 1f) * h
+
+            drawCircle(
+                color = Color.White.copy(alpha = 0.35f),
+                radius = 2.5.dp.toPx(),
+                center = Offset(x, y)
+            )
+        }
+    }
+}
+
+@Composable
+fun FogAnimation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "fog")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f, targetValue = 0.45f,
+        animationSpec = infiniteRepeatable(tween(6000, easing = LinearOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+        label = "alpha"
+    )
+    Box(modifier = Modifier.fillMaxSize().alpha(alpha * 0.15f).background(Color.White))
+}
+
+@Composable
+fun WindAnimation() {
+    val infiniteTransition = rememberInfiniteTransition(label = "wind")
+    val offsetX by infiniteTransition.animateFloat(
+        initialValue = -200f, targetValue = 1200f,
+        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)), label = "x"
     )
     Box(modifier = Modifier.fillMaxSize()) {
-        repeat(5) { i ->
-            val xPos = (20 + i * 60).dp
-            val yPos = ((offsetY + i * 30) % 200).dp
+        repeat(12) { i ->
+            val yPos = (i * 100) % 1200
+            val xBase = (i * 250) % 1400 - 200
+            val xPos = ((offsetX + xBase) % 1600 - 200)
             Box(
                 modifier = Modifier
-                    .offset(x = xPos, y = yPos)
-                    .size(2.dp, 15.dp)
-                    .background(Color.White.copy(alpha = 0.4f), RoundedCornerShape(1.dp))
+                    .offset(x = xPos.dp, y = yPos.dp)
+                    .size(60.dp, 1.dp)
+                    .alpha(0.06f)
+                    .background(Color.White, RoundedCornerShape(1.dp))
             )
         }
     }
@@ -421,17 +615,17 @@ fun ThunderAnimation() {
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = keyframes {
-                durationMillis = 3000
+                durationMillis = 5000
                 0f at 0
-                0f at 2500
-                1f at 2600
-                0f at 2700
-                1f at 2800
-                0f at 2900
+                0f at 4000
+                1f at 4050
+                0f at 4100
+                0.8f at 4150
+                0f at 4200
             }
         ), label = "alpha"
     )
-    Box(modifier = Modifier.fillMaxSize().alpha(alpha * 0.2f).background(Color.White))
+    Box(modifier = Modifier.fillMaxSize().alpha(alpha * 0.1f).background(Color.White))
 }
 
 @Composable
@@ -498,7 +692,7 @@ private fun DetailTile(modifier: Modifier = Modifier, icon: String, label: Strin
                         tint = NauticalPrimary,
                         modifier = Modifier
                             .size(24.dp)
-                            .rotate(windDir.toFloat() + 180f) // Arrow points TO direction, DWD gives FROM. +180 to show where it blows.
+                            .rotate(windDir.toFloat() + 180f)
                     )
                 }
             }
@@ -783,3 +977,4 @@ private fun cloudCoverText(percent: Int?): String {
         else -> "Bedeckt"
     }
 }
+

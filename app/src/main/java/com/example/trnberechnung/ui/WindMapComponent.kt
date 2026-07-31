@@ -201,11 +201,11 @@ private fun updateWindMarkers(
             SymbolOptions()
                 .withLatLng(LatLng(station.latitude, station.longitude))
                 .withIconImage("wind-tile-$dirText")
-                .withIconSize(0.7f)
+                .withIconSize(0.6f)
                 .withTextField("$windSpeedKn/$gustSpeedKn\n$dirText")
-                .withTextSize(10f)
+                .withTextSize(9f)
                 .withTextColor(ColorUtils.colorToRgbaString(AndroidColor.WHITE))
-                .withTextOffset(arrayOf(0f, 1.4f))
+                .withTextOffset(arrayOf(0f, 0.4f))
                 .withTextAnchor("center")
                 .withTextJustify("center")
         )
@@ -215,29 +215,27 @@ private fun updateWindMarkers(
 
 private fun createWindTileBitmap(context: android.content.Context, rotation: Float): Bitmap {
     // A tile that accommodates an arrow at the top and 2 lines of text below
-    // Increased width for longer direction strings like "WSW"
-    val width = 130
-    val height = 155
+    val width = 100
+    val height = 150
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    // Dark rounded background box
+    // Dark rounded background box - slightly more transparent
     val paint = Paint().apply {
-        color = AndroidColor.parseColor("#1B2A39")
+        color = AndroidColor.parseColor("#E61B2A39") // ~90% alpha
         isAntiAlias = true
     }
     val rect = RectF(0f, 0f, width.toFloat(), height.toFloat())
-    canvas.drawRoundRect(rect, 16f, 16f, paint)
+    canvas.drawRoundRect(rect, 14f, 14f, paint)
 
     // Draw the white arrow at the top
     val drawable = ContextCompat.getDrawable(context, R.drawable.ic_wind_arrow)?.mutate()
     drawable?.let {
         it.setTint(AndroidColor.WHITE)
         canvas.save()
-        // Rotate around the center of the arrow's area (top part of the tile)
-        // Icon center at 40 for the taller box.
-        canvas.rotate(rotation + 180f, width / 2f, 40f)
-        val arrowSize = 44
+        // Position arrow in the upper third
+        canvas.rotate(rotation + 180f, width / 2f, 35f)
+        val arrowSize = 34
         it.setBounds(width / 2 - arrowSize / 2, 18, width / 2 + arrowSize / 2, 18 + arrowSize)
         it.draw(canvas)
         canvas.restore()

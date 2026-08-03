@@ -324,11 +324,15 @@ class TideViewModel(
     }
 
     fun saveCrew(member: CrewMember) {
-        viewModelScope.launch { repository.insertCrew(member) }
+        viewModelScope.launch {
+            repository.insertCrew(com.example.trnberechnung.logic.ValidationUtils.sanitizeCrewMember(member))
+        }
     }
 
     fun updateCrew(member: CrewMember) {
-        viewModelScope.launch { repository.updateCrew(member) }
+        viewModelScope.launch {
+            repository.updateCrew(com.example.trnberechnung.logic.ValidationUtils.sanitizeCrewMember(member))
+        }
     }
 
     fun deleteCrew(member: CrewMember) {

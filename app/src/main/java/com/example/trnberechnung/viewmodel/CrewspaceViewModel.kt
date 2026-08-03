@@ -43,7 +43,7 @@ class CrewspaceViewModel(
                 }
             }
         }
-        
+
         // Chats beobachten
         viewModelScope.launch {
             val ownId = _uiState.value.ownSkipperId
@@ -95,7 +95,7 @@ class CrewspaceViewModel(
                     }
                 }
         }
-        
+
         // Planner Events beobachten
         viewModelScope.launch {
             repository.allPlannerEvents.collect { events ->
@@ -348,7 +348,7 @@ class CrewspaceViewModel(
             repository.insertPlannerEvent(event.toEntity())
         }
     }
-    
+
     fun addPlannerEventWithDate(title: String, description: String, date: LocalDate) {
         val event = PlannerEvent(
             date = date,
@@ -359,7 +359,7 @@ class CrewspaceViewModel(
             repository.insertPlannerEvent(event.toEntity())
         }
     }
-    
+
     fun updatePlannerEvent(event: PlannerEvent, newTitle: String, newDescription: String) {
         val updatedEvent = event.copy(title = newTitle, description = newDescription)
         viewModelScope.launch {
@@ -411,17 +411,19 @@ class CrewspaceViewModel(
         val state = _uiState.value
         if (state.addName.isBlank() && state.addSkipperId.isBlank()) return
 
-        val member = CrewMember(
-            name = state.addName.ifBlank { state.addSkipperId },
-            rank = state.addSelectedRole.label,
-            isOnBoard = true,
-            medicalNote = state.addMedicalNotes,
-            emergencyPhone = state.addPhone,
-            skipperId = state.addSkipperId,
-            role = state.addSelectedRole.name,
-            emergencyContact = state.addEmergencyContact,
-            phone = state.addPhone,
-            medicalNotes = state.addMedicalNotes
+        val member = com.example.trnberechnung.logic.ValidationUtils.sanitizeCrewMember(
+            CrewMember(
+                name = state.addName.ifBlank { state.addSkipperId },
+                rank = state.addSelectedRole.label,
+                isOnBoard = true,
+                medicalNote = state.addMedicalNotes,
+                emergencyPhone = state.addPhone,
+                skipperId = state.addSkipperId,
+                role = state.addSelectedRole.name,
+                emergencyContact = state.addEmergencyContact,
+                phone = state.addPhone,
+                medicalNotes = state.addMedicalNotes
+            )
         )
 
         viewModelScope.launch {

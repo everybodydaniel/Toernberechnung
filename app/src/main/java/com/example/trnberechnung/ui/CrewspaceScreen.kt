@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.trnberechnung.messaging.ChatNavigationState
 import com.example.trnberechnung.model.*
 import com.example.trnberechnung.viewmodel.CrewspaceViewModel
+import com.example.trnberechnung.logic.ValidationUtils
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -174,7 +175,7 @@ fun CrewspaceScreen(
             when (uiState.selectedTab) {
                 CrewspaceTab.CHATS -> {
                     ChatsTabContent(
-                        uiState = uiState, 
+                        uiState = uiState,
                         viewModel = viewModel,
                         authRepo = authRepo,
                         onNavigateToLogin = onNavigateToLogin
@@ -336,7 +337,7 @@ private fun CrewspaceSearchBar(
 
 @Composable
 private fun ChatsTabContent(
-    uiState: CrewspaceUiState, 
+    uiState: CrewspaceUiState,
     viewModel: CrewspaceViewModel,
     authRepo: AuthRepository? = null,
     onNavigateToLogin: () -> Unit = {}
@@ -660,7 +661,9 @@ private fun NewConversationBottomSheet(
                 Box(modifier = Modifier.weight(1f)) {
                     CrewspaceTextField(
                         value = uiState.newConversationSkipperId,
-                        onValueChange = { viewModel.updateNewConversationSkipperId(it) },
+                        onValueChange = { input ->
+                            viewModel.updateNewConversationSkipperId(ValidationUtils.sanitizeSkipperId(input))
+                        },
                         placeholder = "Skipper-ID",
                         trailingIcon = {
                             Icon(
@@ -1059,7 +1062,7 @@ private fun ChatBubble(
                 val eventTitle = parts.getOrNull(0) ?: "Termin"
                 val eventDesc = parts.getOrNull(1) ?: ""
                 val eventDateStr = parts.getOrNull(2) ?: ""
-                
+
                 Box(
                     modifier = Modifier
                         .widthIn(max = 280.dp)
@@ -1086,7 +1089,7 @@ private fun ChatBubble(
                                 color = textColor.copy(alpha = 0.8f)
                             )
                         }
-                        
+
                         if (!message.isOwnMessage) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Button(
@@ -1101,7 +1104,7 @@ private fun ChatBubble(
                                 Text("Annehmen", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
-                        
+
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = time,
@@ -1573,13 +1576,13 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
 
         Spacer(modifier = Modifier.height(16.dp))
     }
-    
+
     if (eventToEdit != null) {
         EditPlannerEventBottomSheet(
             event = eventToEdit!!,
             chatThreads = uiState.chatThreads,
             onDismiss = { eventToEdit = null },
-            onSave = { newTitle, newDesc -> 
+            onSave = { newTitle, newDesc ->
                 viewModel.updatePlannerEvent(eventToEdit!!, newTitle, newDesc)
                 eventToEdit = null
             },
@@ -2076,7 +2079,9 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
             // ── Name Feld ──
             CrewspaceTextField(
                 value = uiState.addName,
-                onValueChange = { viewModel.updateAddName(it) },
+                onValueChange = { input ->
+                    viewModel.updateAddName(ValidationUtils.sanitizeName(input))
+                },
                 placeholder = "Name (Optional, falls ID vorhanden)",
                 leadingIcon = {
                     Icon(
@@ -2095,7 +2100,9 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                 Box(modifier = Modifier.weight(1f)) {
                     CrewspaceTextField(
                         value = uiState.addSkipperId,
-                        onValueChange = { viewModel.updateAddSkipperId(it) },
+                        onValueChange = { input ->
+                            viewModel.updateAddSkipperId(ValidationUtils.sanitizeSkipperId(input))
+                        },
                         placeholder = "Skipper-ID",
                         trailingIcon = {
                             Icon(
@@ -2107,9 +2114,9 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                         }
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.width(8.dp))
-                
+
                 // Chat-Auswahl-Button
                 Box {
                     IconButton(
@@ -2141,7 +2148,7 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                             availableChats.forEach { thread ->
                                 DropdownMenuItem(
                                     text = { Text(thread.participantName) },
-                                    onClick = { 
+                                    onClick = {
                                         viewModel.updateAddSkipperId(thread.participantSkipperId)
                                         viewModel.updateAddName(thread.participantName)
                                         showChatDropdown = false
@@ -2203,7 +2210,9 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
             // ── Notfallkontakt ──
             CrewspaceTextField(
                 value = uiState.addEmergencyContact,
-                onValueChange = { viewModel.updateAddEmergencyContact(it) },
+                onValueChange = { input ->
+                    viewModel.updateAddEmergencyContact(ValidationUtils.sanitizeName(input))
+                },
                 placeholder = "Notfallkontakt",
                 leadingIcon = {
                     Icon(
@@ -2218,7 +2227,9 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
             // ── Telefon ──
             CrewspaceTextField(
                 value = uiState.addPhone,
-                onValueChange = { viewModel.updateAddPhone(it) },
+                onValueChange = { input ->
+                    viewModel.updateAddPhone(ValidationUtils.sanitizePhone(input))
+                },
                 placeholder = "Telefon",
                 keyboardType = KeyboardType.Phone,
                 leadingIcon = {
@@ -2234,7 +2245,9 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
             // ── Medizinische Hinweise ──
             CrewspaceTextField(
                 value = uiState.addMedicalNotes,
-                onValueChange = { viewModel.updateAddMedicalNotes(it) },
+                onValueChange = { input ->
+                    viewModel.updateAddMedicalNotes(ValidationUtils.sanitizeMedicalNotes(input))
+                },
                 placeholder = "Medizinische Hinweise",
                 leadingIcon = {
                     Icon(

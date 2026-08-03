@@ -101,11 +101,11 @@ class TideRepository(
     val allCrew: Flow<List<CrewMember>> = crewMemberDao.getAllCrew()
 
     suspend fun insertCrew(member: CrewMember) {
-        crewMemberDao.insertCrew(member)
+        crewMemberDao.insertCrew(com.example.trnberechnung.logic.ValidationUtils.sanitizeCrewMember(member))
     }
 
     suspend fun updateCrew(member: CrewMember) {
-        crewMemberDao.updateCrew(member)
+        crewMemberDao.updateCrew(com.example.trnberechnung.logic.ValidationUtils.sanitizeCrewMember(member))
     }
 
     suspend fun deleteCrew(member: CrewMember) {

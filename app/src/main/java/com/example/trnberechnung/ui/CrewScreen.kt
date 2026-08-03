@@ -532,7 +532,11 @@ private fun CrewMemberDialog(
 
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = { input ->
+                        if (input.all { it.isLetter() || it.isWhitespace() || it == '-' || it == '.' }) {
+                            name = input
+                        }
+                    },
                     label = { Text("Name *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -618,7 +622,11 @@ private fun CrewMemberDialog(
 
                 OutlinedTextField(
                     value = medicalNote,
-                    onValueChange = { medicalNote = it },
+                    onValueChange = { input ->
+                        if (input.all { it.isLetterOrDigit() || it.isWhitespace() || it in ".,-()!" }) {
+                            medicalNote = input
+                        }
+                    },
                     label = { Text("Medizinische Hinweise") },
                     placeholder = { Text("z.B. Allergie, Diabetes...", color = NauticalTextSecondary.copy(alpha = 0.5f)) },
                     modifier = Modifier.fillMaxWidth(),
@@ -637,7 +645,11 @@ private fun CrewMemberDialog(
 
                 OutlinedTextField(
                     value = emergencyPhone,
-                    onValueChange = { emergencyPhone = it },
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() || it in "+- ()" }) {
+                            emergencyPhone = input
+                        }
+                    },
                     label = { Text("Notfallnummer") },
                     placeholder = { Text("+49 ...", color = NauticalTextSecondary.copy(alpha = 0.5f)) },
                     singleLine = true,

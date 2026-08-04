@@ -11,5 +11,9 @@ data class PlannerEvent(
     val id: String = UUID.randomUUID().toString(),
     val date: LocalDate,
     val title: String,
-    val description: String = ""
+    val description: String = "",
+    val startTime: String? = null,
+    val endTime: String? = null,
+    val location: String? = null,
+    val category: String = "Allgemein"
 )

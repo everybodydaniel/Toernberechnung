@@ -338,12 +338,7 @@ class CrewspaceViewModel(
         }
     }
 
-    fun addPlannerEvent(title: String, description: String = "") {
-        val event = PlannerEvent(
-            date = _uiState.value.selectedDate,
-            title = title,
-            description = description
-        )
+    fun addPlannerEvent(event: PlannerEvent) {
         viewModelScope.launch {
             repository.insertPlannerEvent(event.toEntity())
         }
@@ -360,10 +355,9 @@ class CrewspaceViewModel(
         }
     }
 
-    fun updatePlannerEvent(event: PlannerEvent, newTitle: String, newDescription: String) {
-        val updatedEvent = event.copy(title = newTitle, description = newDescription)
+    fun updatePlannerEvent(event: PlannerEvent) {
         viewModelScope.launch {
-            repository.insertPlannerEvent(updatedEvent.toEntity())
+            repository.insertPlannerEvent(event.toEntity())
         }
     }
 

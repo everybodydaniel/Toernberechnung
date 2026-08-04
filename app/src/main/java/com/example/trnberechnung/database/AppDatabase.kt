@@ -16,9 +16,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
-        TideEntity::class, 
-        LogbookEntry::class, 
-        CrewMember::class, 
+        TideEntity::class,
+        LogbookEntry::class,
+        CrewMember::class,
         ChecklistItem::class,
         ChatThreadEntity::class,
         ChatMessageEntity::class,
@@ -29,8 +29,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NautiMessageEntity::class,
         ActiveVoyageEntity::class,
         VoyageBreadcrumbEntity::class,
-    ], 
-    version = 11,
+    ],
+    version = 12,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,6 +46,17 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun activeVoyageDao(): ActiveVoyageDao
 
     companion object {
+        val MIGRATION_11_12 =
+            object : Migration(11, 12) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `planner_events` ADD COLUMN `startTime` TEXT")
+                    db.execSQL("ALTER TABLE `planner_events` ADD COLUMN `endTime` TEXT")
+                    db.execSQL("ALTER TABLE `planner_events` ADD COLUMN `location` TEXT")
+                    db.execSQL(
+                        "ALTER TABLE `planner_events` ADD COLUMN `category` TEXT NOT NULL DEFAULT 'Allgemein'",
+                    )
+                }
+            }
         val MIGRATION_9_10 =
             object : Migration(9, 10) {
                 override fun migrate(db: SupportSQLiteDatabase) {

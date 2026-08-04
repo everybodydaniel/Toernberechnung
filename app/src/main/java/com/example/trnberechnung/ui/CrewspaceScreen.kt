@@ -919,10 +919,13 @@ private fun ChatDetailScreen(viewModel: CrewspaceViewModel, thread: ChatThread) 
                     onRetry = { viewModel.retryMessage(message.id) },
                     onAcceptEvent = { title, desc, dateStr ->
                         try {
-                            val parsedDate = LocalDate.parse(dateStr)
-                            viewModel.addPlannerEventWithDate(title, desc, parsedDate)
+                            // Versuche das Datum zu parsen. Falls es fehlschlägt, öffne den Edit-Sheet für manuelles Anpassen
+                            val parsedDate = runCatching { LocalDate.parse(dateStr) }.getOrNull()
+                            if (parsedDate != null) {
+                                viewModel.addPlannerEventWithDate(title, desc, parsedDate)
+                            }
                         } catch (e: Exception) {
-                            // ignore if date is invalid
+                            // ignore
                         }
                     }
                 )
@@ -1059,9 +1062,24 @@ private fun ChatBubble(
             }
             ChatMessageType.EVENT -> {
                 val parts = message.content.split("|")
-                val eventTitle = parts.getOrNull(0) ?: "Termin"
-                val eventDesc = parts.getOrNull(1) ?: ""
-                val eventDateStr = parts.getOrNull(2) ?: ""
+                val isOldFormat = parts.size >= 2 && parts.all { it.isNotEmpty() }
+
+                val eventTitle: String
+                val eventDesc: String
+                val eventDateStr: String
+
+                if (isOldFormat) {
+                    eventTitle = parts.getOrNull(0) ?: "Termin"
+                    eventDesc = parts.getOrNull(1) ?: ""
+                    eventDateStr = parts.getOrNull(2) ?: ""
+                } else {
+                    // New format is just the text, but let's try to parse if it was structured somehow
+                    // Actually, I changed it to: "${e.title}$timeStr$locStr\n${e.description}\nDatum: ${e.date}"
+                    val lines = message.content.lines()
+                    eventTitle = lines.getOrNull(0) ?: "Termin"
+                    eventDesc = lines.getOrNull(1) ?: ""
+                    eventDateStr = lines.getOrNull(2)?.removePrefix("Datum: ") ?: ""
+                }
 
                 Box(
                     modifier = Modifier
@@ -1075,7 +1093,7 @@ private fun ChatBubble(
                             Icon(Icons.Outlined.DateRange, contentDescription = "Termin", tint = textColor, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "$eventTitle am $eventDateStr",
+                                text = if (eventDateStr.isNotBlank()) "$eventTitle am $eventDateStr" else eventTitle,
                                 fontSize = 15.sp,
                                 color = textColor,
                                 fontWeight = FontWeight.Bold
@@ -1090,10 +1108,13 @@ private fun ChatBubble(
                             )
                         }
 
-                        if (!message.isOwnMessage) {
+                        if (!message.isOwnMessage && eventDateStr.isNotBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Button(
-                                onClick = { onAcceptEvent(eventTitle, eventDesc, eventDateStr) },
+                                onClick = {
+                                    // Try to parse date if possible, otherwise use today or some fallback
+                                    onAcceptEvent(eventTitle, eventDesc, eventDateStr)
+                                },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color.White.copy(alpha = 0.2f),
                                     contentColor = textColor
@@ -1101,7 +1122,7 @@ private fun ChatBubble(
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Annehmen", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Kalender hinzufügen", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
 
@@ -1569,7 +1590,9 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
         DayDetailCard(
             selectedDate = uiState.selectedDate,
             events = eventsForDay,
-            onAddEvent = { viewModel.addPlannerEvent("Neuer Termin") },
+            onAddEvent = {
+                eventToEdit = PlannerEvent(date = uiState.selectedDate, title = "")
+            },
             onDeleteEvent = { viewModel.deletePlannerEvent(it) },
             onEventClick = { eventToEdit = it }
         )
@@ -1582,8 +1605,12 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
             event = eventToEdit!!,
             chatThreads = uiState.chatThreads,
             onDismiss = { eventToEdit = null },
-            onSave = { newTitle, newDesc ->
-                viewModel.updatePlannerEvent(eventToEdit!!, newTitle, newDesc)
+            onSave = { updatedEvent ->
+                if (uiState.plannerEvents.any { it.id == updatedEvent.id }) {
+                    viewModel.updatePlannerEvent(updatedEvent)
+                } else {
+                    viewModel.addPlannerEvent(updatedEvent)
+                }
                 eventToEdit = null
             },
             onDelete = {
@@ -1591,7 +1618,15 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                 eventToEdit = null
             },
             onShare = { threadId ->
-                val text = "${eventToEdit!!.title}|${eventToEdit!!.description}|${eventToEdit!!.date}"
+                val e = eventToEdit!!
+                // Formatierte Nachricht für den Chat - Wir nutzen wieder das Pipe-Format für die "Annehmen"-Logik,
+                // aber erweitern es um die neuen Felder für die Anzeige.
+                val timeStr = if (e.startTime != null) " (${e.startTime}${if (e.endTime != null) "-${e.endTime}" else ""})" else ""
+                val locStr = if (e.location != null) " @ ${e.location}" else ""
+                val displayTitle = "${e.title}$timeStr$locStr"
+
+                val text = "$displayTitle|${e.description}|${e.date}"
+
                 val thread = uiState.chatThreads.find { it.id == threadId }
                 if (thread != null) {
                     viewModel.openChat(thread)
@@ -1836,6 +1871,13 @@ private fun DayDetailCard(
             } else {
                 // ── Event-Liste ──
                 events.forEach { event ->
+                    val categoryColor = when (event.category) {
+                        "Navigation" -> Color(0xFF3B82F6)
+                        "Verpflegung" -> Color(0xFF10B981)
+                        "Landgang" -> Color(0xFFF59E0B)
+                        else -> CrewspaceAccent
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1843,41 +1885,64 @@ private fun DayDetailCard(
                             .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Farbiger Balken links
+                        // Farbiger Balken links basierend auf Kategorie
                         Box(
                             modifier = Modifier
-                                .width(3.dp)
-                                .height(36.dp)
+                                .width(4.dp)
+                                .height(40.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(CrewspaceAccent)
+                                .background(categoryColor)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = event.title,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = CrewspaceTextPrimary
-                            )
-                            if (event.description.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = event.description,
+                                    text = event.title,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = CrewspaceTextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (event.startTime != null) {
+                                    Text(
+                                        text = " • ${event.startTime}",
+                                        fontSize = 12.sp,
+                                        color = CrewspaceAccent,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+
+                            val subText = buildString {
+                                if (!event.location.isNullOrBlank()) {
+                                    append(event.location)
+                                    if (event.description.isNotBlank()) append(" • ")
+                                }
+                                append(event.description)
+                            }
+
+                            if (subText.isNotBlank()) {
+                                Text(
+                                    text = subText,
                                     fontSize = 12.sp,
-                                    color = CrewspaceTextSecondary
+                                    color = CrewspaceTextSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
                         IconButton(
                             onClick = { onDeleteEvent(event) },
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = "Löschen",
-                                tint = CrewspaceTextSecondary.copy(alpha = 0.5f),
-                                modifier = Modifier.size(16.dp)
+                                tint = CrewspaceTextSecondary.copy(alpha = 0.4f),
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }

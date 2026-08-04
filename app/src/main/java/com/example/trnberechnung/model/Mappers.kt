@@ -7,7 +7,7 @@ import com.example.trnberechnung.database.PlannerEventEntity
 fun ChatThreadEntity.toModel(ownSkipperId: String, messages: List<ChatMessage> = emptyList()): ChatThread {
     val otherName = if (ownSkipperId == participant1Id) participant2Name else participant1Name
     val otherId = if (ownSkipperId == participant1Id) participant2Id else participant1Id
-    
+
     return ChatThread(
         id = id,
         type = type,
@@ -88,7 +88,11 @@ fun PlannerEventEntity.toModel(): PlannerEvent {
         id = id,
         date = date,
         title = title,
-        description = description
+        description = description,
+        startTime = startTime,
+        endTime = endTime,
+        location = location,
+        category = category
     )
 }
 
@@ -97,6 +101,10 @@ fun PlannerEvent.toEntity(): PlannerEventEntity {
         id = id,
         date = date,
         title = title,
-        description = description
+        description = description,
+        startTime = startTime,
+        endTime = endTime,
+        location = location,
+        category = category
     )
 }

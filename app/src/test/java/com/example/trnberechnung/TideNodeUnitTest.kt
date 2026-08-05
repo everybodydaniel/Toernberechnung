@@ -1,10 +1,14 @@
 package com.example.trnberechnung
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import kotlin.math.*
 
+@DisplayName("JUnit 5 Unit-Test Suite für TideNode Nautik-Logik")
 class TideNodeUnitTest {
 
     // 1. Haversine Distanzberechnung (Seemeilen)
@@ -36,42 +40,54 @@ class TideNodeUnitTest {
     }
 
     @Test
+    @DisplayName("TC01: Haversine Distanz zwischen Borkum und Norderney")
     fun testHaversineDistanceCalculation() {
-        // Borkum (53.60, 6.67) bis Norderney (53.70, 7.15)
         val dist = calculateHaversineNm(53.60, 6.67, 53.70, 7.15)
-        assertTrue("Distanz sollte zwischen 16.0 und 20.0 NM liegen", dist in 16.0..20.0)
+        assertTrue(dist in 16.0..20.0, "Distanz sollte zwischen 16.0 und 20.0 NM liegen (Errechnet: $dist)")
+    }
+
+    @ParameterizedTest(name = "Distanz {0} NM bei {1} kn = {2} Min")
+    @CsvSource(
+        "13.0, 6.5, 120",
+        "6.5, 6.5, 60",
+        "26.0, 13.0, 120",
+        "0.0, 5.0, 0"
+    )
+    @DisplayName("TC02: Parameterisierte Fahrzeitberechnung")
+    fun testTravelTimeCalculation(distanceNm: Double, speedKnots: Double, expectedMinutes: Int) {
+        val mins = calculateTravelTimeMinutes(distanceNm, speedKnots)
+        assertEquals(expectedMinutes, mins, "Fahrzeit in Minuten für $distanceNm NM bei $speedKnots kn ist nicht korrekt")
+    }
+
+    @ParameterizedTest(name = "Wassertiefe {0}m, Tiefgang {1}m, Marge {2}m -> Status: {3}")
+    @CsvSource(
+        "3.0, 1.2, 0.5, BEFAHRBAR",
+        "1.4, 1.2, 0.5, EINGESCHRAENKT",
+        "1.0, 1.2, 0.5, NICHT_BEFAHRBAR"
+    )
+    @DisplayName("TC03-TC05: Parameterisierte Routen-Sicherheitsbewertung")
+    fun testRouteStatusEvaluation(depth: Double, draft: Double, margin: Double, expectedStatus: String) {
+        val status = evaluateRouteStatus(depth, draft, margin)
+        assertEquals(expectedStatus, status, "Status-Bewertung unterscheidet sich vom erwarteten Ergebnis")
     }
 
     @Test
-    fun testTravelTimeCalculation() {
-        val mins = calculateTravelTimeMinutes(13.0, 6.5)
-        assertEquals("13.0 NM bei 6.5 kn sollte 120 Minuten dauern", 120, mins)
+    @DisplayName("TC06: Gezeiten Wasserstand Zwölftel-Regel 50% Hub")
+    fun testTideTwelfthsRule() {
+        val lowWater = 0.8
+        val highWater = 3.2
+        val range = highWater - lowWater
+        val waterAtHour3 = lowWater + (6.0 / 12.0) * range
+        assertEquals(2.0, waterAtHour3, 0.01, "Wasserstand zur 3. Tidenstunde sollte 2.0m betragen")
     }
 
     @Test
-    fun testRouteStatusBefahrbar() {
-        val status = evaluateRouteStatus(3.0, 1.2, 0.5)
-        assertEquals("Wassertiefe 3.0m mit Tiefgang 1.2m + 0.5m Marge muss BEFAHRBAR sein", "BEFAHRBAR", status)
-    }
-
-    @Test
-    fun testRouteStatusEingeschraenkt() {
-        val status = evaluateRouteStatus(1.4, 1.2, 0.5)
-        assertEquals("Wassertiefe 1.4m mit Tiefgang 1.2m + 0.5m Marge muss EINGESCHRAENKT sein", "EINGESCHRAENKT", status)
-    }
-
-    @Test
-    fun testRouteStatusNichtBefahrbar() {
-        val status = evaluateRouteStatus(1.0, 1.2, 0.5)
-        assertEquals("Wassertiefe 1.0m unter Tiefgang 1.2m muss NICHT_BEFAHRBAR sein", "NICHT_BEFAHRBAR", status)
-    }
-
-    @Test
+    @DisplayName("TC09: Alphabetische Sortierung der Stationen A-Z")
     fun testAlphabeticalStationSorting() {
         val stations = listOf("Borkum", "Juist", "Baltrum", "Norderney", "Emden", "Harlesiel")
         val sorted = stations.sorted()
-        assertEquals("Erster Ort muss Baltrum sein", "Baltrum", sorted[0])
-        assertEquals("Zweiter Ort muss Borkum sein", "Borkum", sorted[1])
-        assertEquals("Dritter Ort muss Emden sein", "Emden", sorted[2])
+        assertEquals("Baltrum", sorted[0], "Erster Ort muss Baltrum sein")
+        assertEquals("Borkum", sorted[1], "Zweiter Ort muss Borkum sein")
+        assertEquals("Emden", sorted[2], "Dritter Ort muss Emden sein")
     }
 }

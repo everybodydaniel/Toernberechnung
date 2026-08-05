@@ -43,7 +43,7 @@ Die App automatisiert den komplexen Prozess der maritimen Routenplanung durch di
 
 ## 🧪 Unit Tests & Qualitätsüberprüfung
 
-- 🧪 **Live Interactive Test Dashboard (HTML):** [everybodydaniel.github.io/Toernberechnung-Android/docs/unit_tests.html](https://everybodydaniel.github.io/Toernberechnung-Android/docs/unit_tests.html)
+- 🧪 **Live Interactive Test Dashboard (HTML):** [everybodydaniel.github.io/Toernberechnung-Android/unit_tests.html](https://everybodydaniel.github.io/Toernberechnung-Android/unit_tests.html)
 - ☕ **JUnit 5 Unit Test Suite (Kotlin):** [`app/src/test/java/com/example/trnberechnung/TideNodeUnitTest.kt`](app/src/test/java/com/example/trnberechnung/TideNodeUnitTest.kt)
 
 ## 🔄 CI/CD Pipeline

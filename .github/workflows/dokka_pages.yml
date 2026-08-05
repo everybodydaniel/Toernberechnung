@@ -44,6 +44,7 @@ jobs:
           mkdir -p public/coverage
           cp -r build/dokka/htmlMultiModule/. public/
           cp -r app/build/reports/jacoco/jacocoTestReport/html/. public/coverage/
+          cp docs/unit_tests.html public/unit_tests.html
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v6

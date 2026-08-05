@@ -4,10 +4,10 @@ import com.example.trnberechnung.model.CrewMember
 
 object ValidationUtils {
 
-    private val NAME_REGEX = Regex("[^a-zA-ZÀ-ÿ\\s\\-\\.]")
+    private val NAME_REGEX = Regex("[^a-zA-ZÀ-ÿ\\s]")
     private val SKIPPER_ID_REGEX = Regex("[^a-zA-Z0-9]")
-    private val PHONE_REGEX = Regex("[^0-9\\+\\-\\(\\)\\s]")
-    private val MEDICAL_NOTES_REGEX = Regex("[^a-zA-Z0-9À-ÿ\\s\\.,!\\?\\(\\):;/\\-]")
+    private val PHONE_REGEX = Regex("[^0-9\\+]")
+    private val MEDICAL_NOTES_REGEX = Regex("[^a-zA-Z0-9À-ÿ\\s]")
 
     fun sanitizeName(name: String): String = name.replace(NAME_REGEX, "")
 

@@ -1,6 +1,7 @@
 package com.example.trnberechnung.ui
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,42 +64,44 @@ import java.util.Locale
 import androidx.compose.ui.graphics.luminance
 
 // ══════════════════════════════════════════════════════════════
-// Crewspace Farbpalette (dynamisch an Dark & Light Mode angepasst)
+// Crewspace Farbpalette (Moderneres Look & Feel)
 // ══════════════════════════════════════════════════════════════
 private val CrewspaceBg: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF0D1B2A) else Color(0xFFF2F2F7)
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF0A0F14) else Color(0xFFF8F9FA)
 
 private val CrewspaceSurface: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E2838) else Color.White
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF161E26) else Color.White
 
 private val CrewspacePrimary: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF93C5FD) else Color(0xFF1B3A5C)
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF3B82F6) else Color(0xFF1E3A8A)
 
 private val CrewspaceAccent: Color
     @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF60A5FA) else Color(0xFF2563EB)
 
 private val CrewspaceTextPrimary: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFFF8FAFC) else Color(0xFF1C1C1E)
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFFF1F5F9) else Color(0xFF111827)
 
 private val CrewspaceTextSecondary: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF94A3B8) else Color(0xFF8E8E93)
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF94A3B8) else Color(0xFF6B7280)
 
 private val CrewspaceTabBg: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E293B) else Color(0xFFE5E5EA)
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E293B) else Color(0xFFF1F5F9)
 
 private val CrewspaceTabActive: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF2563EB) else Color(0xFF1B3A5C)
+    @Composable get() = CrewspaceAccent
 
 private val CrewspaceTabActiveText: Color = Color.White
 
 private val CrewspaceTabInactiveText: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF94A3B8) else Color(0xFF6B7280)
+    @Composable get() = CrewspaceTextSecondary
 
 private val CrewspaceDivider: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF334155) else Color(0xFFE5E5EA)
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E293B) else Color(0xFFE5E7EB)
+
 private val CrewspaceCardBg: Color
-    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E293B) else Color(0xFFF8F8FA)
-private val CrewspaceUnreadBadge = Color(0xFF2563EB)
+    @Composable get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF1E293B) else Color(0xFFF3F4F6)
+
+private val CrewspaceUnreadBadge = Color(0xFFEF4444)
 
 /**
  * Haupt-Composable für den gesamten Crewspace-Screen.
@@ -201,27 +204,24 @@ fun CrewspaceScreen(
 
 @Composable
 private fun CrewspaceHeader() {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
-        Column {
-            Text(
-                text = "Crewspace",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = CrewspacePrimary
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "Crew, Gespräche und Termine an einem Ort",
-                fontSize = 13.sp,
-                color = CrewspaceTextSecondary
-            )
-        }
+        Text(
+            text = "Crewspace",
+            fontSize = 32.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = CrewspacePrimary,
+            letterSpacing = (-0.5).sp
+        )
+        Text(
+            text = "Crew, Gespräche und Termine",
+            fontSize = 14.sp,
+            color = CrewspaceTextSecondary,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -246,46 +246,49 @@ private fun CrewspaceSegmentedTabs(
     selectedTab: CrewspaceTab,
     onTabSelected: (CrewspaceTab) -> Unit
 ) {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(CrewspaceTabBg)
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        color = CrewspaceTabBg,
+        shape = RoundedCornerShape(16.dp)
     ) {
-        tabItems.forEach { item ->
-            val isSelected = selectedTab == item.tab
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            tabItems.forEach { item ->
+                val isSelected = selectedTab == item.tab
 
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        if (isSelected) CrewspaceTabActive else Color.Transparent
-                    )
-                    .clickable { onTabSelected(item.tab) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isSelected) CrewspaceTabActive else Color.Transparent
+                        )
+                        .clickable { onTabSelected(item.tab) },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        item.icon,
-                        contentDescription = item.label,
-                        tint = if (isSelected) CrewspaceTabActiveText else CrewspaceTabInactiveText,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = item.label,
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isSelected) CrewspaceTabActiveText else CrewspaceTabInactiveText
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            item.icon,
+                            contentDescription = item.label,
+                            tint = if (isSelected) CrewspaceTabActiveText else CrewspaceTabInactiveText,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = item.label,
+                            fontSize = 14.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) CrewspaceTabActiveText else CrewspaceTabInactiveText
+                        )
+                    }
                 }
             }
         }
@@ -480,86 +483,87 @@ private fun ChatThreadCard(thread: ChatThread, onClick: () -> Unit) {
             .format(timeFormatter)
     }
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = CrewspaceSurface),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        color = CrewspaceSurface,
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 2.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar
+            // Moderner Avatar mit Initialen-Stil
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(52.dp)
                     .clip(CircleShape)
-                    .background(CrewspaceAccent.copy(alpha = 0.15f)),
+                    .background(CrewspaceAccent.copy(alpha = 0.1f))
+                    .border(1.dp, CrewspaceAccent.copy(alpha = 0.2f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    tint = CrewspaceAccent,
-                    modifier = Modifier.size(24.dp)
+                Text(
+                    text = thread.participantName.take(1).uppercase(),
+                    color = CrewspaceAccent,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
             // Name + letzte Nachricht
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = thread.participantName,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = CrewspaceTextPrimary
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = thread.lastMessage.ifBlank { "Keine Nachrichten" },
-                    fontSize = 13.sp,
-                    color = CrewspaceTextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            // Zeit + Ungelesen-Badge
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
-                Text(
-                    text = time,
-                    fontSize = 12.sp,
-                    color = CrewspaceTextSecondary
-                )
-                if (thread.unreadCount > 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(CrewspaceUnreadBadge),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "${thread.unreadCount}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = thread.participantName,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CrewspaceTextPrimary
+                    )
+                    Text(
+                        text = time,
+                        fontSize = 12.sp,
+                        color = CrewspaceTextSecondary
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = thread.lastMessage.ifBlank { "Keine Nachrichten" },
+                        fontSize = 14.sp,
+                        color = CrewspaceTextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (thread.unreadCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(CrewspaceUnreadBadge),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "${thread.unreadCount}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("›", fontSize = 18.sp, color = CrewspaceTextSecondary.copy(alpha = 0.4f))
         }
     }
 }
@@ -1648,13 +1652,13 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
         .replaceFirstChar { it.titlecase(germanLocale) }
     val year = yearMonth.year
 
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CrewspaceSurface),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        color = CrewspaceSurface,
+        shape = RoundedCornerShape(24.dp),
+        shadowElevation = 4.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             // ── Monat-Navigation ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1663,27 +1667,27 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
             ) {
                 IconButton(
                     onClick = { viewModel.navigateMonth(false) },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp).background(CrewspaceCardBg, CircleShape)
                 ) {
-                    Text("◀", fontSize = 14.sp, color = CrewspaceAccent)
+                    Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = CrewspaceAccent)
                 }
 
                 Text(
                     text = "$monthName $year",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
                     color = CrewspaceTextPrimary
                 )
 
                 IconButton(
                     onClick = { viewModel.navigateMonth(true) },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(40.dp).background(CrewspaceCardBg, CircleShape)
                 ) {
-                    Text("▶", fontSize = 14.sp, color = CrewspaceAccent)
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = CrewspaceAccent)
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // ── Wochentag-Header ──
             val dayLabels = listOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
@@ -1695,27 +1699,26 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
                     ) {
                         Text(
                             text = day,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = CrewspaceTextSecondary
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CrewspaceTextSecondary.copy(alpha = 0.7f)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // ── Kalender-Grid ──
             val firstDayOfMonth = yearMonth.atDay(1)
             val daysInMonth = yearMonth.lengthOfMonth()
-            // Montag = 1 ... Sonntag = 7
-            val startDayOfWeek = firstDayOfMonth.dayOfWeek.value // 1=Mo ... 7=So
+            val startDayOfWeek = firstDayOfMonth.dayOfWeek.value
             val totalCells = startDayOfWeek - 1 + daysInMonth
             val rows = (totalCells + 6) / 7
             val today = LocalDate.now()
 
             for (row in 0 until rows) {
-                Row(modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     for (col in 0 until 7) {
                         val cellIndex = row * 7 + col
                         val dayNumber = cellIndex - (startDayOfWeek - 1) + 1
@@ -1734,12 +1737,12 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
 
                                 Box(
                                     modifier = Modifier
-                                        .size(36.dp)
+                                        .size(40.dp)
                                         .clip(CircleShape)
                                         .background(
                                             when {
                                                 isSelected -> CrewspaceAccent
-                                                isToday -> CrewspaceAccent.copy(alpha = 0.12f)
+                                                isToday -> CrewspaceAccent.copy(alpha = 0.15f)
                                                 else -> Color.Transparent
                                             }
                                         )
@@ -1747,26 +1750,23 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
                                     ) {
                                         Text(
                                             text = "$dayNumber",
-                                            fontSize = 14.sp,
-                                            fontWeight = when {
-                                                isSelected -> FontWeight.Bold
-                                                isToday -> FontWeight.SemiBold
-                                                else -> FontWeight.Normal
-                                            },
+                                            fontSize = 15.sp,
+                                            fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
                                             color = when {
                                                 isSelected -> Color.White
                                                 isToday -> CrewspaceAccent
                                                 else -> CrewspaceTextPrimary
                                             }
                                         )
-                                        // Event-Indikator (kleiner Punkt)
                                         if (hasEvents && !isSelected) {
                                             Box(
                                                 modifier = Modifier
+                                                    .padding(top = 2.dp)
                                                     .size(4.dp)
                                                     .clip(CircleShape)
                                                     .background(CrewspaceAccent)
@@ -1802,74 +1802,80 @@ private fun DayDetailCard(
         .getDisplayName(TextStyle.FULL, germanLocale)
         .replaceFirstChar { it.titlecase(germanLocale) }
 
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CrewspaceSurface),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        color = CrewspaceSurface,
+        shape = RoundedCornerShape(24.dp),
+        shadowElevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header: Tag-Titel + "+ Termin" Button
+        Column(modifier = Modifier.padding(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "$dayOfWeek, $day. $month",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = CrewspaceTextPrimary
-                )
-
-                TextButton(
-                    onClick = onAddEvent,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                ) {
+                Column {
                     Text(
-                        text = "+ Termin",
+                        text = dayOfWeek,
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = CrewspaceAccent
+                        fontWeight = FontWeight.Bold,
+                        color = CrewspaceAccent,
+                        letterSpacing = 0.5.sp
                     )
+                    Text(
+                        text = "$day. $month",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = CrewspaceTextPrimary
+                    )
+                }
+
+                Button(
+                    onClick = onAddEvent,
+                    colors = ButtonDefaults.buttonColors(containerColor = CrewspaceAccent.copy(alpha = 0.1f)),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = CrewspaceAccent, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Termin", color = CrewspaceAccent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(color = CrewspaceDivider, thickness = 0.5.dp)
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = CrewspaceDivider, thickness = 1.dp)
             Spacer(modifier = Modifier.height(12.dp))
 
             if (events.isEmpty()) {
-                // ── Empty State ──
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 24.dp),
+                        .padding(vertical = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        Icons.Outlined.DateRange,
-                        contentDescription = null,
-                        tint = CrewspaceTextSecondary.copy(alpha = 0.4f),
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(CrewspaceCardBg),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.DateRange,
+                            contentDescription = null,
+                            tint = CrewspaceTextSecondary.copy(alpha = 0.3f),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Noch nichts geplant",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
+                        text = "Alles ruhig heute",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
                         color = CrewspaceTextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Tippe auf \"+ Termin\", um einen Eintrag hinzuzufügen.",
-                        fontSize = 12.sp,
-                        color = CrewspaceTextSecondary.copy(alpha = 0.6f),
-                        textAlign = TextAlign.Center
                     )
                 }
             } else {
-                // ── Event-Liste ──
                 events.forEach { event ->
                     val categoryColor = when (event.category) {
                         "Navigation" -> Color(0xFF3B82F6)
@@ -1878,72 +1884,75 @@ private fun DayDetailCard(
                         else -> CrewspaceAccent
                     }
 
-                    Row(
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onEventClick(event) }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(vertical = 4.dp)
+                            .clickable { onEventClick(event) },
+                        color = CrewspaceCardBg,
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        // Farbiger Balken links basierend auf Kategorie
-                        Box(
-                            modifier = Modifier
-                                .width(4.dp)
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(categoryColor)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .height(32.dp)
+                                    .clip(CircleShape)
+                                    .background(categoryColor)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
 
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = event.title,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = CrewspaceTextPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (event.startTime != null) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = " • ${event.startTime}",
+                                        text = event.title,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CrewspaceTextPrimary
+                                    )
+                                    if (event.startTime != null) {
+                                        Text(
+                                            text = " • ${event.startTime}",
+                                            fontSize = 13.sp,
+                                            color = CrewspaceAccent,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+
+                                val subText = buildString {
+                                    if (!event.location.isNullOrBlank()) {
+                                        append(event.location)
+                                        if (event.description.isNotBlank()) append(" • ")
+                                    }
+                                    append(event.description)
+                                }
+
+                                if (subText.isNotBlank()) {
+                                    Text(
+                                        text = subText,
                                         fontSize = 12.sp,
-                                        color = CrewspaceAccent,
-                                        fontWeight = FontWeight.Medium
+                                        color = CrewspaceTextSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
 
-                            val subText = buildString {
-                                if (!event.location.isNullOrBlank()) {
-                                    append(event.location)
-                                    if (event.description.isNotBlank()) append(" • ")
-                                }
-                                append(event.description)
-                            }
-
-                            if (subText.isNotBlank()) {
-                                Text(
-                                    text = subText,
-                                    fontSize = 12.sp,
-                                    color = CrewspaceTextSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                            IconButton(
+                                onClick = { onDeleteEvent(event) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Löschen",
+                                    tint = Color(0xFFEF4444).copy(alpha = 0.5f),
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
-                        }
-
-                        IconButton(
-                            onClick = { onDeleteEvent(event) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Löschen",
-                                tint = CrewspaceTextSecondary.copy(alpha = 0.4f),
-                                modifier = Modifier.size(18.dp)
-                            )
                         }
                     }
                 }
@@ -1981,127 +1990,122 @@ private fun CrewTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceViewMo
 
 @Composable
 private fun CrewOnBoardCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewModel) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CrewspaceSurface),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        color = CrewspaceSurface,
+        shape = RoundedCornerShape(24.dp),
+        shadowElevation = 2.dp
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(20.dp)
         ) {
-            // Header-Zeile
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Kreis mit Anzahl
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
-                            .background(CrewspaceAccent),
+                            .background(CrewspaceAccent.copy(alpha = 0.1f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "${uiState.onBoardCount}",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            color = CrewspaceAccent,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 18.sp
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "an Bord",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        text = "Aktuell an Bord",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
                         color = CrewspaceTextPrimary
                     )
                 }
             }
 
-            // Crewmitglieder-Liste
             if (uiState.crewMembers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = CrewspaceDivider, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = CrewspaceDivider, thickness = 0.5.dp)
-                Spacer(modifier = Modifier.height(8.dp))
 
                 uiState.crewMembers.forEach { member ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Avatar
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(44.dp)
                                 .clip(CircleShape)
-                                .background(CrewspaceAccent.copy(alpha = 0.15f)),
+                                .background(CrewspaceAccent.copy(alpha = 0.05f))
+                                .border(1.dp, CrewspaceAccent.copy(alpha = 0.1f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                Icons.Default.Person,
-                                contentDescription = null,
-                                tint = CrewspaceAccent,
-                                modifier = Modifier.size(20.dp)
+                            Text(
+                                text = member.name.take(1).uppercase(),
+                                color = CrewspaceAccent,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
 
-                        // Name und Rolle
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = member.name,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
                                 color = CrewspaceTextPrimary
                             )
                             Text(
                                 text = member.crewRole.label,
-                                fontSize = 12.sp,
-                                color = CrewspaceTextSecondary
+                                fontSize = 13.sp,
+                                color = CrewspaceTextSecondary,
+                                fontWeight = FontWeight.Medium
                             )
                         }
 
-                        // Status-Indikator
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(10.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (member.isOnBoard) Color(0xFF34C759)
-                                    else Color(0xFFFF3B30)
+                                    if (member.isOnBoard) Color(0xFF10B981)
+                                    else Color(0xFFEF4444)
                                 )
                         )
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
 
-                        // Löschen-Button
                         IconButton(
                             onClick = { viewModel.deleteCrew(member) },
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(32.dp).background(CrewspaceCardBg, CircleShape)
                         ) {
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = "Entfernen",
-                                tint = CrewspaceTextSecondary.copy(alpha = 0.5f),
+                                tint = Color(0xFFEF4444).copy(alpha = 0.8f),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
                     }
                 }
             } else {
-                // Empty-State
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "Noch keine Crewmitglieder hinzugefügt.",
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     color = CrewspaceTextSecondary,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                 )
             }
         }
@@ -2112,53 +2116,53 @@ private fun CrewOnBoardCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewM
 
 @Composable
 private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewModel) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CrewspaceSurface),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        color = CrewspaceSurface,
+        shape = RoundedCornerShape(24.dp),
+        shadowElevation = 2.dp
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Titel
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Outlined.PersonAdd,
-                    contentDescription = null,
-                    tint = CrewspaceAccent,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(CrewspaceAccent.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.PersonAdd,
+                        contentDescription = null,
+                        tint = CrewspaceAccent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Crewmitglied hinzufügen",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "Mitglied hinzufügen",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
                     color = CrewspaceTextPrimary
                 )
             }
 
-            HorizontalDivider(color = CrewspaceDivider, thickness = 0.5.dp)
+            HorizontalDivider(color = CrewspaceDivider, thickness = 1.dp)
 
-            // ── Name Feld ──
             CrewspaceTextField(
                 value = uiState.addName,
                 onValueChange = { input ->
                     viewModel.updateAddName(ValidationUtils.sanitizeName(input))
                 },
-                placeholder = "Name (Optional, falls ID vorhanden)",
+                placeholder = "Name des Crewmitglieds",
                 leadingIcon = {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        tint = CrewspaceTextSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(20.dp))
                 }
             )
 
-            // ── Skipper-ID Feld ──
             var showChatDropdown by remember { mutableStateOf(false) }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2168,35 +2172,27 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                         onValueChange = { input ->
                             viewModel.updateAddSkipperId(ValidationUtils.sanitizeSkipperId(input))
                         },
-                        placeholder = "Skipper-ID",
-                        trailingIcon = {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Suchen",
-                                tint = CrewspaceTextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
+                        placeholder = "Skipper-ID (für Direkt-Chat)",
+                        leadingIcon = {
+                            Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
                         }
                     )
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Chat-Auswahl-Button
-                Box {
-                    IconButton(
-                        onClick = { showChatDropdown = true },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(CrewspaceCardBg, RoundedCornerShape(10.dp))
-                            .border(1.dp, CrewspaceDivider, RoundedCornerShape(10.dp))
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Outlined.Chat,
-                            contentDescription = "Aus Chat auswählen",
-                            tint = CrewspaceAccent
-                        )
-                    }
+                IconButton(
+                    onClick = { showChatDropdown = true },
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(CrewspaceCardBg, RoundedCornerShape(16.dp))
+                        .border(1.dp, CrewspaceDivider, RoundedCornerShape(16.dp))
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.Chat,
+                        contentDescription = "Aus Chat auswählen",
+                        tint = CrewspaceAccent
+                    )
 
                     DropdownMenu(
                         expanded = showChatDropdown,
@@ -2225,16 +2221,15 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                 }
             }
 
-            // ── Rollen-Auswahl (Filter-Chips) ──
             Column {
                 Text(
-                    text = "ROLLE",
+                    text = "ROLLE AN BORD",
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.ExtraBold,
                     color = CrewspaceTextSecondary,
-                    letterSpacing = 1.sp
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
 
                 val mainRoles = listOf(CrewRole.SKIPPER, CrewRole.CO_SKIPPER, CrewRole.NAVIGATION)
 
@@ -2244,111 +2239,80 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                 ) {
                     mainRoles.forEach { role ->
                         val isSelected = uiState.addSelectedRole == role
-                        Box(
+                        Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    if (isSelected) CrewspaceAccent
-                                    else CrewspaceCardBg
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isSelected) CrewspaceAccent else CrewspaceDivider,
-                                    shape = RoundedCornerShape(10.dp)
-                                )
-                                .clickable { viewModel.updateAddSelectedRole(role) }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                                .clickable { viewModel.updateAddSelectedRole(role) },
+                            color = if (isSelected) CrewspaceAccent else CrewspaceCardBg,
+                            shape = RoundedCornerShape(12.dp),
+                            border = if (!isSelected) BorderStroke(1.dp, CrewspaceDivider) else null
                         ) {
-                            Text(
-                                text = role.label,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (isSelected) Color.White else CrewspaceTextPrimary
-                            )
+                            Box(modifier = Modifier.padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = role.label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else CrewspaceTextPrimary
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // ── Notfallkontakt ──
             CrewspaceTextField(
                 value = uiState.addEmergencyContact,
                 onValueChange = { input ->
                     viewModel.updateAddEmergencyContact(ValidationUtils.sanitizeName(input))
                 },
-                placeholder = "Notfallkontakt",
+                placeholder = "Notfallkontakt (Name)",
                 leadingIcon = {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        tint = CrewspaceTextSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Icon(Icons.Default.ContactPhone, contentDescription = null, modifier = Modifier.size(20.dp))
                 }
             )
 
-            // ── Telefon ──
             CrewspaceTextField(
                 value = uiState.addPhone,
                 onValueChange = { input ->
                     viewModel.updateAddPhone(ValidationUtils.sanitizePhone(input))
                 },
-                placeholder = "Telefon",
+                placeholder = "Notfall-Telefonnummer",
                 keyboardType = KeyboardType.Phone,
                 leadingIcon = {
-                    Icon(
-                        Icons.Outlined.Phone,
-                        contentDescription = null,
-                        tint = CrewspaceTextSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Icon(Icons.Outlined.Phone, contentDescription = null, modifier = Modifier.size(20.dp))
                 }
             )
 
-            // ── Medizinische Hinweise ──
             CrewspaceTextField(
                 value = uiState.addMedicalNotes,
                 onValueChange = { input ->
                     viewModel.updateAddMedicalNotes(ValidationUtils.sanitizeMedicalNotes(input))
                 },
-                placeholder = "Medizinische Hinweise",
+                placeholder = "Medizinische Hinweise / Allergien",
                 leadingIcon = {
-                    Icon(
-                        Icons.Outlined.MedicalServices,
-                        contentDescription = null,
-                        tint = CrewspaceTextSecondary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Icon(Icons.Outlined.MedicalServices, contentDescription = null, modifier = Modifier.size(20.dp))
                 }
             )
 
-            // ── Hinzufügen-Button ──
             Button(
                 onClick = { viewModel.addCrewMember() },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(54.dp),
                 enabled = uiState.addSkipperId.isNotBlank() || uiState.addName.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CrewspaceAccent,
-                    contentColor = Color.White,
-                    disabledContainerColor = CrewspaceDivider,
-                    disabledContentColor = CrewspaceTextSecondary
+                    contentColor = Color.White
                 ),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(16.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Hinzufügen",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
+                    text = "Crewmitglied hinzufügen",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
@@ -2373,25 +2337,29 @@ private fun CrewspaceTextField(
         placeholder = {
             Text(
                 text = placeholder,
-                color = CrewspaceTextSecondary.copy(alpha = 0.6f),
-                fontSize = 14.sp
+                color = CrewspaceTextSecondary.copy(alpha = 0.5f),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium
             )
         },
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Next),
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = CrewspaceAccent,
             unfocusedBorderColor = CrewspaceDivider,
-            focusedContainerColor = Color.White,
+            focusedContainerColor = CrewspaceCardBg,
             unfocusedContainerColor = CrewspaceCardBg,
             cursorColor = CrewspaceAccent,
             focusedTextColor = CrewspaceTextPrimary,
-            unfocusedTextColor = CrewspaceTextPrimary
-        )
+            unfocusedTextColor = CrewspaceTextPrimary,
+            focusedLeadingIconColor = CrewspaceAccent,
+            unfocusedLeadingIconColor = CrewspaceTextSecondary
+        ),
+        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     )
 }
 

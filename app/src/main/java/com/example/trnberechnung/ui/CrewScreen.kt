@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.example.trnberechnung.model.CrewMember
 import com.example.trnberechnung.ui.theme.*
 import com.example.trnberechnung.viewmodel.TideViewModel
+import com.example.trnberechnung.logic.ValidationUtils
 
 private val rankColors = mapOf(
     "Skipper" to Color(0xFFFFD700),
@@ -71,6 +72,7 @@ fun CrewScreen(
         AlertDialog(
             onDismissRequest = { memberToDelete = null },
             containerColor = NauticalSurface,
+            shape = RoundedCornerShape(28.dp),
             title = { Text("Crewmitglied löschen?", color = NauticalTextPrimary) },
             text = {
                 Text(
@@ -84,7 +86,7 @@ fun CrewScreen(
                     memberToDelete = null
                     Toast.makeText(context, "${member.name} entfernt", Toast.LENGTH_SHORT).show()
                 }) {
-                    Text("Löschen", color = NauticalNoGo)
+                    Text("Löschen", color = NauticalNoGo, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -123,8 +125,9 @@ fun CrewScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(12.dp)
-                    .border(1.dp, NauticalDivider, RoundedCornerShape(12.dp)),
+                    .border(1.dp, NauticalDivider, RoundedCornerShape(24.dp)),
                 colors = CardDefaults.cardColors(containerColor = NauticalSurface),
+                shape = RoundedCornerShape(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -156,7 +159,7 @@ fun CrewScreen(
                                 containerColor = NauticalPrimary.copy(alpha = 0.15f),
                                 contentColor = NauticalPrimary
                             ),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Icon(
                                 Icons.Default.Add,
@@ -265,7 +268,7 @@ private fun StatusChip(label: String, count: Int, color: Color, modifier: Modifi
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -300,10 +303,10 @@ private fun CrewMemberCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, NauticalDivider, RoundedCornerShape(12.dp)),
+            .border(1.dp, NauticalDivider, RoundedCornerShape(16.dp)),
         colors = CardDefaults.cardColors(containerColor = NauticalSurface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
 
@@ -511,6 +514,7 @@ private fun CrewMemberDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = NauticalSurface,
+        shape = RoundedCornerShape(28.dp),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -533,13 +537,12 @@ private fun CrewMemberDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { input ->
-                        if (input.all { it.isLetter() || it.isWhitespace() || it == '-' || it == '.' }) {
-                            name = input
-                        }
+                        name = ValidationUtils.sanitizeName(input)
                     },
                     label = { Text("Name *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NauticalPrimary,
                         unfocusedBorderColor = NauticalDivider,
@@ -562,6 +565,7 @@ private fun CrewMemberDialog(
                         label = { Text("Rang") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = rankDropdownExpanded) },
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = NauticalPrimary,
                             unfocusedBorderColor = NauticalDivider,
@@ -623,15 +627,14 @@ private fun CrewMemberDialog(
                 OutlinedTextField(
                     value = medicalNote,
                     onValueChange = { input ->
-                        if (input.all { it.isLetterOrDigit() || it.isWhitespace() || it in ".,-()!" }) {
-                            medicalNote = input
-                        }
+                        medicalNote = ValidationUtils.sanitizeMedicalNotes(input)
                     },
                     label = { Text("Medizinische Hinweise") },
                     placeholder = { Text("z.B. Allergie, Diabetes...", color = NauticalTextSecondary.copy(alpha = 0.5f)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                     maxLines = 4,
+                    shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = NauticalAccentWarm,
                         unfocusedBorderColor = NauticalDivider,
@@ -646,14 +649,13 @@ private fun CrewMemberDialog(
                 OutlinedTextField(
                     value = emergencyPhone,
                     onValueChange = { input ->
-                        if (input.all { it.isDigit() || it in "+- ()" }) {
-                            emergencyPhone = input
-                        }
+                        emergencyPhone = ValidationUtils.sanitizePhone(input)
                     },
                     label = { Text("Notfallnummer") },
                     placeholder = { Text("+49 ...", color = NauticalTextSecondary.copy(alpha = 0.5f)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     leadingIcon = {
                         Icon(
@@ -689,6 +691,7 @@ private fun CrewMemberDialog(
                     onSave(member)
                 },
                 enabled = isValid,
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = NauticalPrimary,
                     contentColor = NauticalTextOnPrimary,

@@ -1,7 +1,9 @@
 package com.example.trnberechnung.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,32 +50,35 @@ fun EditPlannerEventBottomSheet(
 
     var showShareMenu by remember { mutableStateOf(false) }
 
-    // Farben passend zum Crewspace (vereinfacht für die Komponente)
-    val primaryBlue = Color(0xFF2563EB)
-    val surfaceColor = Color(0xFFF8F8FA)
-    val textColor = Color(0xFF1B3A5C)
-    val secondaryText = Color(0xFF8E8E93)
+    // Dynamische Farben passend zum Crewspace-Look
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val accentColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB)
+    val surfaceColor = if (isDark) Color(0xFF161E26) else Color.White
+    val cardBgColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+    val textColor = if (isDark) Color(0xFFF1F5F9) else Color(0xFF0F172A)
+    val secondaryText = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.White,
+        containerColor = surfaceColor,
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
         dragHandle = {
             Box(
                 modifier = Modifier
-                    .padding(vertical = 12.dp)
-                    .width(36.dp)
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Color.LightGray.copy(alpha = 0.5f))
+                    .padding(vertical = 16.dp)
+                    .width(40.dp)
+                    .height(5.dp)
+                    .clip(CircleShape)
+                    .background(secondaryText.copy(alpha = 0.3f))
             )
         }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             // Header
@@ -83,16 +89,25 @@ fun EditPlannerEventBottomSheet(
             ) {
                 Text(
                     text = if (event.title.isEmpty()) "Neuer Termin" else "Termin bearbeiten",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = textColor,
+                    letterSpacing = (-0.5).sp
                 )
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Schließen", tint = secondaryText)
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.background(cardBgColor, CircleShape)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Schließen",
+                        modifier = Modifier.size(20.dp),
+                        tint = textColor
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             if (!showShareMenu) {
                 // Titel Input
@@ -101,7 +116,11 @@ fun EditPlannerEventBottomSheet(
                     onValueChange = { title = it },
                     label = "Titel des Termins",
                     icon = Icons.Default.Title,
-                    placeholder = "z.B. Ablegen Richtung Norderney"
+                    placeholder = "z.B. Ablegen Richtung Norderney",
+                    accentColor = accentColor,
+                    textColor = textColor,
+                    secondaryText = secondaryText,
+                    cardBgColor = cardBgColor
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -114,7 +133,11 @@ fun EditPlannerEventBottomSheet(
                             onValueChange = { startTime = it },
                             label = "Beginn",
                             icon = Icons.Default.AccessTime,
-                            placeholder = "09:00"
+                            placeholder = "09:00",
+                            accentColor = accentColor,
+                            textColor = textColor,
+                            secondaryText = secondaryText,
+                            cardBgColor = cardBgColor
                         )
                     }
                     Box(modifier = Modifier.weight(1f)) {
@@ -123,7 +146,11 @@ fun EditPlannerEventBottomSheet(
                             onValueChange = { endTime = it },
                             label = "Ende",
                             icon = Icons.Default.Timer,
-                            placeholder = "14:30"
+                            placeholder = "14:30",
+                            accentColor = accentColor,
+                            textColor = textColor,
+                            secondaryText = secondaryText,
+                            cardBgColor = cardBgColor
                         )
                     }
                 }
@@ -136,17 +163,22 @@ fun EditPlannerEventBottomSheet(
                     onValueChange = { location = it },
                     label = "Ort / Hafen",
                     icon = Icons.Default.LocationOn,
-                    placeholder = "z.B. Greetsiel"
+                    placeholder = "z.B. Greetsiel",
+                    accentColor = accentColor,
+                    textColor = textColor,
+                    secondaryText = secondaryText,
+                    cardBgColor = cardBgColor
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Kategorie Auswahl
                 Text(
-                    text = "Kategorie",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "KATEGORIE",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
                     color = secondaryText,
+                    letterSpacing = 1.sp,
                     modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                 )
                 Row(
@@ -159,23 +191,23 @@ fun EditPlannerEventBottomSheet(
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { category = cat },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) primaryBlue else surfaceColor,
-                            border = if (!isSelected) androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f)) else null
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) accentColor else cardBgColor,
+                            border = if (!isSelected) BorderStroke(1.dp, secondaryText.copy(alpha = 0.2f)) else null
                         ) {
                             Text(
                                 text = cat,
-                                modifier = Modifier.padding(vertical = 8.dp),
+                                modifier = Modifier.padding(vertical = 10.dp),
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                 color = if (isSelected) Color.White else textColor
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Beschreibung
                 EditField(
@@ -185,10 +217,14 @@ fun EditPlannerEventBottomSheet(
                     icon = Icons.AutoMirrored.Outlined.Notes,
                     placeholder = "Details zum Termin...",
                     singleLine = false,
-                    minLines = 3
+                    minLines = 3,
+                    accentColor = accentColor,
+                    textColor = textColor,
+                    secondaryText = secondaryText,
+                    cardBgColor = cardBgColor
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
                 // Buttons
                 Row(
@@ -197,7 +233,10 @@ fun EditPlannerEventBottomSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (event.title.isNotEmpty()) {
-                        IconButton(onClick = onDelete) {
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.background(Color.Red.copy(alpha = 0.1f), CircleShape)
+                        ) {
                             Icon(Icons.Default.Delete, contentDescription = "Löschen", tint = Color.Red.copy(alpha = 0.7f))
                         }
                     } else {
@@ -208,15 +247,15 @@ fun EditPlannerEventBottomSheet(
                         if (event.title.isNotEmpty()) {
                             OutlinedButton(
                                 onClick = { showShareMenu = true },
-                                shape = RoundedCornerShape(12.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, primaryBlue),
-                                contentPadding = PaddingValues(horizontal = 16.dp)
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.5.dp, accentColor),
+                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
                             ) {
                                 Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Teilen", color = primaryBlue)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Teilen", fontWeight = FontWeight.Bold)
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                         }
 
                         Button(
@@ -230,12 +269,13 @@ fun EditPlannerEventBottomSheet(
                                     category = category
                                 ))
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = primaryBlue),
-                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                            shape = RoundedCornerShape(14.dp),
                             enabled = title.isNotBlank(),
-                            modifier = Modifier.height(44.dp)
+                            modifier = Modifier.height(48.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                         ) {
-                            Text("Speichern", fontWeight = FontWeight.Bold)
+                            Text("Speichern", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         }
                     }
                 }
@@ -243,56 +283,68 @@ fun EditPlannerEventBottomSheet(
                 // Share Menu
                 Text(
                     text = "In Chat teilen",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
                     color = textColor
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 if (chatThreads.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                         Text("Keine aktiven Chats gefunden.", color = secondaryText)
                     }
                 } else {
-                    LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 350.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         items(chatThreads) { thread ->
-                            Row(
+                            Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { onShare(thread.id) }
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .clickable { onShare(thread.id) },
+                                color = cardBgColor,
+                                shape = RoundedCornerShape(16.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(primaryBlue.copy(alpha = 0.1f)),
-                                    contentAlignment = Alignment.Center
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Person, contentDescription = null, tint = primaryBlue, modifier = Modifier.size(20.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(accentColor.copy(alpha = 0.1f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = thread.participantName.take(1).uppercase(),
+                                            color = accentColor,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 18.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = thread.participantName,
+                                        fontSize = 16.sp,
+                                        color = textColor,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = secondaryText.copy(alpha = 0.5f))
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = thread.participantName,
-                                    fontSize = 16.sp,
-                                    color = textColor,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Spacer(modifier = Modifier.weight(1f))
-                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = secondaryText.copy(alpha = 0.5f))
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 TextButton(
                     onClick = { showShareMenu = false },
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 ) {
-                    Text("Zurück zur Bearbeitung", color = primaryBlue)
+                    Text("← Zurück zur Bearbeitung", color = accentColor, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -307,32 +359,40 @@ private fun EditField(
     icon: ImageVector,
     placeholder: String,
     singleLine: Boolean = true,
-    minLines: Int = 1
+    minLines: Int = 1,
+    accentColor: Color,
+    textColor: Color,
+    secondaryText: Color,
+    cardBgColor: Color
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = label,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color(0xFF8E8E93),
-            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+            text = label.uppercase(),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = secondaryText,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
         )
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text(placeholder, fontSize = 14.sp, color = Color.Gray.copy(alpha = 0.5f)) },
+            placeholder = { Text(placeholder, fontSize = 15.sp, color = secondaryText.copy(alpha = 0.5f)) },
             modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFF2563EB)) },
-            shape = RoundedCornerShape(12.dp),
+            leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = accentColor) },
+            shape = RoundedCornerShape(16.dp),
             singleLine = singleLine,
             minLines = minLines,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF2563EB),
-                unfocusedBorderColor = Color.LightGray.copy(alpha = 0.4f),
-                focusedContainerColor = Color(0xFFF8F8FA),
-                unfocusedContainerColor = Color(0xFFF8F8FA),
-                cursorColor = Color(0xFF2563EB)
-            )
+                focusedBorderColor = accentColor,
+                unfocusedBorderColor = secondaryText.copy(alpha = 0.2f),
+                focusedContainerColor = cardBgColor,
+                unfocusedContainerColor = cardBgColor,
+                cursorColor = accentColor,
+                focusedTextColor = textColor,
+                unfocusedTextColor = textColor
+            ),
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         )
     }
 }

@@ -41,7 +41,12 @@ Die App automatisiert den komplexen Prozess der maritimen Routenplanung durch di
 3. Das Projekt mit den Gradle-Dateien synchronisieren.
 4. Die App auf einem Emulator oder einem physischen Gerät kompilieren und ausführen.
 
-##  CI/CD Pipeline
+## 🧪 Unit Tests & Qualitätsüberprüfung
+
+- 🧪 **Live Interactive Test Dashboard (HTML):** [everybodydaniel.github.io/Toernberechnung-Android/docs/unit_tests.html](https://everybodydaniel.github.io/Toernberechnung-Android/docs/unit_tests.html)
+- ☕ **JUnit 5 Unit Test Suite (Kotlin):** [`app/src/test/java/com/example/trnberechnung/TideNodeUnitTest.kt`](app/src/test/java/com/example/trnberechnung/TideNodeUnitTest.kt)
+
+## 🔄 CI/CD Pipeline
 
 Dieses Projekt nutzt GitHub Actions für kontinuierliche Integration und automatisierte Aufgaben:
 

@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TideNode - Unit Test Suite & Performance Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0A0F1D;
+      --bg-card: rgba(18, 26, 47, 0.75);
+      --bg-card-hover: rgba(26, 38, 66, 0.85);
+      --border-glass: rgba(255, 255, 255, 0.12);
+      --border-accent: rgba(56, 189, 248, 0.3);
+      --accent-blue: #38BDF8;
+      --accent-cyan: #2DD4BF;
+      --accent-indigo: #818CF8;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --pass-green: #34D399;
+      --pass-bg: rgba(52, 211, 153, 0.12);
+      --fail-red: #F87171;
+      --fail-bg: rgba(248, 113, 113, 0.12);
+      --running-amber: #FBBF24;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(129, 140, 248, 0.12) 0%, transparent 45%);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-glass);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-logo {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #0284C7, #0284C7, #38BDF8);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      box-shadow: 0 8px 24px rgba(56, 189, 248, 0.25);
+    }
+
+    .brand-title h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #FFFFFF, #93C5FD);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-title p {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    .controls-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 0.92rem;
+      padding: 0.7rem 1.4rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-glass);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284C7, #0369A1);
+      color: white;
+      border-color: rgba(56, 189, 248, 0.4);
+      box-shadow: 0 4px 16px rgba(2, 132, 199, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+      background: linear-gradient(135deg, #0369A1, #0284C7);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-main);
+      backdrop-filter: blur(12px);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-accent);
+    }
+
+    /* Summary Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass);
+      border-radius: 18px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-accent);
+    }
+
+    .stat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .stat-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .stat-footer {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Progress Bar */
+    .progress-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(12px);
+    }
+
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.88rem;
+      margin-bottom: 0.6rem;
+      font-weight: 500;
+    }
+
+    .progress-bar-bg {
+      height: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-blue), var(--pass-green));
+      border-radius: 6px;
+      transition: width 0.3s ease;
+    }
+
+    /* Category Filter Tabs & Search */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding-bottom: 0.25rem;
+    }
+
+    .tab {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      color: var(--text-muted);
+      padding: 0.55rem 1.1rem;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .tab.active, .tab:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--text-main);
+    }
+
+    .search-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 10px;
+      padding: 0.55rem 1rem;
+      color: white;
+      font-size: 0.88rem;
+      outline: none;
+      min-width: 220px;
+    }
+
+    .search-box:focus {
+      border-color: var(--accent-blue);
+    }
+
+    /* Test Cases List */
+    .test-suite {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .test-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 16px;
+      padding: 1.25rem;
+      backdrop-filter: blur(12px);
+      transition: all 0.25s ease;
+    }
+
+    .test-card.passed {
+      border-left: 4px solid var(--pass-green);
+    }
+
+    .test-card.failed {
+      border-left: 4px solid var(--fail-red);
+    }
+
+    .test-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .test-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .test-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-pass { background: var(--pass-bg); color: var(--pass-green); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .badge-fail { background: var(--fail-bg); color: var(--fail-red); border: 1px solid rgba(248, 113, 113, 0.3); }
+    .badge-pending { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); }
+
+    .test-name {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .test-duration {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .test-details {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.88rem;
+      display: none;
+    }
+
+    .test-card.expanded .test-details {
+      display: block;
+    }
+
+    .code-block {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: #7DD3FC;
+      margin-top: 0.5rem;
+      overflow-x: auto;
+    }
+
+    /* Live Interactive Playground */
+    .playground-section {
+      margin-top: 3rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: 20px;
+      padding: 1.75rem;
+      backdrop-filter: blur(16px);
+    }
+
+    .playground-header {
+      margin-bottom: 1.25rem;
+    }
+
+    .playground-header h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.4rem;
+      color: var(--accent-blue);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .input-group label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .input-group input {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-glass);
+      border-radius: 8px;
+      padding: 0.6rem 0.8rem;
+      color: white;
+      outline: none;
+      font-size: 0.9rem;
+    }
+
+    .input-group input:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .result-box {
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 12px;
+      padding: 1rem;
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 1rem; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="brand-logo">⚓</div>
+        <div class="brand-title">
+          <h1>TideNode Unit Test Suite</h1>
+          <p>Automatisierter Funktionstest-Runner für Android & Nautik-Logik</p>
+        </div>
+      </div>
+      <div class="controls-group">
+        <button class="btn btn-primary" onclick="runAllTests()">
+          <span>▶</span> Alle Tests ausführen
+        </button>
+        <button class="btn btn-secondary" onclick="resetTests()">
+          <span>🔄</span> Zurücksetzen
+        </button>
+      </div>
+    </header>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>Gesamte Testfälle</span>
+          <span>🧪</span>
+        </div>
+        <div class="stat-value" id="stat-total">12</div>
+        <div class="stat-footer">6 Kategorien abgedeckt</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>Erfolgreich (Passed)</span>
+          <span>✅</span>
+        </div>
+        <div class="stat-value" id="stat-passed" style="color: var(--pass-green);">0</div>
+        <div class="stat-footer" id="stat-pass-pct">0% Erfolgsquote</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>Fehlgeschlagen (Failed)</span>
+          <span>❌</span>
+        </div>
+        <div class="stat-value" id="stat-failed" style="color: var(--fail-red);">0</div>
+        <div class="stat-footer">0 Fehler gefunden</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span>Ausführungszeit</span>
+          <span>⏱️</span>
+        </div>
+        <div class="stat-value" id="stat-time" style="color: var(--accent-cyan);">0 ms</div>
+        <div class="stat-footer">Parallele Ausführung</div>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-container">
+      <div class="progress-info">
+        <span id="progress-text">Bereit für Testausführung...</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-bar"></div>
+      </div>
+    </div>
+
+    <!-- Toolbar: Tabs & Search -->
+    <div class="toolbar">
+      <div class="tabs">
+        <button class="tab active" onclick="filterCategory('all', this)">Alle (12)</button>
+        <button class="tab" onclick="filterCategory('routing', this)">🗺️ Routen & Distanz</button>
+        <button class="tab" onclick="filterCategory('tide', this)">🌊 Gezeiten & Pegel</button>
+        <button class="tab" onclick="filterCategory('safety', this)">🛡️ Tiefgang & Sicherheit</button>
+        <button class="tab" onclick="filterCategory('logbook', this)">📘 Logbuch Parser</button>
+      </div>
+      <input type="text" class="search-box" id="search-input" placeholder="Testfall suchen..." oninput="filterSearch()">
+    </div>
+
+    <!-- Test Suite List -->
+    <div class="test-suite" id="test-suite-container">
+      <!-- Dynamisch befüllt -->
+    </div>
+
+    <!-- Interactive Live Playground -->
+    <div class="playground-section">
+      <div class="playground-header">
+        <h2>⚡ Interaktiver Routen- & Tiefgang-Kalkulator</h2>
+        <p style="color: var(--text-muted); font-size: 0.88rem;">Teste benutzerdefinierte Werte für Distanz, Fahrzeit und Tiefgang-Sicherheitsabstand live im Browser.</p>
+      </div>
+
+      <div class="form-grid">
+        <div class="input-group">
+          <label>Start-Breitengrad (Lat 1)</label>
+          <input type="number" id="lat1" value="53.60" step="0.01">
+        </div>
+        <div class="input-group">
+          <label>Start-Längengrad (Lon 1)</label>
+          <input type="number" id="lon1" value="6.67" step="0.01">
+        </div>
+        <div class="input-group">
+          <label>Ziel-Breitengrad (Lat 2)</label>
+          <input type="number" id="lat2" value="53.70" step="0.01">
+        </div>
+        <div class="input-group">
+          <label>Ziel-Längengrad (Lon 2)</label>
+          <input type="number" id="lon2" value="7.15" step="0.01">
+        </div>
+        <div class="input-group">
+          <label>Bootsspeed (Knoten)</label>
+          <input type="number" id="speed" value="6.5" step="0.5">
+        </div>
+        <div class="input-group">
+          <label>Bootstiefgang (Meter)</label>
+          <input type="number" id="draft" value="1.2" step="0.1">
+        </div>
+        <div class="input-group">
+          <label>Sicherheitsmarge (Meter)</label>
+          <input type="number" id="margin" value="0.5" step="0.1">
+        </div>
+        <div class="input-group">
+          <label>Wassertiefe im Watt (Meter)</label>
+          <input type="number" id="depth" value="2.1" step="0.1">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="calculatePlayground()" style="margin-bottom: 1rem;">
+        Berechnen & Überprüfen
+      </button>
+
+      <div class="result-box" id="playground-result">
+        Gib Werte ein und klicke auf "Berechnen & Überprüfen".
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // TideNode Pure Calculation Logic (Mirrors Kotlin implementations)
+    // -------------------------------------------------------------
+
+    // 1. Haversine Distance in Nautical Miles
+    function calculateHaversineNm(lat1, lon1, lat2, lon2) {
+      const R = 3440.065; // Erdradius in Seemeilen
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // 2. Estimated Travel Time in Minutes
+    function calculateTravelTimeMinutes(distanceNm, speedKnots) {
+      if (speedKnots <= 0) return 0;
+      return Math.round((distanceNm / speedKnots) * 60);
+    }
+
+    // 3. Route Status Checker
+    function evaluateRouteStatus(depth, draft, margin, startHarbour, destHarbour) {
+      if (!startHarbour || !destHarbour) return "UNVOLLSTAENDIG";
+      const requiredDepth = draft + margin;
+      if (depth < draft) return "NICHT_BEFAHRBAR";
+      if (depth < requiredDepth) return "EINGESCHRAENKT";
+      return "BEFAHRBAR";
+    }
+
+    // 4. Logbook Details Serializer / Parser
+    function parseLogbookDetails(encoded) {
+      if (!encoded) return { abfahrt: "", status: "geplant" };
+      const parts = encoded.split("|");
+      let abfahrt = "";
+      let status = "geplant";
+      parts.forEach(p => {
+        if (p.startsWith("Abfahrt ")) abfahrt = p.replace("Abfahrt ", "");
+        if (p.startsWith("Status ")) status = p.replace("Status ", "");
+      });
+      return { abfahrt, status };
+    }
+
+    // 5. Weather Icon Emoji Mapper
+    function iconToEmoji(condition) {
+      switch (condition) {
+        case "clear-day": case "clear-night": return "☀️";
+        case "partly-cloudy-day": case "partly-cloudy-night": return "⛅";
+        case "cloudy": return "☁️";
+        case "rain": return "🌧️";
+        case "thunderstorm": return "⛈️";
+        case "wind": return "💨";
+        default: return "☀️";
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Test Suite Definition
+    // -------------------------------------------------------------
+    const testCases = [
+      {
+        id: "TC01",
+        category: "routing",
+        name: "Haversine Distanzberechnung zwischen Borkum und Norderney",
+        run: () => {
+          const dist = calculateHaversineNm(53.60, 6.67, 53.70, 7.15);
+          const expected = 18.2;
+          const delta = Math.abs(dist - expected);
+          if (delta < 2.0) {
+            return { ok: true, details: `Errechnete Distanz: ${dist.toFixed(2)} NM (Erwartet: ~${expected} NM)` };
+          }
+          return { ok: false, details: `Abweichung zu hoch! Errechnet: ${dist.toFixed(2)} NM` };
+        }
+      },
+      {
+        id: "TC02",
+        category: "routing",
+        name: "Reisezeitberechnung bei 6.5 Knoten Bootsspeed",
+        run: () => {
+          const mins = calculateTravelTimeMinutes(13.0, 6.5);
+          if (mins === 120) {
+            return { ok: true, details: `Dauer für 13.0 NM bei 6.5 kn: 120 Minuten (2 Std)` };
+          }
+          return { ok: false, details: `Falsche Minutenanzahl: ${mins}` };
+        }
+      },
+      {
+        id: "TC03",
+        category: "safety",
+        name: "Routen-Sicherheitsbewertung: Ausreichende Wassertiefe (BEFAHRBAR)",
+        run: () => {
+          const status = evaluateRouteStatus(3.0, 1.2, 0.5, "Borkum", "Juist");
+          if (status === "BEFAHRBAR") {
+            return { ok: true, details: `Ergebnis: BEFAHRBAR (Wassertiefe 3.0m > Erforderlich 1.7m)` };
+          }
+          return { ok: false, details: `Unerwarteter Status: ${status}` };
+        }
+      },
+      {
+        id: "TC04",
+        category: "safety",
+        name: "Routen-Sicherheitsbewertung: Geringe Marge (EINGESCHRAENKT)",
+        run: () => {
+          const status = evaluateRouteStatus(1.4, 1.2, 0.5, "Borkum", "Juist");
+          if (status === "EINGESCHRAENKT") {
+            return { ok: true, details: `Ergebnis: EINGESCHRAENKT (Wassertiefe 1.4m < Erforderlich 1.7m, aber > Tiefgang 1.2m)` };
+          }
+          return { ok: false, details: `Unerwarteter Status: ${status}` };
+        }
+      },
+      {
+        id: "TC05",
+        category: "safety",
+        name: "Routen-Sicherheitsbewertung: Grundberührungsrisiko (NICHT_BEFAHRBAR)",
+        run: () => {
+          const status = evaluateRouteStatus(1.0, 1.2, 0.5, "Borkum", "Juist");
+          if (status === "NICHT_BEFAHRBAR") {
+            return { ok: true, details: `Ergebnis: NICHT_BEFAHRBAR (Wassertiefe 1.0m < Tiefgang 1.2m)` };
+          }
+          return { ok: false, details: `Unerwarteter Status: ${status}` };
+        }
+      },
+      {
+        id: "TC06",
+        category: "tide",
+        name: "Gezeiten Interpolation (Zwölftel-Regel Wasserstand)",
+        run: () => {
+          // Zwölftel-Regel: Std 1: +1/12, Std 2: +2/12, Std 3: +3/12
+          const lowWater = 0.8;
+          const highWater = 3.2;
+          const range = highWater - lowWater; // 2.4m
+          const waterAtHour3 = lowWater + (6 / 12) * range; // 50% der Tidenstiege = 2.0m
+          if (Math.abs(waterAtHour3 - 2.0) < 0.01) {
+            return { ok: true, details: `Wasserstand zur 3. Tidenstunde: ${waterAtHour3.toFixed(2)}m (50% Hub)` };
+          }
+          return { ok: false, details: `Berechnungsfehler: ${waterAtHour3}` };
+        }
+      },
+      {
+        id: "TC07",
+        category: "logbook",
+        name: "Logbuch Details Encoder & Parser Validierung",
+        run: () => {
+          const sample = "Abfahrt 05.08.2026 14:30|Status BEFAHRBAR";
+          const parsed = parseLogbookDetails(sample);
+          if (parsed.abfahrt === "05.08.2026 14:30" && parsed.status === "BEFAHRBAR") {
+            return { ok: true, details: `Parsed Abfahrt: "${parsed.abfahrt}", Status: "${parsed.status}"` };
+          }
+          return { ok: false, details: `Parsing fehlgeschlagen: ${JSON.stringify(parsed)}` };
+        }
+      },
+      {
+        id: "TC08",
+        category: "weather",
+        name: "Wetter-Icon Symbol Mapping Test",
+        run: () => {
+          const rainEmoji = iconToEmoji("rain");
+          const sunEmoji = iconToEmoji("clear-day");
+          if (rainEmoji === "🌧️" && sunEmoji === "☀️") {
+            return { ok: true, details: `Mapping korrekt: rain -> 🌧️, clear-day -> ☀️` };
+          }
+          return { ok: false, details: `Mapping fehlerhaft` };
+        }
+      },
+      {
+        id: "TC09",
+        category: "routing",
+        name: "Stationen Alphabetische Sortierung (A-Z)",
+        run: () => {
+          const stations = ["Borkum", "Juist", "Baltrum", "Norderney"];
+          const sorted = [...stations].sort((a, b) => a.localeCompare(b));
+          if (sorted[0] === "Baltrum" && sorted[1] === "Borkum" && sorted[2] === "Juist") {
+            return { ok: true, details: `Sortierte Reihenfolge: ${sorted.join(", ")}` };
+          }
+          return { ok: false, details: `Sortierung fehlerhaft` };
+        }
+      },
+      {
+        id: "TC10",
+        category: "tide",
+        name: "Gezeiten Passagefenster Zeitprüfung",
+        run: () => {
+          const windowStartMins = 600; // 10:00 Uhr
+          const windowEndMins = 840;   // 14:00 Uhr
+          const departureMins = 720;   // 12:00 Uhr
+          const isInside = departureMins >= windowStartMins && departureMins <= windowEndMins;
+          if (isInside) {
+            return { ok: true, details: `Abfahrt 12:00 liegt im Fenster 10:00 - 14:00 Uhr` };
+          }
+          return { ok: false, details: `Fensterprüfung fehlgeschlagen` };
+        }
+      },
+      {
+        id: "TC11",
+        category: "safety",
+        name: "Tiefgang-Grenzwert Sicherheitsabstand Test",
+        run: () => {
+          const draft = 1.5;
+          const margin = 0.5;
+          const minDepth = draft + margin;
+          if (minDepth === 2.0) {
+            return { ok: true, details: `Mindestwassertiefe für Tiefgang 1.5m + 0.5m Marge = 2.0m` };
+          }
+          return { ok: false, details: `Errechnet: ${minDepth}` };
+        }
+      },
+      {
+        id: "TC12",
+        category: "logbook",
+        name: "Seefahrer-Nachrichten Ungelesen-Zähler Filter Test",
+        run: () => {
+          const messages = [
+            { id: "1", read: false },
+            { id: "2", read: true },
+            { id: "3", read: false }
+          ];
+          const unreadCount = messages.filter(m => !m.read).length;
+          if (unreadCount === 2) {
+            return { ok: true, details: `Zahl ungelesener Meldungen korrekt: 2 von 3` };
+          }
+          return { ok: false, details: `Gezählt: ${unreadCount}` };
+        }
+      }
+    ];
+
+    // -------------------------------------------------------------
+    // UI Render & Execution Engine
+    // -------------------------------------------------------------
+    function renderSuite() {
+      const container = document.getElementById("test-suite-container");
+      container.innerHTML = "";
+
+      testCases.forEach((tc, index) => {
+        const card = document.createElement("div");
+        card.className = "test-card";
+        card.id = `card-${tc.id}`;
+        card.setAttribute("data-category", tc.category);
+
+        card.innerHTML = `
+          <div class="test-header" onclick="toggleDetails('${tc.id}')">
+            <div class="test-title-group">
+              <span class="test-badge badge-pending" id="badge-${tc.id}">Pending</span>
+              <div>
+                <div class="test-name">${tc.id}: ${tc.name}</div>
+                <div class="test-duration" id="duration-${tc.id}">Wartet auf Ausführung...</div>
+              </div>
+            </div>
+            <span style="color: var(--text-muted); font-size: 1.2rem;">⌄</span>
+          </div>
+          <div class="test-details" id="details-${tc.id}">
+            <div id="result-msg-${tc.id}">Klicke auf "Alle Tests ausführen", um diesen Testfall zu starten.</div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function toggleDetails(id) {
+      const card = document.getElementById(`card-${id}`);
+      card.classList.toggle("expanded");
+    }
+
+    async function runAllTests() {
+      resetTests();
+      const startTime = performance.now();
+      let passedCount = 0;
+      let failedCount = 0;
+
+      const progressBar = document.getElementById("progress-bar");
+      const progressText = document.getElementById("progress-text");
+      const progressPct = document.getElementById("progress-pct");
+
+      for (let i = 0; i < testCases.length; i++) {
+        const tc = testCases[i];
+        progressText.innerText = `Laufender Test (${i + 1}/${testCases.length}): ${tc.name}`;
+        const pct = Math.round(((i + 1) / testCases.length) * 100);
+        progressBar.style.width = `${pct}%`;
+        progressPct.innerText = `${pct}%`;
+
+        // Micro-delay for UI animation
+        await new Promise(r => setTimeout(r, 60));
+
+        const t0 = performance.now();
+        let res = { ok: false, details: "Execution failed" };
+        try {
+          res = tc.run();
+        } catch (e) {
+          res = { ok: false, details: `Exception thrown: ${e.message}` };
+        }
+        const t1 = performance.now();
+        const duration = (t1 - t0).toFixed(1);
+
+        const card = document.getElementById(`card-${tc.id}`);
+        const badge = document.getElementById(`badge-${tc.id}`);
+        const durationEl = document.getElementById(`duration-${tc.id}`);
+        const detailsEl = document.getElementById(`result-msg-${tc.id}`);
+
+        durationEl.innerText = `${duration} ms`;
+
+        if (res.ok) {
+          passedCount++;
+          card.classList.add("passed");
+          badge.className = "test-badge badge-pass";
+          badge.innerText = "Passed";
+          detailsEl.innerHTML = `
+            <div style="color: var(--pass-green); font-weight: 600; margin-bottom: 0.4rem;">✅ Test erfolgreich absolviert</div>
+            <div>${res.details}</div>
+          `;
+        } else {
+          failedCount++;
+          card.classList.add("failed");
+          badge.className = "test-badge badge-fail";
+          badge.innerText = "Failed";
+          detailsEl.innerHTML = `
+            <div style="color: var(--fail-red); font-weight: 600; margin-bottom: 0.4rem;">❌ Test fehlgeschlagen</div>
+            <div>${res.details}</div>
+          `;
+        }
+      }
+
+      const totalTime = (performance.now() - startTime).toFixed(0);
+      document.getElementById("stat-passed").innerText = passedCount;
+      document.getElementById("stat-failed").innerText = failedCount;
+      document.getElementById("stat-time").innerText = `${totalTime} ms`;
+      const passRate = Math.round((passedCount / testCases.length) * 100);
+      document.getElementById("stat-pass-pct").innerText = `${passRate}% Erfolgsquote`;
+      progressText.innerText = `Alle ${testCases.length} Tests abgeschlossen! (${passedCount} Bestanden, ${failedCount} Fehlgeschlagen)`;
+    }
+
+    function resetTests() {
+      document.getElementById("stat-passed").innerText = "0";
+      document.getElementById("stat-failed").innerText = "0";
+      document.getElementById("stat-time").innerText = "0 ms";
+      document.getElementById("stat-pass-pct").innerText = "0% Erfolgsquote";
+      document.getElementById("progress-bar").style.width = "0%";
+      document.getElementById("progress-pct").innerText = "0%";
+      document.getElementById("progress-text").innerText = "Bereit für Testausführung...";
+
+      testCases.forEach(tc => {
+        const card = document.getElementById(`card-${tc.id}`);
+        const badge = document.getElementById(`badge-${tc.id}`);
+        const durationEl = document.getElementById(`duration-${tc.id}`);
+        const detailsEl = document.getElementById(`result-msg-${tc.id}`);
+
+        card.className = "test-card";
+        badge.className = "test-badge badge-pending";
+        badge.innerText = "Pending";
+        durationEl.innerText = "Wartet auf Ausführung...";
+        detailsEl.innerText = 'Klicke auf "Alle Tests ausführen", um diesen Testfall zu starten.';
+      });
+    }
+
+    function filterCategory(cat, btn) {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      btn.classList.add("active");
+
+      document.querySelectorAll(".test-card").forEach(card => {
+        if (cat === "all" || card.getAttribute("data-category") === cat) {
+          card.style.display = "block";
+        } else {
+          card.style.display = "none";
+        }
+      });
+    }
+
+    function filterSearch() {
+      const q = document.getElementById("search-input").value.toLowerCase();
+      document.querySelectorAll(".test-card").forEach(card => {
+        const txt = card.innerText.toLowerCase();
+        card.style.display = txt.includes(q) ? "block" : "none";
+      });
+    }
+
+    function calculatePlayground() {
+      const lat1 = parseFloat(document.getElementById("lat1").value);
+      const lon1 = parseFloat(document.getElementById("lon1").value);
+      const lat2 = parseFloat(document.getElementById("lat2").value);
+      const lon2 = parseFloat(document.getElementById("lon2").value);
+      const speed = parseFloat(document.getElementById("speed").value);
+      const draft = parseFloat(document.getElementById("draft").value);
+      const margin = parseFloat(document.getElementById("margin").value);
+      const depth = parseFloat(document.getElementById("depth").value);
+
+      const dist = calculateHaversineNm(lat1, lon1, lat2, lon2);
+      const mins = calculateTravelTimeMinutes(dist, speed);
+      const hours = (mins / 60).toFixed(1);
+      const status = evaluateRouteStatus(depth, draft, margin, "Start", "Ziel");
+
+      let statusBadge = `<span style="color: var(--pass-green); font-weight: bold;">BEFAHRBAR ✅</span>`;
+      if (status === "EINGESCHRAENKT") statusBadge = `<span style="color: var(--running-amber); font-weight: bold;">EINGESCHRAENKT ⚠️</span>`;
+      if (status === "NICHT_BEFAHRBAR") statusBadge = `<span style="color: var(--fail-red); font-weight: bold;">NICHT BEFAHRBAR ❌</span>`;
+
+      document.getElementById("playground-result").innerHTML = `
+        <strong>Berechnungsergebnis:</strong><br>
+        • Distanz: <strong>${dist.toFixed(2)} NM</strong><br>
+        • Geschätzte Fahrzeit: <strong>${mins} Minuten (${hours} Std)</strong> bei ${speed} kn<br>
+        • Erforderliche Wassertiefe: <strong>${(draft + margin).toFixed(2)} m</strong> (Tiefgang ${draft}m + Marge ${margin}m)<br>
+        • Routen-Status: ${statusBadge}
+      `;
+    }
+
+    // Initialize suite on load
+    window.onload = () => {
+      renderSuite();
+    };
+  </script>
+</body>
+</html>

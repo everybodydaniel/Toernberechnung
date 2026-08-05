@@ -1,6 +1,10 @@
 package com.example.trnberechnung.ui
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
@@ -18,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -181,10 +187,12 @@ fun MainAppScreen(
             )
         }
 
-    val topClearance = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 78.dp
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val headerHeight = if (isLandscape) 52.dp else 78.dp
+    val topClearance = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + headerHeight
     val bottomSystemInset =
         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val bottomOverlayClearance = 88.dp
+    val bottomOverlayClearance = if (isLandscape) 54.dp else 88.dp
     val mapBottomClearance = bottomSystemInset + bottomOverlayClearance
 
     Box(
@@ -290,21 +298,39 @@ fun MainAppScreen(
             }
         }
 
+        val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
         if (isMainTab) {
             TideNodeAppHeader(
                 unreadCount = unreadCount,
                 onNotifications = { showNoticeQuickLook = !showNoticeQuickLook },
-                onRefresh = { refreshCoordinator.refresh(currentRoute) },
+                onRefresh = {
+                    toggleScreenOrientation(context)
+                    refreshCoordinator.refresh(currentRoute)
+                },
                 onSettings = {
                     showNoticeQuickLook = false
                     navController.navigate(Screen.Settings.route) { launchSingleTop = true }
                 },
-                modifier = Modifier.align(Alignment.TopCenter).testTag("global_app_header"),
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .testTag("global_app_header"),
             )
 
             TideNodeBottomNavigation(
                 navController = navController,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier =
+                    Modifier
+                        .align(if (isLandscape && currentRoute == Screen.MapRoute.route) Alignment.BottomStart else Alignment.BottomCenter)
+                        .then(
+                            if (isLandscape && currentRoute == Screen.MapRoute.route) {
+                                Modifier.fillMaxWidth(0.48f).widthIn(max = 440.dp)
+                            } else {
+                                Modifier.fillMaxWidth()
+                            },
+                        ),
             )
 
             if (
@@ -320,7 +346,14 @@ fun MainAppScreen(
                     },
                     modifier =
                         Modifier
-                            .align(Alignment.BottomCenter)
+                            .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
+                            .then(
+                                if (isLandscape) {
+                                    Modifier.fillMaxWidth(0.48f).widthIn(max = 440.dp)
+                                } else {
+                                    Modifier
+                                },
+                            )
                             .padding(
                                 start = 28.dp,
                                 end = 28.dp,
@@ -393,15 +426,22 @@ private fun TideNodeBottomNavigation(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val navHeight = if (isLandscape) 50.dp else 72.dp
+    val itemHeight = if (isLandscape) 44.dp else 62.dp
 
     Row(
         modifier =
             modifier
-                .padding(start = 18.dp, end = 18.dp, bottom = bottomInset + 10.dp)
+                .padding(
+                    start = if (isLandscape) 10.dp else 18.dp,
+                    end = if (isLandscape) 10.dp else 18.dp,
+                    bottom = if (isLandscape) bottomInset + 4.dp else bottomInset + 10.dp,
+                )
                 .fillMaxWidth()
-                .height(72.dp)
-                .tideNodeGlass(cornerRadius = 34.dp, elevation = 14.dp, alpha = 0.80f)
-                .padding(horizontal = 8.dp, vertical = 5.dp)
+                .height(navHeight)
+                .tideNodeGlass(cornerRadius = if (isLandscape) 24.dp else 34.dp, elevation = 14.dp, alpha = 0.80f)
+                .padding(horizontal = 8.dp, vertical = if (isLandscape) 3.dp else 5.dp)
                 .testTag("global_bottom_navigation"),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -412,7 +452,7 @@ private fun TideNodeBottomNavigation(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .height(62.dp)
+                        .height(itemHeight)
                         .background(
                             color =
                                 if (selected) {
@@ -420,7 +460,7 @@ private fun TideNodeBottomNavigation(
                                 } else {
                                     Color.Transparent
                                 },
-                            shape = RoundedCornerShape(28.dp),
+                            shape = RoundedCornerShape(if (isLandscape) 20.dp else 28.dp),
                         )
                         .selectable(
                             selected = selected,
@@ -487,5 +527,21 @@ private fun NavHostController.navigateMainTab(route: String) {
         popUpTo(graph.startDestinationId) { saveState = true }
         launchSingleTop = true
         restoreState = true
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+private fun toggleScreenOrientation(context: Context) {
+    val activity = context.findActivity() ?: return
+    val currentOrientation = activity.resources.configuration.orientation
+    activity.requestedOrientation = if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE) {
+        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    } else {
+        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
 }

@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AltRoute
@@ -40,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.MaterialTheme
@@ -270,6 +273,9 @@ fun MapTabScreen(
             },
         )
 
+        val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val panelWidthModifier = if (isLandscape) Modifier.fillMaxWidth(0.48f).widthIn(max = 440.dp) else Modifier
+
         RoutePlanningPill(
             title = if (routeState.hasCompleteRouteInput) routeState.routeTitle else "Törn planen",
             subtitle =
@@ -282,10 +288,11 @@ fun MapTabScreen(
             onClick = { showPlanner = true },
             modifier =
                 Modifier
-                    .align(Alignment.TopCenter)
+                    .align(if (isLandscape) Alignment.TopStart else Alignment.TopCenter)
+                    .then(panelWidthModifier)
                     .padding(
                         start = 16.dp,
-                        end = 16.dp,
+                        end = if (isLandscape) 4.dp else 16.dp,
                         top = topOverlayClearance + 8.dp,
                     ),
         )
@@ -295,10 +302,11 @@ fun MapTabScreen(
                 viewModel = nautiViewModel,
                 modifier =
                     Modifier
-                        .align(Alignment.BottomCenter)
+                        .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
+                        .then(panelWidthModifier)
                         .padding(
                             start = 14.dp,
-                            end = 14.dp,
+                            end = if (isLandscape) 4.dp else 14.dp,
                             bottom = bottomOverlayClearance + 4.dp,
                         ),
             )
@@ -328,10 +336,11 @@ fun MapTabScreen(
                 },
                 modifier =
                     Modifier
-                        .align(Alignment.BottomCenter)
+                        .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
+                        .then(panelWidthModifier)
                         .padding(
                             start = 14.dp,
-                            end = 14.dp,
+                            end = if (isLandscape) 4.dp else 14.dp,
                             bottom = bottomOverlayClearance + 4.dp,
                         ),
             )
@@ -340,10 +349,11 @@ fun MapTabScreen(
                 viewModel = nautiViewModel,
                 modifier =
                     Modifier
-                        .align(Alignment.BottomCenter)
+                        .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
+                        .then(panelWidthModifier)
                         .padding(
                             start = 16.dp,
-                            end = 16.dp,
+                            end = if (isLandscape) 4.dp else 16.dp,
                             bottom = bottomOverlayClearance + 10.dp,
                         ),
             )

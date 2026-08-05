@@ -1,5 +1,6 @@
 package com.example.trnberechnung.ui
 
+import android.content.res.Configuration
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -36,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -204,24 +206,27 @@ fun CrewspaceScreen(
 
 @Composable
 private fun CrewspaceHeader() {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = 20.dp, vertical = if (isLandscape) 2.dp else 12.dp)
     ) {
         Text(
             text = "Crewspace",
-            fontSize = 32.sp,
+            fontSize = if (isLandscape) 20.sp else 32.sp,
             fontWeight = FontWeight.ExtraBold,
             color = CrewspacePrimary,
             letterSpacing = (-0.5).sp
         )
-        Text(
-            text = "Crew, Gespräche und Termine",
-            fontSize = 14.sp,
-            color = CrewspaceTextSecondary,
-            fontWeight = FontWeight.Medium
-        )
+        if (!isLandscape) {
+            Text(
+                text = "Crew, Gespräche und Termine",
+                fontSize = 14.sp,
+                color = CrewspaceTextSecondary,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
@@ -246,10 +251,11 @@ private fun CrewspaceSegmentedTabs(
     selectedTab: CrewspaceTab,
     onTabSelected: (CrewspaceTab) -> Unit
 ) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = if (isLandscape) 2.dp else 8.dp),
         color = CrewspaceTabBg,
         shape = RoundedCornerShape(16.dp)
     ) {

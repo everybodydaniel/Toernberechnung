@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -1260,9 +1261,17 @@ fun StationSelectionDialog(
     onStationSelected: (TideStationData) -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        GlassCard(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .heightIn(max = 420.dp)
+        ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Column {
                         Text("Standort auswählen", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         Text("Ostfriesische Inseln", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
@@ -1271,26 +1280,50 @@ fun StationSelectionDialog(
                         Icon(Icons.Default.Close, null, tint = Color.White)
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
-                stations.forEach { station ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (station == selectedStation) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-                            .clickable { onStationSelected(station) }
-                            .padding(vertical = 12.dp, horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (station == selectedStation) {
-                                Box(modifier = Modifier.size(4.dp, 16.dp).background(Color(0xFF4FC3F7), RoundedCornerShape(2.dp)))
-                                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                val sortedStations = remember(stations) {
+                    stations.sortedBy { it.gaugeLabel ?: it.area }
+                }
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(sortedStations) { station ->
+                        val isSelected = station == selectedStation
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                                .clickable { onStationSelected(station) }
+                                .padding(vertical = 10.dp, horizontal = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(4.dp, 16.dp)
+                                            .background(Color(0xFF4FC3F7), RoundedCornerShape(2.dp))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(
+                                    text = station.gaugeLabel ?: station.area,
+                                    color = Color.White,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 15.sp
+                                )
                             }
-                            Text(station.gaugeLabel ?: station.area, color = Color.White, fontSize = 16.sp)
+                            val temp = station.temperature?.toInt() ?: 17
+                            Text(
+                                text = "$temp°",
+                                color = if (isSelected) Color(0xFF4FC3F7) else Color.White.copy(alpha = 0.8f),
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 15.sp
+                            )
                         }
-                        val temp = station.temperature?.toInt() ?: 17
-                        Text("$temp°", color = Color.White, fontSize = 16.sp)
                     }
                 }
             }

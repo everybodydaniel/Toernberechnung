@@ -147,7 +147,7 @@ fun TideGraphScreen(viewModel: TideViewModel) {
                     .background(NauticalSurface)
                     .border(1.dp, NauticalDivider, RoundedCornerShape(8.dp))
             ) {
-                allStations.forEach { station ->
+                allStations.sortedBy { it.gaugeLabel ?: it.area }.forEach { station ->
                     DropdownMenuItem(
                         text = {
                             Text(

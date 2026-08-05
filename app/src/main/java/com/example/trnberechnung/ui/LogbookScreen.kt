@@ -1,5 +1,6 @@
 package com.example.trnberechnung.ui
 
+import android.content.res.Configuration
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -7,6 +8,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -101,17 +105,19 @@ fun LogbookScreen(
         )
     }
 
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .testTag("screen_logbook")
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Spacer(modifier = Modifier.height(topOverlayClearance + 4.dp))
+        Spacer(modifier = Modifier.height(topOverlayClearance + (if (isLandscape) 2.dp else 4.dp)))
         Text(
             "LOGBUCH",
             modifier = Modifier
-                .padding(start = 16.dp, top = 8.dp, bottom = 4.dp)
+                .padding(start = 16.dp, top = if (isLandscape) 2.dp else 8.dp, bottom = if (isLandscape) 2.dp else 4.dp)
                 .testTag("screen_header_logbook"),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -139,6 +145,7 @@ fun LogbookScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 16.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
@@ -153,7 +160,7 @@ fun LogbookScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 34.dp),
+                            .padding(horizontal = 24.dp, vertical = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
@@ -162,21 +169,21 @@ fun LogbookScreen(
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(54.dp)
                         )
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             "Dein Logbuch ist bereit",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             "Speichere eine Planung, zeichne eine Fahrt auf oder erstelle eine leere PDF-Vorlage.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
-                        Spacer(modifier = Modifier.height(26.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
                         Button(
                             onClick = createBlankPdf,
                             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -190,6 +197,7 @@ fun LogbookScreen(
                             Spacer(Modifier.width(12.dp))
                             Text("Leere PDF erstellen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
+                        Spacer(modifier = Modifier.height(maxOf(16.dp, bottomOverlayClearance)))
                     }
                 }
             }
@@ -222,10 +230,11 @@ private fun LogbookActionBar(
     logCount: Int,
     onCreateBlankPdf: () -> Unit
 ) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = if (isLandscape) 4.dp else 12.dp),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)
@@ -233,7 +242,7 @@ private fun LogbookActionBar(
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Row(
-            modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+            modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = if (isLandscape) 6.dp else 14.dp, bottom = if (isLandscape) 6.dp else 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {

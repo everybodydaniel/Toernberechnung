@@ -1,5 +1,6 @@
 package com.example.trnberechnung.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -51,12 +53,18 @@ fun TideNodeAppHeader(
     modifier: Modifier = Modifier,
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val headerHeight = if (isLandscape) 52.dp else 78.dp
+    val logoSize = if (isLandscape) 30.dp else 42.dp
+    val titleFontSize = if (isLandscape) 20.sp else 28.sp
+    val buttonSize = if (isLandscape) 36.dp else 44.dp
+
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .height(78.dp)
+                .height(headerHeight)
                 .padding(horizontal = 14.dp),
     ) {
         Row(
@@ -67,26 +75,27 @@ fun TideNodeAppHeader(
                 painter = painterResource(R.drawable.tidenode_mark),
                 contentDescription = "TideNode Logo",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(42.dp).testTag("app_header_logo"),
+                modifier = Modifier.size(logoSize).testTag("app_header_logo"),
             )
-            Spacer(Modifier.size(9.dp))
+            Spacer(Modifier.size(if (isLandscape) 6.dp else 9.dp))
             Text(
                 text = "TideNode",
                 color = if (isDark) Color.White else Color(0xFF0F172A),
-                fontSize = 28.sp,
+                fontSize = titleFontSize,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.8).sp,
                 modifier = Modifier.testTag("app_header_wordmark"),
             )
             Spacer(Modifier.weight(1f))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 GlassIconButton(
                     icon = Icons.Default.Notifications,
                     contentDescription = "Seefahrer-Nachrichten",
                     onClick = onNotifications,
+                    size = buttonSize,
                     modifier = Modifier.testTag("app_header_notifications"),
                     badge = {
                         if (unreadCount > 0) {
@@ -115,14 +124,16 @@ fun TideNodeAppHeader(
                 )
                 GlassIconButton(
                     icon = Icons.Default.Refresh,
-                    contentDescription = "Aktuellen Tab aktualisieren",
+                    contentDescription = "Bildschirm drehen / Aktualisieren",
                     onClick = onRefresh,
+                    size = buttonSize,
                     modifier = Modifier.testTag("app_header_refresh"),
                 )
                 GlassIconButton(
                     icon = Icons.Default.Settings,
                     contentDescription = "Einstellungen",
                     onClick = onSettings,
+                    size = buttonSize,
                     modifier = Modifier.testTag("app_header_settings"),
                 )
             }

@@ -84,13 +84,25 @@ fun ChatMessage.toEntity(ownerId: String): ChatMessageEntity {
 }
 
 fun PlannerEventEntity.toModel(): PlannerEvent {
+    fun formatTime(time: String?): String? {
+        if (time == null || time.contains(":")) return time
+        val seconds = time.toLongOrNull() ?: return time
+        return try {
+            java.time.LocalTime.ofSecondOfDay(seconds % 86400)
+                .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+        } catch (e: Exception) {
+            time
+        }
+    }
+
     return PlannerEvent(
         id = id,
-        date = date,
+        startDate = startDate,
+        endDate = endDate,
         title = title,
         description = description,
-        startTime = startTime,
-        endTime = endTime,
+        startTime = formatTime(startTime),
+        endTime = formatTime(endTime),
         location = location,
         category = category
     )
@@ -99,7 +111,8 @@ fun PlannerEventEntity.toModel(): PlannerEvent {
 fun PlannerEvent.toEntity(): PlannerEventEntity {
     return PlannerEventEntity(
         id = id,
-        date = date,
+        startDate = startDate,
+        endDate = endDate,
         title = title,
         description = description,
         startTime = startTime,

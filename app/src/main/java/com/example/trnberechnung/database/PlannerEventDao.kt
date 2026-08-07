@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PlannerEventDao {
-    @Query("SELECT * FROM planner_events ORDER BY date ASC")
+    @Query("SELECT * FROM planner_events ORDER BY startDate ASC")
     fun getAllEvents(): Flow<List<PlannerEventEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

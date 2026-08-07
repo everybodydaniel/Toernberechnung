@@ -152,16 +152,31 @@ class TideRepository(
                 )
             if (response.isSuccessful) {
                 response.body()?.forEach { ev ->
-                    val localDate = try {
-                        java.time.OffsetDateTime.parse(ev.startsAt).toLocalDate()
+                    val startDateTime = try {
+                        java.time.OffsetDateTime.parse(ev.startsAt)
                     } catch (e: Exception) {
-                        java.time.LocalDate.now()
+                        null
                     }
+                    val endDateTime = try {
+                        java.time.OffsetDateTime.parse(ev.endsAt)
+                    } catch (e: Exception) {
+                        null
+                    }
+
+                    val start = startDateTime?.toLocalDate() ?: java.time.LocalDate.now()
+                    val end = endDateTime?.toLocalDate() ?: start
+                    val startTimeStr = startDateTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                    val endTimeStr = endDateTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+
                     val entity = PlannerEventEntity(
                         id = ev.id,
-                        date = localDate,
+                        startDate = start,
+                        endDate = end,
                         title = ev.title,
-                        description = ev.notes ?: ""
+                        description = ev.notes ?: "",
+                        location = ev.location,
+                        startTime = startTimeStr,
+                        endTime = endTimeStr
                     )
                     plannerEventDao.insertEvent(entity)
                 }

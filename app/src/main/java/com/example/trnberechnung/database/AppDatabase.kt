@@ -30,7 +30,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ActiveVoyageEntity::class,
         VoyageBreadcrumbEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,6 +46,40 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun activeVoyageDao(): ActiveVoyageDao
 
     companion object {
+        val MIGRATION_12_13 =
+            object : Migration(12, 13) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // Create new table
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `planner_events_new` (
+                            `id` TEXT NOT NULL,
+                            `startDate` TEXT NOT NULL,
+                            `endDate` TEXT NOT NULL,
+                            `title` TEXT NOT NULL,
+                            `description` TEXT NOT NULL,
+                            `startTime` TEXT,
+                            `endTime` TEXT,
+                            `location` TEXT,
+                            `category` TEXT NOT NULL,
+                            PRIMARY KEY(`id`)
+                        )
+                        """.trimIndent()
+                    )
+                    // Copy data from old table, mapping 'date' to 'startDate' and 'endDate'
+                    db.execSQL(
+                        """
+                        INSERT INTO `planner_events_new` (id, startDate, endDate, title, description, startTime, endTime, location, category)
+                        SELECT id, date, date, title, description, startTime, endTime, location, category FROM `planner_events`
+                        """.trimIndent()
+                    )
+                    // Remove old table
+                    db.execSQL("DROP TABLE `planner_events`")
+                    // Rename new table to old table name
+                    db.execSQL("ALTER TABLE `planner_events_new` RENAME TO `planner_events`")
+                }
+            }
+
         val MIGRATION_11_12 =
             object : Migration(11, 12) {
                 override fun migrate(db: SupportSQLiteDatabase) {

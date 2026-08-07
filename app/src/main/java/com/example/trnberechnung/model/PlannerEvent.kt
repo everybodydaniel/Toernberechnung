@@ -9,7 +9,8 @@ import java.util.UUID
  */
 data class PlannerEvent(
     val id: String = UUID.randomUUID().toString(),
-    val date: LocalDate,
+    val startDate: LocalDate,
+    val endDate: LocalDate,
     val title: String,
     val description: String = "",
     val startTime: String? = null,

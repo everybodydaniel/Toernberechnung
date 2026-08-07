@@ -11,15 +11,17 @@ Die App automatisiert den komplexen Prozess der maritimen Routenplanung durch di
 - **Automatisches See-Routing:** Verwendet einen maßgeschneiderten, gitterbasierten A*-Routing-Algorithmus, um sicherzustellen, dass Routen strikt befahrbaren Wasserwegen folgen und Landmassen meiden.
 - **Sicherheitsbewertung:** Bietet automatische GO/NO-GO-Sicherheitsempfehlungen basierend auf dem Tiefgang, Echtzeit-Tiefendaten und aktuellen Wetterbedingungen.
 - **Gezeiten-Simulation:** Integriert Gezeitendaten, um die sichersten Abfahrtszeiten und Zeitfenster für die Überfahrt zu berechnen.
+- **Crewspace & Kollaboration:** Echtzeit-Chat (Firebase), gemeinsame Terminplanung (Kalender) und Crew-Verwaltung (Rollen, Notfallkontakte) für eine koordinierte Törn-Vorbereitung.
 - **Offline-First:** Speichert wichtige nautische Daten lokal mit der Room Database, um die Funktionalität auch ohne aktive Internetverbindung auf See zu gewährleisten.
 - **Daten-Authentizität:** Bezieht zuverlässige nautische und geografische Daten direkt von den WFS-Endpunkten des BSH (Bundesamt für Seeschifffahrt und Hydrographie).
 
-##  Tech Stack
+## Tech Stack
 
 - **Sprache:** Kotlin
 - **UI Framework:** Jetpack Compose (Material 3)
 - **Architektur:** MVVM (Model-View-ViewModel)
 - **Karten-Rendering:** MapLibre GL Android SDK
+- **Backend/Chat:** Firebase (Auth, Realtime Database)
 - **Netzwerk:** Retrofit2, OkHttp, Kotlinx Coroutines
 - **Lokaler Speicher:** Room Database
 - **Dokumentation:** KDoc (generiert mit Dokka)

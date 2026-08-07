@@ -38,8 +38,14 @@ data class CrewspaceUiState(
     val chatError: String? = null,
     val chatBusy: Boolean = false,
 
+    // ── Lösch-Bestätigung & Bearbeitung ──
+    val memberToDelete: CrewMember? = null,
+    val eventToDelete: PlannerEvent? = null,
+    val editingMember: CrewMember? = null,
+
     // ── Planung ──
     val selectedDate: LocalDate = LocalDate.now(),
+
     val currentMonth: LocalDate = LocalDate.now().withDayOfMonth(1),
     val plannerEvents: List<PlannerEvent> = emptyList(),
 

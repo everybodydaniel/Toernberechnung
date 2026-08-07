@@ -64,6 +64,9 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 import androidx.compose.ui.graphics.luminance
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 // ══════════════════════════════════════════════════════════════
 // Crewspace Farbpalette (Moderneres Look & Feel)
@@ -200,6 +203,133 @@ fun CrewspaceScreen(
     if (uiState.showNewConversationSheet) {
         NewConversationBottomSheet(uiState = uiState, viewModel = viewModel)
     }
+
+    // ── Deletion Confirmation Dialogs ──
+    uiState.memberToDelete?.let { member ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDeleteCrew() },
+            title = { Text("Crewmitglied entfernen") },
+            text = { Text("Möchtest du ${member.name} wirklich von Bord entfernen?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.confirmDeleteCrew() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF4444))
+                ) {
+                    Text("Entfernen", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelDeleteCrew() }) {
+                    Text("Abbrechen")
+                }
+            },
+            containerColor = CrewspaceSurface,
+            titleContentColor = CrewspaceTextPrimary,
+            textContentColor = CrewspaceTextSecondary
+        )
+    }
+
+    uiState.eventToDelete?.let { event ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDeletePlannerEvent() },
+            title = { Text("Termin löschen") },
+            text = { Text("Möchtest du den Termin '${event.title}' wirklich unwiderruflich löschen?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.confirmDeletePlannerEvent() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF4444))
+                ) {
+                    Text("Löschen", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelDeletePlannerEvent() }) {
+                    Text("Abbrechen")
+                }
+            },
+            containerColor = CrewspaceSurface,
+            titleContentColor = CrewspaceTextPrimary,
+            textContentColor = CrewspaceTextSecondary
+        )
+    }
+
+    uiState.editingMember?.let { member ->
+        EditCrewMemberDialog(
+            member = member,
+            onDismiss = { viewModel.cancelEditingCrew() },
+            onSave = { updated ->
+                viewModel.updateCrew(updated)
+                viewModel.cancelEditingCrew()
+            }
+        )
+    }
+}
+
+@Composable
+private fun EditCrewMemberDialog(
+    member: CrewMember,
+    onDismiss: () -> Unit,
+    onSave: (CrewMember) -> Unit
+) {
+    var name by remember { mutableStateOf(member.name) }
+    var skipperId by remember { mutableStateOf(member.skipperId) }
+    var emergencyContact by remember { mutableStateOf(member.emergencyContact) }
+    var phone by remember { mutableStateOf(member.phone) }
+    var medicalNotes by remember { mutableStateOf(member.medicalNotes) }
+    var role by remember { mutableStateOf(member.crewRole) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Crewmitglied bearbeiten") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CrewspaceTextField(value = name, onValueChange = { name = it }, placeholder = "Name")
+                CrewspaceTextField(value = skipperId, onValueChange = { skipperId = it }, placeholder = "Skipper-ID")
+
+                Text("Rolle", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CrewspaceTextSecondary)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(CrewRole.SKIPPER, CrewRole.CO_SKIPPER, CrewRole.NAVIGATION).forEach { r ->
+                        val isSelected = role == r
+                        Surface(
+                            modifier = Modifier.weight(1f).clickable { role = r },
+                            color = if (isSelected) CrewspaceAccent else CrewspaceCardBg,
+                            shape = RoundedCornerShape(8.dp),
+                            border = if (!isSelected) BorderStroke(1.dp, CrewspaceDivider) else null
+                        ) {
+                            Text(r.label, modifier = Modifier.padding(vertical = 8.dp), textAlign = TextAlign.Center, fontSize = 11.sp, color = if(isSelected) Color.White else CrewspaceTextPrimary)
+                        }
+                    }
+                }
+
+                CrewspaceTextField(value = emergencyContact, onValueChange = { emergencyContact = it }, placeholder = "Notfallkontakt")
+                CrewspaceTextField(value = phone, onValueChange = { phone = it }, placeholder = "Telefon", keyboardType = KeyboardType.Phone)
+                CrewspaceTextField(value = medicalNotes, onValueChange = { medicalNotes = it }, placeholder = "Medizinische Hinweise")
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                onSave(member.copy(
+                    name = name,
+                    skipperId = skipperId,
+                    emergencyContact = emergencyContact,
+                    phone = phone,
+                    medicalNotes = medicalNotes,
+                    role = role.name,
+                    rank = role.label
+                ))
+            }, colors = ButtonDefaults.buttonColors(containerColor = CrewspaceAccent)) {
+                Text("Speichern")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Abbrechen") }
+        },
+        containerColor = CrewspaceSurface,
+        titleContentColor = CrewspaceTextPrimary
+    )
 }
 // Header: "Crewspace" Titel + Untertitel + Edit-Button
 // ══════════════════════════════════════════════════════════════
@@ -655,74 +785,106 @@ private fun NewConversationBottomSheet(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ── Skipper-ID Feld ──
-            Text(
-                text = "SKIPPER ÜBER ID FINDEN",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = CrewspaceTextSecondary,
-                letterSpacing = 1.sp
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            if (uiState.newConversationTab == NewConversationTab.DIRECT) {
+                // ── Skipper-ID Feld ──
+                Text(
+                    text = "SKIPPER ÜBER ID FINDEN",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = CrewspaceTextSecondary,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
-            var showCrewDropdown by remember { mutableStateOf(false) }
+                var showCrewDropdown by remember { mutableStateOf(false) }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.weight(1f)) {
-                    CrewspaceTextField(
-                        value = uiState.newConversationSkipperId,
-                        onValueChange = { input ->
-                            viewModel.updateNewConversationSkipperId(ValidationUtils.sanitizeSkipperId(input))
-                        },
-                        placeholder = "Skipper-ID",
-                        trailingIcon = {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Suchen",
-                                tint = CrewspaceTextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Aus Crew auswählen
-                Box {
-                    IconButton(
-                        onClick = { showCrewDropdown = true },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(CrewspaceCardBg, RoundedCornerShape(10.dp))
-                            .border(1.dp, CrewspaceDivider, RoundedCornerShape(10.dp))
-                    ) {
-                        Icon(
-                            Icons.Outlined.Groups,
-                            contentDescription = "Aus Crew auswählen",
-                            tint = CrewspaceAccent
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        CrewspaceTextField(
+                            value = uiState.newConversationSkipperId,
+                            onValueChange = { input ->
+                                viewModel.updateNewConversationSkipperId(ValidationUtils.sanitizeSkipperId(input))
+                            },
+                            placeholder = "Skipper-ID",
+                            trailingIcon = {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = "Suchen",
+                                    tint = CrewspaceTextSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         )
                     }
 
-                    DropdownMenu(
-                        expanded = showCrewDropdown,
-                        onDismissRequest = { showCrewDropdown = false },
-                        modifier = Modifier.background(CrewspaceSurface)
-                    ) {
-                        if (uiState.crewMembers.isEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text("Keine Crew vorhanden", color = CrewspaceTextSecondary) },
-                                onClick = { showCrewDropdown = false }
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Aus Crew auswählen
+                    Box {
+                        IconButton(
+                            onClick = { showCrewDropdown = true },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(CrewspaceCardBg, RoundedCornerShape(10.dp))
+                                .border(1.dp, CrewspaceDivider, RoundedCornerShape(10.dp))
+                        ) {
+                            Icon(
+                                Icons.Outlined.Groups,
+                                contentDescription = "Aus Crew auswählen",
+                                tint = CrewspaceAccent
                             )
-                        } else {
-                            uiState.crewMembers.forEach { member ->
+                        }
+
+                        DropdownMenu(
+                            expanded = showCrewDropdown,
+                            onDismissRequest = { showCrewDropdown = false },
+                            modifier = Modifier.background(CrewspaceSurface)
+                        ) {
+                            if (uiState.crewMembers.isEmpty()) {
                                 DropdownMenuItem(
-                                    text = { Text(member.name.ifBlank { "Unbenannt" }) },
-                                    onClick = {
-                                        viewModel.updateNewConversationSkipperId(member.skipperId)
-                                        showCrewDropdown = false
-                                    }
+                                    text = { Text("Keine Crew vorhanden", color = CrewspaceTextSecondary) },
+                                    onClick = { showCrewDropdown = false }
                                 )
+                            } else {
+                                uiState.crewMembers.forEach { member ->
+                                    DropdownMenuItem(
+                                        text = { Text(member.name.ifBlank { "Unbenannt" }) },
+                                        onClick = {
+                                            viewModel.updateNewConversationSkipperId(member.skipperId)
+                                            showCrewDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // ── Gruppe erstellen UI ──
+                Text(
+                    text = "GRUPPENMITGLIEDER AUSWÄHLEN",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = CrewspaceTextSecondary,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (uiState.crewMembers.isEmpty()) {
+                    Text("Keine Crewmitglieder verfügbar.", color = CrewspaceTextSecondary, fontSize = 14.sp)
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                        items(uiState.crewMembers) { member ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { /* Multi-Select logic here if needed */ }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(checked = false, onCheckedChange = null) // Dummy for Beta
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(member.name, color = CrewspaceTextPrimary)
                             }
                         }
                     }
@@ -758,11 +920,19 @@ private fun NewConversationBottomSheet(
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
-                Text(
-                    text = if (uiState.chatBusy) "Wird geöffnet …" else "→ Chat starten",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                if (uiState.chatBusy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "→ Chat starten",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
@@ -927,12 +1097,21 @@ private fun ChatDetailScreen(viewModel: CrewspaceViewModel, thread: ChatThread) 
                 ChatBubble(
                     message = message,
                     onRetry = { viewModel.retryMessage(message.id) },
-                    onAcceptEvent = { title, desc, dateStr ->
+                    onAcceptEvent = { title, desc, startStr, endStr, sTime, eTime ->
                         try {
-                            // Versuche das Datum zu parsen. Falls es fehlschlägt, öffne den Edit-Sheet für manuelles Anpassen
-                            val parsedDate = runCatching { LocalDate.parse(dateStr) }.getOrNull()
-                            if (parsedDate != null) {
-                                viewModel.addPlannerEventWithDate(title, desc, parsedDate)
+                            val start = runCatching { LocalDate.parse(startStr) }.getOrNull()
+                            val end = runCatching { LocalDate.parse(endStr) }.getOrNull() ?: start
+                            if (start != null && end != null) {
+                                viewModel.addPlannerEvent(
+                                    PlannerEvent(
+                                        startDate = start,
+                                        endDate = end,
+                                        title = title,
+                                        description = desc,
+                                        startTime = sTime,
+                                        endTime = eTime
+                                    )
+                                )
                             }
                         } catch (e: Exception) {
                             // ignore
@@ -973,11 +1152,22 @@ private fun ChatDetailScreen(viewModel: CrewspaceViewModel, thread: ChatThread) 
 
 // ── Chat-Bubble ────────────────────────────────────────────
 
+@Serializable
+private data class PlannerEventMessage(
+    val title: String,
+    val description: String,
+    val startDate: String,
+    val endDate: String,
+    val location: String? = null,
+    val startTime: String? = null,
+    val endTime: String? = null
+)
+
 @Composable
 private fun ChatBubble(
     message: ChatMessage,
     onRetry: () -> Unit = {},
-    onAcceptEvent: (title: String, desc: String, dateStr: String) -> Unit = { _, _, _ -> }
+    onAcceptEvent: (title: String, desc: String, startDateStr: String, endDateStr: String, startTime: String?, endTime: String?) -> Unit = { _, _, _, _, _, _ -> }
 ) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
     val time = remember(message.timestamp) {
@@ -1071,24 +1261,26 @@ private fun ChatBubble(
                 }
             }
             ChatMessageType.EVENT -> {
-                val parts = message.content.split("|")
-                val isOldFormat = parts.size >= 2 && parts.all { it.isNotEmpty() }
+                val eventData = remember(message.content) {
+                    runCatching { Json.decodeFromString<PlannerEventMessage>(message.content) }.getOrNull()
+                }
 
                 val eventTitle: String
                 val eventDesc: String
-                val eventDateStr: String
+                val eventStartDateStr: String
+                val eventEndDateStr: String
 
-                if (isOldFormat) {
+                if (eventData != null) {
+                    eventTitle = eventData.title
+                    eventDesc = eventData.description
+                    eventStartDateStr = eventData.startDate
+                    eventEndDateStr = eventData.endDate
+                } else {
+                    val parts = message.content.split("|")
                     eventTitle = parts.getOrNull(0) ?: "Termin"
                     eventDesc = parts.getOrNull(1) ?: ""
-                    eventDateStr = parts.getOrNull(2) ?: ""
-                } else {
-                    // New format is just the text, but let's try to parse if it was structured somehow
-                    // Actually, I changed it to: "${e.title}$timeStr$locStr\n${e.description}\nDatum: ${e.date}"
-                    val lines = message.content.lines()
-                    eventTitle = lines.getOrNull(0) ?: "Termin"
-                    eventDesc = lines.getOrNull(1) ?: ""
-                    eventDateStr = lines.getOrNull(2)?.removePrefix("Datum: ") ?: ""
+                    eventStartDateStr = parts.getOrNull(2) ?: ""
+                    eventEndDateStr = parts.getOrNull(2) ?: "" // Fallback if old format
                 }
 
                 Box(
@@ -1102,8 +1294,13 @@ private fun ChatBubble(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Outlined.DateRange, contentDescription = "Termin", tint = textColor, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
+                            val dateDisplay = if (eventStartDateStr == eventEndDateStr) {
+                                if (eventStartDateStr.isNotBlank()) "am $eventStartDateStr" else ""
+                            } else {
+                                "vom $eventStartDateStr bis $eventEndDateStr"
+                            }
                             Text(
-                                text = if (eventDateStr.isNotBlank()) "$eventTitle am $eventDateStr" else eventTitle,
+                                text = "$eventTitle $dateDisplay".trim(),
                                 fontSize = 15.sp,
                                 color = textColor,
                                 fontWeight = FontWeight.Bold
@@ -1118,12 +1315,18 @@ private fun ChatBubble(
                             )
                         }
 
-                        if (!message.isOwnMessage && eventDateStr.isNotBlank()) {
+                        if (!message.isOwnMessage && eventStartDateStr.isNotBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Button(
                                 onClick = {
-                                    // Try to parse date if possible, otherwise use today or some fallback
-                                    onAcceptEvent(eventTitle, eventDesc, eventDateStr)
+                                    onAcceptEvent(
+                                        eventTitle,
+                                        eventDesc,
+                                        eventStartDateStr,
+                                        eventEndDateStr,
+                                        eventData?.startTime,
+                                        eventData?.endTime
+                                    )
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color.White.copy(alpha = 0.2f),
@@ -1601,7 +1804,7 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
             selectedDate = uiState.selectedDate,
             events = eventsForDay,
             onAddEvent = {
-                eventToEdit = PlannerEvent(date = uiState.selectedDate, title = "")
+                eventToEdit = PlannerEvent(startDate = uiState.selectedDate, endDate = uiState.selectedDate, title = "")
             },
             onDeleteEvent = { viewModel.deletePlannerEvent(it) },
             onEventClick = { eventToEdit = it }
@@ -1629,18 +1832,21 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
             },
             onShare = { threadId ->
                 val e = eventToEdit!!
-                // Formatierte Nachricht für den Chat - Wir nutzen wieder das Pipe-Format für die "Annehmen"-Logik,
-                // aber erweitern es um die neuen Felder für die Anzeige.
-                val timeStr = if (e.startTime != null) " (${e.startTime}${if (e.endTime != null) "-${e.endTime}" else ""})" else ""
-                val locStr = if (e.location != null) " @ ${e.location}" else ""
-                val displayTitle = "${e.title}$timeStr$locStr"
-
-                val text = "$displayTitle|${e.description}|${e.date}"
+                val eventMessage = PlannerEventMessage(
+                    title = e.title,
+                    description = e.description,
+                    startDate = e.startDate.toString(),
+                    endDate = e.endDate.toString(),
+                    location = e.location,
+                    startTime = e.startTime,
+                    endTime = e.endTime
+                )
+                val jsonText = Json.encodeToString(eventMessage)
 
                 val thread = uiState.chatThreads.find { it.id == threadId }
                 if (thread != null) {
                     viewModel.openChat(thread)
-                    viewModel.sendAttachmentMessage(ChatMessageType.EVENT, text)
+                    viewModel.sendAttachmentMessage(ChatMessageType.EVENT, jsonText)
                     eventToEdit = null
                 }
             }
@@ -1739,7 +1945,9 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
                                 val date = yearMonth.atDay(dayNumber)
                                 val isSelected = date == uiState.selectedDate
                                 val isToday = date == today
-                                val hasEvents = uiState.plannerEvents.any { it.date == date }
+                                val hasEvents = uiState.plannerEvents.any { event ->
+                                    !date.isBefore(event.startDate) && !date.isAfter(event.endDate)
+                                }
 
                                 Box(
                                     modifier = Modifier
@@ -1978,6 +2186,7 @@ private fun CrewTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceViewMo
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding() // Sicherstellen, dass die Tastatur die Felder nicht verdeckt
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -2101,6 +2310,45 @@ private fun CrewOnBoardCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewM
                                 tint = Color(0xFFEF4444).copy(alpha = 0.8f),
                                 modifier = Modifier.size(16.dp)
                             )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        var showEditMenu by remember { mutableStateOf(false) }
+
+                        Box {
+                            IconButton(
+                                onClick = { showEditMenu = true },
+                                modifier = Modifier.size(32.dp).background(CrewspaceCardBg, CircleShape)
+                            ) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Bearbeiten",
+                                    tint = CrewspaceAccent,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showEditMenu,
+                                onDismissRequest = { showEditMenu = false },
+                                modifier = Modifier.background(CrewspaceSurface)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(if (member.isOnBoard) "Von Bord gehen" else "An Bord gehen") },
+                                    onClick = {
+                                        viewModel.updateCrew(member.copy(isOnBoard = !member.isOnBoard))
+                                        showEditMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Details bearbeiten") },
+                                    onClick = {
+                                        viewModel.startEditingCrew(member)
+                                        showEditMenu = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -2335,8 +2583,11 @@ private fun CrewspaceTextField(
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text,
     leadingIcon: @Composable (() -> Unit)? = null,
-    trailingIcon: @Composable (() -> Unit)? = null
+    trailingIcon: @Composable (() -> Unit)? = null,
+    imeAction: ImeAction = ImeAction.Next
 ) {
+    val isError = value.any { !it.isLetterOrDigit() && it != ' ' && it != '+' } && placeholder.contains("Name")
+
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -2350,8 +2601,10 @@ private fun CrewspaceTextField(
         },
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
+        isError = isError,
+        supportingText = if (isError) { { Text("Nur Buchstaben und Zahlen erlaubt") } } else null,
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Next),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = OutlinedTextFieldDefaults.colors(

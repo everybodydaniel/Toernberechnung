@@ -237,12 +237,19 @@ class CrewspaceViewModel(
         val text = state.chatInput.trim()
         if (text.isBlank() || !thread.isChatAvailable) return
 
+        // Puffer den Text, falls das Senden fehlschlägt
+        val originalText = state.chatInput
+        _uiState.update { it.copy(chatInput = "") }
+
         viewModelScope.launch {
             runCatching { chatRepository.queueText(thread.id, text) }
-                .onSuccess {
-                    _uiState.update { it.copy(chatInput = "", chatError = null) }
+                .onFailure { error ->
+                    // Bei Fehler Text wiederherstellen (optional, hier zeigen wir eher den Fehler an)
+                    // Wir lassen ihn leer, damit der User nicht verwirrt ist, bieten aber Retry über die Message-Liste an.
+                    // Falls wir ihn wiederherstellen wollen:
+                    // _uiState.update { it.copy(chatInput = originalText) }
+                    showChatError(error)
                 }
-                .onFailure(::showChatError)
         }
     }
 
@@ -346,7 +353,8 @@ class CrewspaceViewModel(
 
     fun addPlannerEventWithDate(title: String, description: String, date: LocalDate) {
         val event = PlannerEvent(
-            date = date,
+            startDate = date,
+            endDate = date,
             title = title,
             description = description
         )
@@ -362,15 +370,29 @@ class CrewspaceViewModel(
     }
 
     fun deletePlannerEvent(event: PlannerEvent) {
+        _uiState.update { it.copy(eventToDelete = event) }
+    }
+
+    fun confirmDeletePlannerEvent() {
+        val event = _uiState.value.eventToDelete ?: return
         viewModelScope.launch {
             repository.deletePlannerEvent(event.toEntity())
+            _uiState.update { it.copy(eventToDelete = null) }
         }
     }
 
-    /** Events für das ausgewählte Datum */
+    fun cancelDeletePlannerEvent() {
+        _uiState.update { it.copy(eventToDelete = null) }
+    }
+
+    /** Events für das ausgewählte Datum (inkl. mehrtägige Termine) */
     fun eventsForSelectedDate(): List<PlannerEvent> {
         val state = _uiState.value
-        return state.plannerEvents.filter { it.date == state.selectedDate }
+        val selected = state.selectedDate
+        return state.plannerEvents.filter { event ->
+            // Ein Event ist relevant, wenn das ausgewählte Datum zwischen Start und Ende liegt
+            !selected.isBefore(event.startDate) && !selected.isAfter(event.endDate)
+        }
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -405,6 +427,12 @@ class CrewspaceViewModel(
         val state = _uiState.value
         if (state.addName.isBlank() && state.addSkipperId.isBlank()) return
 
+        // Dubletten-Prüfung
+        if (state.addSkipperId.isNotBlank() && state.crewMembers.any { it.skipperId == state.addSkipperId }) {
+            _uiState.update { it.copy(chatError = "Dieses Mitglied (ID: ${state.addSkipperId}) ist bereits an Bord.") }
+            return
+        }
+
         val member = com.example.trnberechnung.logic.ValidationUtils.sanitizeCrewMember(
             CrewMember(
                 name = state.addName.ifBlank { state.addSkipperId },
@@ -432,21 +460,40 @@ class CrewspaceViewModel(
                 addSelectedRole = CrewRole.SKIPPER,
                 addEmergencyContact = "",
                 addPhone = "",
-                addMedicalNotes = ""
+                addMedicalNotes = "",
+                chatError = null
             )
         }
     }
 
-    fun deleteCrew(member: CrewMember) {
-        viewModelScope.launch {
-            repository.deleteCrew(member)
-        }
+    fun startEditingCrew(member: CrewMember) {
+        _uiState.update { it.copy(editingMember = member) }
+    }
+
+    fun cancelEditingCrew() {
+        _uiState.update { it.copy(editingMember = null) }
     }
 
     fun updateCrew(member: CrewMember) {
         viewModelScope.launch {
             repository.updateCrew(member)
         }
+    }
+
+    fun deleteCrew(member: CrewMember) {
+        _uiState.update { it.copy(memberToDelete = member) }
+    }
+
+    fun confirmDeleteCrew() {
+        val member = _uiState.value.memberToDelete ?: return
+        viewModelScope.launch {
+            repository.deleteCrew(member)
+            _uiState.update { it.copy(memberToDelete = null) }
+        }
+    }
+
+    fun cancelDeleteCrew() {
+        _uiState.update { it.copy(memberToDelete = null) }
     }
 
 }

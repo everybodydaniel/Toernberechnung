@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.filled.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.trnberechnung.model.ChatThread
@@ -43,12 +45,17 @@ fun EditPlannerEventBottomSheet(
     // Lokale States für alle Felder
     var title by remember { mutableStateOf(event.title) }
     var description by remember { mutableStateOf(event.description) }
+    var startDate by remember { mutableStateOf(event.startDate) }
+    var endDate by remember { mutableStateOf(event.endDate) }
     var startTime by remember { mutableStateOf(event.startTime ?: "") }
     var endTime by remember { mutableStateOf(event.endTime ?: "") }
     var location by remember { mutableStateOf(event.location ?: "") }
     var category by remember { mutableStateOf(event.category) }
 
     var showShareMenu by remember { mutableStateOf(false) }
+
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
 
     // Dynamische Farben passend zum Crewspace-Look
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -125,32 +132,118 @@ fun EditPlannerEventBottomSheet(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Zeit Row
+                // Datum Row
+                Text(
+                    text = "ZEITRAUM",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = secondaryText,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        EditField(
-                            value = startTime,
-                            onValueChange = { startTime = it },
-                            label = "Beginn",
-                            icon = Icons.Default.AccessTime,
-                            placeholder = "09:00",
+                    Box(modifier = Modifier.weight(1f).clickable { showStartDatePicker = true }) {
+                        ReadOnlyField(
+                            label = "VON",
+                            value = startDate.toString(),
+                            icon = Icons.Default.CalendarToday,
                             accentColor = accentColor,
                             textColor = textColor,
                             secondaryText = secondaryText,
                             cardBgColor = cardBgColor
                         )
                     }
-                    Box(modifier = Modifier.weight(1f)) {
-                        EditField(
-                            value = endTime,
-                            onValueChange = { endTime = it },
-                            label = "Ende",
-                            icon = Icons.Default.Timer,
-                            placeholder = "14:30",
+                    Box(modifier = Modifier.weight(1f).clickable { showEndDatePicker = true }) {
+                        ReadOnlyField(
+                            label = "BIS",
+                            value = endDate.toString(),
+                            icon = Icons.Default.CalendarToday,
                             accentColor = accentColor,
                             textColor = textColor,
                             secondaryText = secondaryText,
                             cardBgColor = cardBgColor
+                        )
+                    }
+                }
+
+                if (showStartDatePicker) {
+                    DatePickerDialog(
+                        onDismissRequest = { showStartDatePicker = false },
+                        confirmButton = {
+                            TextButton(onClick = { showStartDatePicker = false }) { Text("OK") }
+                        }
+                    ) {
+                        val datePickerState = rememberDatePickerState(
+                            initialSelectedDateMillis = startDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        )
+                        DatePicker(state = datePickerState)
+                        LaunchedEffect(datePickerState.selectedDateMillis) {
+                            datePickerState.selectedDateMillis?.let {
+                                startDate = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                                if (endDate.isBefore(startDate)) endDate = startDate
+                            }
+                        }
+                    }
+                }
+
+                if (showEndDatePicker) {
+                    DatePickerDialog(
+                        onDismissRequest = { showEndDatePicker = false },
+                        confirmButton = {
+                            TextButton(onClick = { showEndDatePicker = false }) { Text("OK") }
+                        }
+                    ) {
+                        val datePickerState = rememberDatePickerState(
+                            initialSelectedDateMillis = endDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        )
+                        DatePicker(state = datePickerState)
+                        LaunchedEffect(datePickerState.selectedDateMillis) {
+                            datePickerState.selectedDateMillis?.let {
+                                val selected = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                                if (!selected.isBefore(startDate)) {
+                                    endDate = selected
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Zeit Row
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        EditField(
+                            value = startTime,
+                            onValueChange = { input ->
+                                val filtered = input.filter { it.isDigit() || it == ':' }
+                                if (filtered.length <= 5) startTime = filtered
+                            },
+                            label = "Uhrzeit Start",
+                            icon = Icons.Default.AccessTime,
+                            placeholder = "HH:mm",
+                            accentColor = accentColor,
+                            textColor = textColor,
+                            secondaryText = secondaryText,
+                            cardBgColor = cardBgColor,
+                            keyboardType = KeyboardType.Text
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        EditField(
+                            value = endTime,
+                            onValueChange = { input ->
+                                val filtered = input.filter { it.isDigit() || it == ':' }
+                                if (filtered.length <= 5) endTime = filtered
+                            },
+                            label = "Uhrzeit Ende",
+                            icon = Icons.Default.Timer,
+                            placeholder = "HH:mm",
+                            accentColor = accentColor,
+                            textColor = textColor,
+                            secondaryText = secondaryText,
+                            cardBgColor = cardBgColor,
+                            keyboardType = KeyboardType.Text
                         )
                     }
                 }
@@ -263,6 +356,8 @@ fun EditPlannerEventBottomSheet(
                                 onSave(event.copy(
                                     title = title,
                                     description = description,
+                                    startDate = startDate,
+                                    endDate = endDate,
                                     startTime = startTime.ifBlank { null },
                                     endTime = endTime.ifBlank { null },
                                     location = location.ifBlank { null },
@@ -352,6 +447,43 @@ fun EditPlannerEventBottomSheet(
 }
 
 @Composable
+private fun ReadOnlyField(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    accentColor: Color,
+    textColor: Color,
+    secondaryText: Color,
+    cardBgColor: Color
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = secondaryText,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = cardBgColor,
+            border = BorderStroke(1.dp, secondaryText.copy(alpha = 0.2f))
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = accentColor)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(text = value, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = textColor)
+            }
+        }
+    }
+}
+
+@Composable
 private fun EditField(
     value: String,
     onValueChange: (String) -> Unit,
@@ -363,7 +495,8 @@ private fun EditField(
     accentColor: Color,
     textColor: Color,
     secondaryText: Color,
-    cardBgColor: Color
+    cardBgColor: Color,
+    keyboardType: KeyboardType = KeyboardType.Text
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -383,6 +516,7 @@ private fun EditField(
             shape = RoundedCornerShape(16.dp),
             singleLine = singleLine,
             minLines = minLines,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = accentColor,
                 unfocusedBorderColor = secondaryText.copy(alpha = 0.2f),

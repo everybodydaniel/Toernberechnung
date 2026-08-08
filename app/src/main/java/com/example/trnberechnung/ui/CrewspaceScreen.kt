@@ -54,7 +54,6 @@ import com.example.trnberechnung.messaging.ChatNavigationState
 import com.example.trnberechnung.model.*
 import com.example.trnberechnung.viewmodel.CrewspaceViewModel
 import com.example.trnberechnung.logic.ValidationUtils
-import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -112,6 +111,7 @@ private val CrewspaceUnreadBadge = Color(0xFFEF4444)
  * Haupt-Composable für den gesamten Crewspace-Screen.
  * Enthält Header, Segmented Tabs und routet zu den drei Sub-Screens.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CrewspaceScreen(
     viewModel: CrewspaceViewModel,
@@ -1473,7 +1473,7 @@ private fun VoiceMessageBubble(
     val timeColor = if (isOwnMessage) Color.White.copy(alpha = 0.7f) else CrewspaceTextSecondary
     val minutes = durationSeconds / 60
     val seconds = durationSeconds % 60
-    val durationText = "%d:%02d".format(minutes, seconds)
+    val durationText = String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
 
     Column {
         Box(
@@ -1782,6 +1782,7 @@ private fun ChatInputBar(
 // Planung Tab – Vollständige Implementierung
 // ══════════════════════════════════════════════════════════════
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceViewModel) {
     val scrollState = rememberScrollState()
@@ -1813,6 +1814,48 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
         Spacer(modifier = Modifier.height(16.dp))
     }
 
+    val context = LocalContext.current
+    val shareEventExternally = { event: PlannerEvent ->
+        val dateFormatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
+        val shareText = buildString {
+            append("⚓ *CREWSPACE TERMIN* ⚓\n\n")
+            append("📍 *${event.title.uppercase()}*\n")
+            append("──────────────────\n")
+
+            if (event.startDate == event.endDate) {
+                append("📅 *Datum:* ${event.startDate.format(dateFormatter)}\n")
+            } else {
+                append("📅 *Zeitraum:* ${event.startDate.format(dateFormatter)} bis ${event.endDate.format(dateFormatter)}\n")
+            }
+
+            if (!event.startTime.isNullOrBlank()) {
+                append("⏰ *Zeit:* ${event.startTime}")
+                if (!event.endTime.isNullOrBlank()) append(" - ${event.endTime}")
+                append(" Uhr\n")
+            }
+
+            if (!event.location.isNullOrBlank()) {
+                append("🗺️ *Ort:* ${event.location}\n")
+            }
+
+            if (event.description.isNotBlank()) {
+                append("\n📝 *Details:*\n")
+                append(event.description)
+                append("\n")
+            }
+
+            append("──────────────────\n")
+            append("_Gesendet via Tide Node_")
+        }
+        val sendIntent = android.content.Intent().apply {
+            action = android.content.Intent.ACTION_SEND
+            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+            type = "text/plain"
+        }
+        val shareIntent = android.content.Intent.createChooser(sendIntent, "Termin teilen")
+        context.startActivity(shareIntent)
+    }
+
     if (eventToEdit != null) {
         EditPlannerEventBottomSheet(
             event = eventToEdit!!,
@@ -1830,6 +1873,7 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                 viewModel.deletePlannerEvent(eventToEdit!!)
                 eventToEdit = null
             },
+            onExternalShare = { event -> shareEventExternally(event) },
             onShare = { threadId ->
                 val e = eventToEdit!!
                 val eventMessage = PlannerEventMessage(
@@ -1856,6 +1900,7 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
 
 // ── Custom Kalender-Card ──────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewModel) {
     val yearMonth = YearMonth.from(uiState.currentMonth)
@@ -1872,6 +1917,8 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             // ── Monat-Navigation ──
+            var showMonthYearPicker by remember { mutableStateOf(false) }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1884,12 +1931,30 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
                     Icon(Icons.Default.ChevronLeft, contentDescription = null, tint = CrewspaceAccent)
                 }
 
-                Text(
-                    text = "$monthName $year",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = CrewspaceTextPrimary
-                )
+                Surface(
+                    onClick = { showMonthYearPicker = true },
+                    color = Color.Transparent,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "$monthName $year",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = CrewspaceTextPrimary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = CrewspaceTextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
 
                 IconButton(
                     onClick = { viewModel.navigateMonth(true) },
@@ -1899,11 +1964,54 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
                 }
             }
 
+            if (showMonthYearPicker) {
+                val initialDate = uiState.currentMonth
+                val datePickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = initialDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                )
+
+                DatePickerDialog(
+                    onDismissRequest = { showMonthYearPicker = false },
+                    confirmButton = {
+                        TextButton(onClick = {
+            datePickerState.selectedDateMillis?.let {
+                                val selectedDate = Instant.ofEpochMilli(it)
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDate()
+                                viewModel.setCurrentMonth(selectedDate)
+                                viewModel.selectDate(selectedDate)
+                            }
+                            showMonthYearPicker = false
+                        }) { Text("Auswählen") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showMonthYearPicker = false }) { Text("Abbrechen") }
+                    }
+                ) {
+                    DatePicker(
+                        state = datePickerState,
+                        title = {
+                            Text(
+                                "Monat & Jahr wählen",
+                                modifier = Modifier.padding(start = 24.dp, top = 24.dp, end = 24.dp),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CrewspaceAccent
+                            )
+                        },
+                        showModeToggle = false
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
             // ── Wochentag-Header ──
             val dayLabels = listOf("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 dayLabels.forEach { day ->
                     Box(
                         modifier = Modifier.weight(1f),
@@ -1912,8 +2020,9 @@ private fun CalendarCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewMode
                         Text(
                             text = day,
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = CrewspaceTextSecondary.copy(alpha = 0.7f)
+                            fontWeight = FontWeight.ExtraBold,
+                            color = CrewspaceTextSecondary.copy(alpha = 0.8f),
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -2046,13 +2155,15 @@ private fun DayDetailCard(
 
                 Button(
                     onClick = onAddEvent,
-                    colors = ButtonDefaults.buttonColors(containerColor = CrewspaceAccent.copy(alpha = 0.1f)),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp)
+                    colors = ButtonDefaults.buttonColors(containerColor = CrewspaceAccent),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.height(40.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = CrewspaceAccent, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Termin", color = CrewspaceAccent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Termin", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
 
@@ -2091,13 +2202,6 @@ private fun DayDetailCard(
                 }
             } else {
                 events.forEach { event ->
-                    val categoryColor = when (event.category) {
-                        "Navigation" -> Color(0xFF3B82F6)
-                        "Verpflegung" -> Color(0xFF10B981)
-                        "Landgang" -> Color(0xFFF59E0B)
-                        else -> CrewspaceAccent
-                    }
-
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2115,7 +2219,7 @@ private fun DayDetailCard(
                                     .width(4.dp)
                                     .height(32.dp)
                                     .clip(CircleShape)
-                                    .background(categoryColor)
+                                    .background(CrewspaceAccent)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
 
@@ -2253,7 +2357,9 @@ private fun CrewOnBoardCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewM
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { viewModel.startEditingCrew(member) }
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -2290,65 +2396,29 @@ private fun CrewOnBoardCard(uiState: CrewspaceUiState, viewModel: CrewspaceViewM
 
                         Box(
                             modifier = Modifier
-                                .size(10.dp)
+                                .size(16.dp)
                                 .clip(CircleShape)
                                 .background(
                                     if (member.isOnBoard) Color(0xFF10B981)
                                     else Color(0xFFEF4444)
                                 )
+                                .clickable {
+                                    viewModel.updateCrew(member.copy(isOnBoard = !member.isOnBoard))
+                                }
                         )
 
                         Spacer(modifier = Modifier.width(12.dp))
 
                         IconButton(
                             onClick = { viewModel.deleteCrew(member) },
-                            modifier = Modifier.size(32.dp).background(CrewspaceCardBg, CircleShape)
+                            modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = "Entfernen",
                                 tint = Color(0xFFEF4444).copy(alpha = 0.8f),
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(14.dp)
                             )
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        var showEditMenu by remember { mutableStateOf(false) }
-
-                        Box {
-                            IconButton(
-                                onClick = { showEditMenu = true },
-                                modifier = Modifier.size(32.dp).background(CrewspaceCardBg, CircleShape)
-                            ) {
-                                Icon(
-                                    Icons.Default.Edit,
-                                    contentDescription = "Bearbeiten",
-                                    tint = CrewspaceAccent,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-
-                            DropdownMenu(
-                                expanded = showEditMenu,
-                                onDismissRequest = { showEditMenu = false },
-                                modifier = Modifier.background(CrewspaceSurface)
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(if (member.isOnBoard) "Von Bord gehen" else "An Bord gehen") },
-                                    onClick = {
-                                        viewModel.updateCrew(member.copy(isOnBoard = !member.isOnBoard))
-                                        showEditMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Details bearbeiten") },
-                                    onClick = {
-                                        viewModel.startEditingCrew(member)
-                                        showEditMenu = false
-                                    }
-                                )
-                            }
                         }
                     }
                 }

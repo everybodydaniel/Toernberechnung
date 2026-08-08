@@ -38,9 +38,12 @@ fun EditPlannerEventBottomSheet(
     onDismiss: () -> Unit,
     onSave: (PlannerEvent) -> Unit,
     onDelete: () -> Unit,
+    onExternalShare: (PlannerEvent) -> Unit,
     onShare: (String) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val dateFormatter = remember { java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy") }
 
     // Lokale States für alle Felder
     var title by remember { mutableStateOf(event.title) }
@@ -50,12 +53,13 @@ fun EditPlannerEventBottomSheet(
     var startTime by remember { mutableStateOf(event.startTime ?: "") }
     var endTime by remember { mutableStateOf(event.endTime ?: "") }
     var location by remember { mutableStateOf(event.location ?: "") }
-    var category by remember { mutableStateOf(event.category) }
 
     var showShareMenu by remember { mutableStateOf(false) }
 
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
 
     // Dynamische Farben passend zum Crewspace-Look
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -145,7 +149,7 @@ fun EditPlannerEventBottomSheet(
                     Box(modifier = Modifier.weight(1f).clickable { showStartDatePicker = true }) {
                         ReadOnlyField(
                             label = "VON",
-                            value = startDate.toString(),
+                            value = startDate.format(dateFormatter),
                             icon = Icons.Default.CalendarToday,
                             accentColor = accentColor,
                             textColor = textColor,
@@ -156,7 +160,7 @@ fun EditPlannerEventBottomSheet(
                     Box(modifier = Modifier.weight(1f).clickable { showEndDatePicker = true }) {
                         ReadOnlyField(
                             label = "BIS",
-                            value = endDate.toString(),
+                            value = endDate.format(dateFormatter),
                             icon = Icons.Default.CalendarToday,
                             accentColor = accentColor,
                             textColor = textColor,
@@ -212,40 +216,76 @@ fun EditPlannerEventBottomSheet(
 
                 // Zeit Row
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        EditField(
-                            value = startTime,
-                            onValueChange = { input ->
-                                val filtered = input.filter { it.isDigit() || it == ':' }
-                                if (filtered.length <= 5) startTime = filtered
-                            },
+                    Box(modifier = Modifier.weight(1f).clickable { showStartTimePicker = true }) {
+                        ReadOnlyField(
                             label = "Uhrzeit Start",
+                            value = startTime.ifBlank { "--:--" },
                             icon = Icons.Default.AccessTime,
-                            placeholder = "HH:mm",
                             accentColor = accentColor,
                             textColor = textColor,
                             secondaryText = secondaryText,
-                            cardBgColor = cardBgColor,
-                            keyboardType = KeyboardType.Text
+                            cardBgColor = cardBgColor
                         )
                     }
-                    Box(modifier = Modifier.weight(1f)) {
-                        EditField(
-                            value = endTime,
-                            onValueChange = { input ->
-                                val filtered = input.filter { it.isDigit() || it == ':' }
-                                if (filtered.length <= 5) endTime = filtered
-                            },
+                    Box(modifier = Modifier.weight(1f).clickable { showEndTimePicker = true }) {
+                        ReadOnlyField(
                             label = "Uhrzeit Ende",
-                            icon = Icons.Default.Timer,
-                            placeholder = "HH:mm",
+                            value = endTime.ifBlank { "--:--" },
+                            icon = Icons.Default.AccessTime,
                             accentColor = accentColor,
                             textColor = textColor,
                             secondaryText = secondaryText,
-                            cardBgColor = cardBgColor,
-                            keyboardType = KeyboardType.Text
+                            cardBgColor = cardBgColor
                         )
                     }
+                }
+
+                if (showStartTimePicker) {
+                    val initialHour = startTime.substringBefore(":").toIntOrNull() ?: 12
+                    val initialMinute = startTime.substringAfter(":").toIntOrNull() ?: 0
+                    val timePickerState = rememberTimePickerState(initialHour, initialMinute, is24Hour = true)
+
+                    AlertDialog(
+                        onDismissRequest = { showStartTimePicker = false },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                startTime = String.format(java.util.Locale.getDefault(), "%02d:%02d", timePickerState.hour, timePickerState.minute)
+                                showStartTimePicker = false
+                            }) { Text("OK") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showStartTimePicker = false }) { Text("Abbrechen") }
+                        },
+                        text = {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                TimePicker(state = timePickerState)
+                            }
+                        }
+                    )
+                }
+
+                if (showEndTimePicker) {
+                    val initialHour = endTime.substringBefore(":").toIntOrNull() ?: 12
+                    val initialMinute = endTime.substringAfter(":").toIntOrNull() ?: 0
+                    val timePickerState = rememberTimePickerState(initialHour, initialMinute, is24Hour = true)
+
+                    AlertDialog(
+                        onDismissRequest = { showEndTimePicker = false },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                endTime = String.format(java.util.Locale.getDefault(), "%02d:%02d", timePickerState.hour, timePickerState.minute)
+                                showEndTimePicker = false
+                            }) { Text("OK") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showEndTimePicker = false }) { Text("Abbrechen") }
+                        },
+                        text = {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                TimePicker(state = timePickerState)
+                            }
+                        }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -262,43 +302,6 @@ fun EditPlannerEventBottomSheet(
                     secondaryText = secondaryText,
                     cardBgColor = cardBgColor
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Kategorie Auswahl
-                Text(
-                    text = "KATEGORIE",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = secondaryText,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("Allgemein", "Navigation", "Verpflegung", "Landgang").forEach { cat ->
-                        val isSelected = category == cat
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { category = cat },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) accentColor else cardBgColor,
-                            border = if (!isSelected) BorderStroke(1.dp, secondaryText.copy(alpha = 0.2f)) else null
-                        ) {
-                            Text(
-                                text = cat,
-                                modifier = Modifier.padding(vertical = 10.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                color = if (isSelected) Color.White else textColor
-                            )
-                        }
-                    }
-                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -338,15 +341,30 @@ fun EditPlannerEventBottomSheet(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (event.title.isNotEmpty()) {
+                            IconButton(
+                                onClick = {
+                                    onExternalShare(event.copy(
+                                        title = title,
+                                        description = description,
+                                        startDate = startDate,
+                                        endDate = endDate,
+                                        startTime = startTime.ifBlank { null },
+                                        endTime = endTime.ifBlank { null },
+                                        location = location.ifBlank { null }
+                                    ))
+                                },
+                                modifier = Modifier.background(accentColor.copy(alpha = 0.1f), CircleShape)
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = "Extern teilen", tint = accentColor)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
                             OutlinedButton(
                                 onClick = { showShareMenu = true },
                                 shape = RoundedCornerShape(14.dp),
                                 border = BorderStroke(1.5.dp, accentColor),
                                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
                             ) {
-                                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Teilen", fontWeight = FontWeight.Bold)
+                                Text("In Chat", fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                         }
@@ -360,8 +378,7 @@ fun EditPlannerEventBottomSheet(
                                     endDate = endDate,
                                     startTime = startTime.ifBlank { null },
                                     endTime = endTime.ifBlank { null },
-                                    location = location.ifBlank { null },
-                                    category = category
+                                    location = location.ifBlank { null }
                                 ))
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = accentColor),

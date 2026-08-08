@@ -345,6 +345,10 @@ class CrewspaceViewModel(
         }
     }
 
+    fun setCurrentMonth(date: LocalDate) {
+        _uiState.update { it.copy(currentMonth = date.withDayOfMonth(1)) }
+    }
+
     fun addPlannerEvent(event: PlannerEvent) {
         viewModelScope.launch {
             repository.insertPlannerEvent(event.toEntity())

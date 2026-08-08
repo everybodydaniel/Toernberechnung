@@ -129,31 +129,9 @@ class MainActivity : ComponentActivity() {
                         viewModel.loadData()
                     }
 
-                    val startDestination = if (!authRepo.isLoggedIn && !authRepo.isSkipped) {
-                        "login"
-                    } else {
-                        "main"
-                    }
+                    val startDestination = "main"
 
                     NavHost(navController = rootNavController, startDestination = startDestination) {
-                        composable("login") {
-                            LoginScreen(
-                                authRepo = authRepo,
-                                onLoginSuccess = {
-                                    lifecycleScope.launch {
-                                        runCatching { chatRepository.activate() }
-                                    }
-                                    rootNavController.navigate("main") {
-                                        popUpTo("login") { inclusive = true }
-                                    }
-                                },
-                                onSkip = {
-                                    rootNavController.navigate("main") {
-                                        popUpTo("login") { inclusive = true }
-                                    }
-                                }
-                            )
-                        }
                         composable("main") {
                             MainAppScreen(
                                 viewModel = viewModel,

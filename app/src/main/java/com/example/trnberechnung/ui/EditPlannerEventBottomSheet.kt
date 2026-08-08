@@ -357,15 +357,6 @@ fun EditPlannerEventBottomSheet(
                             ) {
                                 Icon(Icons.Default.Share, contentDescription = "Extern teilen", tint = accentColor)
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            OutlinedButton(
-                                onClick = { showShareMenu = true },
-                                shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.5.dp, accentColor),
-                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
-                            ) {
-                                Text("In Chat", fontWeight = FontWeight.Bold)
-                            }
                             Spacer(modifier = Modifier.width(12.dp))
                         }
 

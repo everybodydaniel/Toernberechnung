@@ -6,7 +6,6 @@ import java.time.LocalDate
  * Die drei Haupt-Tabs des Crewspace-Screens.
  */
 enum class CrewspaceTab(val label: String) {
-    CHATS("Chats"),
     PLANUNG("Planung"),
     CREW("Crew"),
 }
@@ -24,7 +23,7 @@ enum class NewConversationTab {
  */
 data class CrewspaceUiState(
     // ── Allgemein ──
-    val selectedTab: CrewspaceTab = CrewspaceTab.CHATS,
+    val selectedTab: CrewspaceTab = CrewspaceTab.PLANUNG,
     val searchQuery: String = "",
 
     // ── Chats ──

@@ -162,18 +162,6 @@ fun CrewspaceScreen(
             onTabSelected = { viewModel.selectTab(it) }
         )
 
-        // ── Suchleiste (nur im Chat-Tab sichtbar) ──
-        AnimatedVisibility(
-            visible = uiState.selectedTab == CrewspaceTab.CHATS,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            CrewspaceSearchBar(
-                query = uiState.searchQuery,
-                onQueryChange = { viewModel.updateSearchQuery(it) }
-            )
-        }
-
         // ── Tab-Content ──
         Box(
             modifier = Modifier
@@ -181,14 +169,6 @@ fun CrewspaceScreen(
                 .weight(1f)
         ) {
             when (uiState.selectedTab) {
-                CrewspaceTab.CHATS -> {
-                    ChatsTabContent(
-                        uiState = uiState,
-                        viewModel = viewModel,
-                        authRepo = authRepo,
-                        onNavigateToLogin = onNavigateToLogin
-                    )
-                }
                 CrewspaceTab.PLANUNG -> {
                     PlanungTabContent(uiState = uiState, viewModel = viewModel)
                 }
@@ -197,11 +177,6 @@ fun CrewspaceScreen(
                 }
             }
         }
-    }
-
-    // ── BottomSheet für neue Unterhaltung ──
-    if (uiState.showNewConversationSheet) {
-        NewConversationBottomSheet(uiState = uiState, viewModel = viewModel)
     }
 
     // ── Deletion Confirmation Dialogs ──
@@ -272,7 +247,6 @@ private fun EditCrewMemberDialog(
     onSave: (CrewMember) -> Unit
 ) {
     var name by remember { mutableStateOf(member.name) }
-    var skipperId by remember { mutableStateOf(member.skipperId) }
     var emergencyContact by remember { mutableStateOf(member.emergencyContact) }
     var phone by remember { mutableStateOf(member.phone) }
     var medicalNotes by remember { mutableStateOf(member.medicalNotes) }
@@ -287,7 +261,6 @@ private fun EditCrewMemberDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 CrewspaceTextField(value = name, onValueChange = { name = it }, placeholder = "Name")
-                CrewspaceTextField(value = skipperId, onValueChange = { skipperId = it }, placeholder = "Skipper-ID")
 
                 Text("Rolle", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = CrewspaceTextSecondary)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -313,7 +286,6 @@ private fun EditCrewMemberDialog(
             Button(onClick = {
                 onSave(member.copy(
                     name = name,
-                    skipperId = skipperId,
                     emergencyContact = emergencyContact,
                     phone = phone,
                     medicalNotes = medicalNotes,
@@ -351,7 +323,7 @@ private fun CrewspaceHeader() {
         )
         if (!isLandscape) {
             Text(
-                text = "Crew, Gespräche und Termine",
+                text = "Crew und Termine",
                 fontSize = 14.sp,
                 color = CrewspaceTextSecondary,
                 fontWeight = FontWeight.Medium
@@ -371,7 +343,6 @@ private data class TabItem(
 )
 
 private val tabItems = listOf(
-    TabItem(CrewspaceTab.CHATS, Icons.AutoMirrored.Outlined.Chat, "Chats"),
     TabItem(CrewspaceTab.PLANUNG, Icons.Outlined.DateRange, "Planung"),
     TabItem(CrewspaceTab.CREW, Icons.Outlined.Groups, "Crew"),
 )
@@ -1818,7 +1789,7 @@ private fun PlanungTabContent(uiState: CrewspaceUiState, viewModel: CrewspaceVie
     val shareEventExternally = { event: PlannerEvent ->
         val dateFormatter = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")
         val shareText = buildString {
-            append("⚓ *CREWSPACE TERMIN* ⚓\n\n")
+            append("⚓ *TIDE NODE TERMIN* ⚓\n\n")
             append("📍 *${event.title.uppercase()}*\n")
             append("──────────────────\n")
 
@@ -2487,64 +2458,6 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                 }
             )
 
-            var showChatDropdown by remember { mutableStateOf(false) }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.weight(1f)) {
-                    CrewspaceTextField(
-                        value = uiState.addSkipperId,
-                        onValueChange = { input ->
-                            viewModel.updateAddSkipperId(ValidationUtils.sanitizeSkipperId(input))
-                        },
-                        placeholder = "Skipper-ID (für Direkt-Chat)",
-                        leadingIcon = {
-                            Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(20.dp))
-                        }
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                IconButton(
-                    onClick = { showChatDropdown = true },
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(CrewspaceCardBg, RoundedCornerShape(16.dp))
-                        .border(1.dp, CrewspaceDivider, RoundedCornerShape(16.dp))
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.Chat,
-                        contentDescription = "Aus Chat auswählen",
-                        tint = CrewspaceAccent
-                    )
-
-                    DropdownMenu(
-                        expanded = showChatDropdown,
-                        onDismissRequest = { showChatDropdown = false },
-                        modifier = Modifier.background(CrewspaceSurface)
-                    ) {
-                        val availableChats = uiState.chatThreads.filter { it.type == ChatThreadType.DIRECT }
-                        if (availableChats.isEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text("Keine Chats vorhanden", color = CrewspaceTextSecondary) },
-                                onClick = { showChatDropdown = false }
-                            )
-                        } else {
-                            availableChats.forEach { thread ->
-                                DropdownMenuItem(
-                                    text = { Text(thread.participantName) },
-                                    onClick = {
-                                        viewModel.updateAddSkipperId(thread.participantSkipperId)
-                                        viewModel.updateAddName(thread.participantName)
-                                        showChatDropdown = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             Column {
                 Text(
                     text = "ROLLE AN BORD",
@@ -2623,7 +2536,7 @@ private fun CrewAddMemberCard(uiState: CrewspaceUiState, viewModel: CrewspaceVie
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),
-                enabled = uiState.addSkipperId.isNotBlank() || uiState.addName.isNotBlank(),
+                enabled = uiState.addName.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CrewspaceAccent,
                     contentColor = Color.White

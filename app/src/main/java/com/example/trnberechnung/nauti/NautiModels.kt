@@ -24,6 +24,21 @@ sealed interface NautiAction {
 
     data object StartNavigation : NautiAction
 
+    /**
+     * Plans the given trip and, once the deterministic engine has confirmed it is navigable,
+     * starts the GPS recording for it.
+     *
+     * This is the only action that can begin a voyage from a chat sentence, so it always
+     * requires explicit skipper confirmation ([NautiActionCodec.requiresConfirmation]) and is
+     * additionally gated on route status and location permission before anything starts.
+     */
+    data class StartVoyage(
+        val startHarbourId: String,
+        val destinationHarbourId: String,
+        val intermediateHarbourIds: List<String> = emptyList(),
+        val departure: ZonedDateTime? = null,
+    ) : NautiAction
+
     data object ShowPassageWindow : NautiAction
 
     data class ShowWeather(

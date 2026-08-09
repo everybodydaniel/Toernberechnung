@@ -1,6 +1,5 @@
 package com.example.trnberechnung.ui
 
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,9 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CellTower
@@ -33,31 +29,20 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DirectionsBoat
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Sailing
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Water
 import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -73,14 +58,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -122,9 +104,6 @@ private val SettingsTextColor: Color
 @Composable
 fun DashboardScreen(
     authRepo: AuthRepository? = null,
-    onNavigateToLogin: () -> Unit = {},
-    onLogout: () -> Unit = {},
-    onStartNavigation: () -> Unit,
     onToggleDarkMode: (Boolean) -> Unit = {},
     onReplayOnboarding: () -> Unit = {},
 ) {
@@ -140,10 +119,6 @@ fun DashboardScreen(
     var safetyMargin by remember { mutableStateOf(if (repo.safetyMargin > 0) repo.safetyMargin.toString() else "") }
 
     var isDark by remember { mutableStateOf(authRepo?.isDarkMode ?: false) }
-    var authTabSelected by remember { mutableStateOf("login") }
-    var loginEmail by remember { mutableStateOf("") }
-    var loginPassword by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
     var boatTypeExpanded by remember { mutableStateOf(false) }
     var showOnboardingDialog by remember { mutableStateOf(false) }
 
@@ -215,203 +190,7 @@ fun DashboardScreen(
         }
 
         // ══════════════════════════════════════════════════
-        // Card 2: Crewspace-Konto
-        // ══════════════════════════════════════════════════
-        SettingsCard {
-            SettingsCardHeader(
-                icon = Icons.Default.Group,
-                title = "Crewspace-Konto",
-            )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text =
-                    "Melde dich an, um Skipper per ID zu finden, private Chats und Gruppen zu erstellen " +
-                        "und Termine gemeinsam zu planen.",
-                fontSize = 13.sp,
-                color = SettingsSubtitle,
-                lineHeight = 18.sp,
-            )
-            Spacer(Modifier.height(14.dp))
-
-            val isLoggedIn = authRepo?.isLoggedIn ?: false
-            if (!isLoggedIn) {
-                // Login / Registrieren Toggle
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(SettingsInputBg)
-                            .padding(4.dp),
-                ) {
-                    val isLogin = authTabSelected == "login"
-                    Box(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isLogin) SettingsPrimaryBlue else Color.Transparent)
-                                .clickable { authTabSelected = "login" },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.Login,
-                                null,
-                                tint = if (isLogin) Color.White else SettingsSubtitle,
-                                modifier = Modifier.size(17.dp),
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                "Login",
-                                color = if (isLogin) Color.White else SettingsSubtitle,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                            )
-                        }
-                    }
-                    Box(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (!isLogin) SettingsPrimaryBlue else Color.Transparent)
-                                .clickable { authTabSelected = "register" },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.PersonAdd,
-                                null,
-                                tint = if (!isLogin) Color.White else SettingsSubtitle,
-                                modifier = Modifier.size(17.dp),
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                "Registrieren",
-                                color = if (!isLogin) Color.White else SettingsSubtitle,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                // Input: Email
-                SettingsInputField(
-                    value = loginEmail,
-                    onValueChange = { loginEmail = it },
-                    placeholder = "E-Mail",
-                    leadingIcon = Icons.Default.Email,
-                    keyboardType = KeyboardType.Email,
-                )
-
-                Spacer(Modifier.height(10.dp))
-
-                // Input: Passwort
-                SettingsInputField(
-                    value = loginPassword,
-                    onValueChange = { loginPassword = it },
-                    placeholder = "Passwort",
-                    leadingIcon = Icons.Default.Lock,
-                    keyboardType = KeyboardType.Password,
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                null,
-                                tint = SettingsSubtitle,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    },
-                )
-
-                Spacer(Modifier.height(14.dp))
-
-                // Submit Button
-                Button(
-                    onClick = onNavigateToLogin,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = SettingsPrimaryBlue,
-                            contentColor = Color.White,
-                        ),
-                ) {
-                    Text(
-                        if (authTabSelected == "login") "Einloggen" else "Konto erstellen",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                    )
-                }
-            } else {
-                // Logged in View
-                val skipperId = authRepo?.skipperId ?: ""
-                val userName = authRepo?.userName ?: "Skipper"
-                val clipboardManager = LocalClipboardManager.current
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(SettingsBadgeBg),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Default.AccountCircle, null, tint = SettingsPrimaryBlue, modifier = Modifier.size(32.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(userName, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = Color(0xFF0F172A))
-                        Text(authRepo?.userEmail ?: "", fontSize = 12.sp, color = SettingsSubtitle)
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(SettingsBadgeBg)
-                            .border(1.dp, SettingsPrimaryBlue.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
-                            .clickable {
-                                clipboardManager.setText(AnnotatedString(skipperId))
-                                Toast.makeText(context, "Skipper-ID kopiert!", Toast.LENGTH_SHORT).show()
-                            }
-                            .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("SKIPPER-ID", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SettingsSubtitle)
-                        Text(skipperId, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = SettingsPrimaryBlue)
-                    }
-                    Icon(Icons.Outlined.ContentCopy, null, tint = SettingsPrimaryBlue, modifier = Modifier.size(18.dp))
-                }
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = onLogout,
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFEE2E2), contentColor = Color(0xFFDC2626)),
-                ) {
-                    Icon(Icons.AutoMirrored.Outlined.Logout, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Abmelden", fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-
-        // ══════════════════════════════════════════════════
-        // Card 3: Bootsprofil
+        // Card 2: Bootsprofil
         // ══════════════════════════════════════════════════
         SettingsCard {
             SettingsCardHeader(
@@ -479,15 +258,6 @@ fun DashboardScreen(
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
-
-            // Phone Icon Subtitle
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Smartphone, null, tint = SettingsSubtitle, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Auf diesem Gerät gespeichert", fontSize = 13.sp, color = SettingsSubtitle)
-            }
-
             Spacer(Modifier.height(12.dp))
 
             // Rufzeichen Field
@@ -547,7 +317,7 @@ fun DashboardScreen(
         }
 
         // ══════════════════════════════════════════════════
-        // Card 4: Darstellung (Dark / White Mode Slider)
+        // Card 3: Darstellung (Dark / White Mode Slider)
         // ══════════════════════════════════════════════════
         SettingsCard {
             SettingsCardHeader(
@@ -644,7 +414,7 @@ fun DashboardScreen(
         }
 
         // ══════════════════════════════════════════════════
-        // Card 5: Einführung
+        // Card 4: Einführung
         // ══════════════════════════════════════════════════
         SettingsCard {
             SettingsCardHeader(
@@ -686,7 +456,7 @@ fun DashboardScreen(
         }
 
         // ══════════════════════════════════════════════════
-        // Card 6: Datenquellen (Android Native Data Sources)
+        // Card 5: Datenquellen (Android Native Data Sources)
         // ══════════════════════════════════════════════════
         SettingsCard {
             SettingsCardHeader(
@@ -706,16 +476,10 @@ fun DashboardScreen(
                 title = "Open-Meteo & DWD",
                 subtitle = "Wetter-Prognosen, Wind und Böen",
             )
-            Spacer(Modifier.height(8.dp))
-            DataSourceRow(
-                icon = Icons.Default.Lock,
-                title = "Firebase Auth",
-                subtitle = "Sicherer Crewspace-Zugang mit eindeutiger Skipper-ID",
-            )
         }
 
         // ══════════════════════════════════════════════════
-        // Card 7: Copyright & Disclaimer
+        // Card 6: Copyright & Disclaimer
         // ══════════════════════════════════════════════════
         SettingsCard {
             Text(

@@ -53,13 +53,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.example.trnberechnung.mapplanning.HarbourCatalog
 import com.example.trnberechnung.mapplanning.HarbourId
 import com.example.trnberechnung.mapplanning.RoutePlanningViewModel
 import com.example.trnberechnung.mapplanning.RouteStatus
 import com.example.trnberechnung.model.BoatProfileRepository
 import com.example.trnberechnung.model.LogbookEntry
 import com.example.trnberechnung.nauti.NautiAction
+import com.example.trnberechnung.nauti.NautiStationMatcher
 import com.example.trnberechnung.navigation.ActiveVoyageManager
 import com.example.trnberechnung.navigation.FusedLocationProvider
 import com.example.trnberechnung.navigation.LocationAccess
@@ -99,6 +99,11 @@ fun MapTabScreen(
     var showPlanner by remember { mutableStateOf(false) }
     var showRestrictedConfirmation by remember { mutableStateOf(false) }
     var permissionStartPending by remember { mutableStateOf(false) }
+    // Set when the restricted-route dialog was triggered by a Nauti chat instruction rather than by
+    // the skipper tapping start, so the dialog can say where the suggestion came from.
+    var restrictedFromNauti by remember { mutableStateOf(false) }
+    val nautiVoyageLauncher =
+        remember(planningViewModel) { NautiVoyageLauncher(planningViewModel) }
 
     DisposableEffect(nautiViewModel) {
         nautiViewModel.showCompact()
@@ -233,6 +238,30 @@ fun MapTabScreen(
                     }
                 }
                 NautiAction.StartNavigation -> currentNavigationStarter(Unit)
+                is NautiAction.StartVoyage -> {
+                    // Plan first, then let the deterministic route status decide. The skipper has
+                    // already confirmed the action in the chat bubble; these are the remaining gates.
+                    val preflight = nautiVoyageLauncher.planAndPreflight(action)
+                    // Always reveal what was actually computed, whatever the outcome.
+                    showPlanner = true
+                    when (preflight.outcome) {
+                        VoyagePreflight.READY -> {
+                            // Reuses the existing permission -> startVoyage -> foreground service
+                            // chain; no second start implementation.
+                            permissionStartPending = true
+                        }
+                        VoyagePreflight.RESTRICTED -> {
+                            restrictedFromNauti = true
+                            showRestrictedConfirmation = true
+                        }
+                        else ->
+                            Toast.makeText(
+                                context,
+                                preflight.message ?: "Die Fahrt konnte nicht gestartet werden.",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                    }
+                }
                 NautiAction.ShowPassageWindow -> {
                     if (currentRouteState.hasCompleteRouteInput) {
                         planningViewModel.refreshPassageWindow()
@@ -369,17 +398,26 @@ fun MapTabScreen(
 
     if (showRestrictedConfirmation) {
         AlertDialog(
-            onDismissRequest = { showRestrictedConfirmation = false },
+            onDismissRequest = {
+                showRestrictedConfirmation = false
+                restrictedFromNauti = false
+            },
             title = { Text("Route mit Einschränkungen") },
             text = {
                 Text(
-                    "Die Route ist nur mit Einschränkungen befahrbar. Prüfe Wetter, Tide, WuK und amtliche Meldungen vor dem Start.",
+                    if (restrictedFromNauti) {
+                        "Nauti hat diesen Törn vorbereitet, er ist aber nur mit Einschränkungen " +
+                            "befahrbar. Prüfe Wetter, Tide, WuK und amtliche Meldungen vor dem Start."
+                    } else {
+                        "Die Route ist nur mit Einschränkungen befahrbar. Prüfe Wetter, Tide, WuK und amtliche Meldungen vor dem Start."
+                    },
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showRestrictedConfirmation = false
+                        restrictedFromNauti = false
                         startNavigationAfterValidation()
                     },
                 ) {
@@ -387,7 +425,12 @@ fun MapTabScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showRestrictedConfirmation = false }) {
+                TextButton(
+                    onClick = {
+                        showRestrictedConfirmation = false
+                        restrictedFromNauti = false
+                    },
+                ) {
                     Text("Abbrechen")
                 }
             },
@@ -475,19 +518,7 @@ private fun selectNautiStation(
     stations: List<com.example.trnberechnung.model.TideStationData>,
     tideViewModel: TideViewModel,
 ) {
-    val harbourId = HarbourId.fromRawValue(rawHarbourId)
-    val harbour = harbourId?.let(HarbourCatalog::get)
-    val station =
-        if (harbour == null) {
-            stations.firstOrNull()
-        } else {
-            stations.minByOrNull {
-                val latitudeDelta = it.latitude - harbour.coordinate.latitude
-                val longitudeDelta = it.longitude - harbour.coordinate.longitude
-                latitudeDelta * latitudeDelta + longitudeDelta * longitudeDelta
-            }
-        }
-    station?.let(tideViewModel::selectStation)
+    NautiStationMatcher.nearestStation(rawHarbourId, stations)?.let(tideViewModel::selectStation)
 }
 
 private fun durationLabel(minutes: Long): String {

@@ -115,8 +115,6 @@ private val CrewspaceUnreadBadge = Color(0xFFEF4444)
 @Composable
 fun CrewspaceScreen(
     viewModel: CrewspaceViewModel,
-    authRepo: AuthRepository? = null,
-    onNavigateToLogin: () -> Unit = {},
     topOverlayClearance: Dp = 0.dp,
     bottomOverlayClearance: Dp = 0.dp
 ) {
@@ -449,55 +447,7 @@ private fun CrewspaceSearchBar(
 private fun ChatsTabContent(
     uiState: CrewspaceUiState,
     viewModel: CrewspaceViewModel,
-    authRepo: AuthRepository? = null,
-    onNavigateToLogin: () -> Unit = {}
 ) {
-    val isLoggedIn = authRepo?.isLoggedIn ?: true // Fallback true, falls authRepo null ist
-
-    if (!isLoggedIn) {
-        // ── Gast-Modus UI ──
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(32.dp)
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.Chat,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = CrewspaceTextSecondary.copy(alpha = 0.5f)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "Du bist im Gastmodus",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = CrewspaceTextPrimary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Melde dich an, um mit anderen Skippern in Kontakt zu treten und Crews zu planen.",
-                    fontSize = 15.sp,
-                    color = CrewspaceTextSecondary,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = onNavigateToLogin,
-                    colors = ButtonDefaults.buttonColors(containerColor = CrewspacePrimary),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(48.dp).fillMaxWidth()
-                ) {
-                    Text("Jetzt Anmelden", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-        return
-    }
-
     if (uiState.chatThreads.isEmpty()) {
         // ── Empty State: "Dein Crewspace ist bereit" ──
         Box(

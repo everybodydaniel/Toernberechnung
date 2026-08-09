@@ -16,8 +16,6 @@ import com.example.trnberechnung.dto.WeatherDto
 import kotlinx.coroutines.flow.Flow
 import com.example.trnberechnung.database.PlannerEventDao
 import com.example.trnberechnung.database.PlannerEventEntity
-import com.example.trnberechnung.database.SeafarerMessageDao
-import com.example.trnberechnung.database.SeafarerMessageEntity
 
 class TideRepository(
     private val tideDao: TideDao,
@@ -25,13 +23,7 @@ class TideRepository(
     private val crewMemberDao: CrewMemberDao,
     private val checklistDao: ChecklistDao,
     private val plannerEventDao: PlannerEventDao,
-    private val seafarerMessageDao: SeafarerMessageDao? = null,
-    private val maritimeNoticeRepository: MaritimeNoticeRepository? = null,
 ) {
-    private val noticeRepository: MaritimeNoticeRepository? by lazy {
-        maritimeNoticeRepository
-    }
-
     suspend fun getDataFromApi(): List<TideStationData> {
         return try {
             android.util.Log.d("BSH_API", "Calling BSH API...")
@@ -186,46 +178,4 @@ class TideRepository(
         }
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // SEAFARER MESSAGES (BfS-Nachrichten)
-    // ══════════════════════════════════════════════════════════════
-
-    val allActiveMessages: Flow<List<SeafarerMessageEntity>>
-        get() = seafarerMessageDao?.getAllActive() ?: kotlinx.coroutines.flow.flowOf(emptyList())
-
-    val unreadMessages: Flow<List<SeafarerMessageEntity>>
-        get() = seafarerMessageDao?.getUnread() ?: kotlinx.coroutines.flow.flowOf(emptyList())
-
-    val readMessages: Flow<List<SeafarerMessageEntity>>
-        get() = seafarerMessageDao?.getRead() ?: kotlinx.coroutines.flow.flowOf(emptyList())
-
-    val archivedMessages: Flow<List<SeafarerMessageEntity>>
-        get() = seafarerMessageDao?.getArchived() ?: kotlinx.coroutines.flow.flowOf(emptyList())
-
-    val unreadMessageCount: Flow<Int>
-        get() = seafarerMessageDao?.getUnreadCount() ?: kotlinx.coroutines.flow.flowOf(0)
-
-    fun searchMessages(query: String): Flow<List<SeafarerMessageEntity>> =
-        seafarerMessageDao?.search(query) ?: kotlinx.coroutines.flow.flowOf(emptyList())
-
-    suspend fun markMessageAsRead(messageId: String) {
-        noticeRepository?.markRead(messageId) ?: seafarerMessageDao?.markAsRead(messageId)
-    }
-
-    suspend fun markAllMessagesAsRead() {
-        noticeRepository?.markAllRead() ?: seafarerMessageDao?.markAllAsRead()
-    }
-
-    suspend fun archiveMessage(messageId: String) {
-        noticeRepository?.archiveLocally(messageId) ?: seafarerMessageDao?.archive(messageId)
-    }
-
-    suspend fun syncSeafarerMessages(force: Boolean = false) {
-        val repository = noticeRepository ?: return
-        runCatching { repository.refresh(force) }
-            .onFailure { error ->
-                if (error is kotlinx.coroutines.CancellationException) throw error
-                android.util.Log.e("ELWIS", "Sync error: ${error.message}", error)
-            }
-    }
 }

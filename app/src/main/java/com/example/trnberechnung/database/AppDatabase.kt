@@ -23,14 +23,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ChatThreadEntity::class,
         ChatMessageEntity::class,
         PlannerEventEntity::class,
-        SeafarerMessageEntity::class,
-        MaritimeNoticeSyncEntity::class,
         NautiConversationEntity::class,
         NautiMessageEntity::class,
         ActiveVoyageEntity::class,
         VoyageBreadcrumbEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,12 +38,18 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun checklistDao(): ChecklistDao
     abstract fun chatDao(): ChatDao
     abstract fun plannerEventDao(): PlannerEventDao
-    abstract fun seafarerMessageDao(): SeafarerMessageDao
-    abstract fun maritimeNoticeSyncDao(): MaritimeNoticeSyncDao
     abstract fun nautiDao(): NautiDao
     abstract fun activeVoyageDao(): ActiveVoyageDao
 
     companion object {
+        val MIGRATION_13_14 =
+            object : Migration(13, 14) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("DROP TABLE IF EXISTS `maritime_notice_sync`")
+                    db.execSQL("DROP TABLE IF EXISTS `seafarer_messages`")
+                }
+            }
+
         val MIGRATION_12_13 =
             object : Migration(12, 13) {
                 override fun migrate(db: SupportSQLiteDatabase) {

@@ -66,7 +66,7 @@ class FullAppUiTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun fullMapShellPlannerNautiNoticesSettingsAndTabs() {
+    fun fullMapShellPlannerNautiSettingsAndTabs() {
         completeOnboarding()
 
         composeTestRule.onNodeWithTag("nav_map_route").assertIsSelected()
@@ -100,15 +100,6 @@ class FullAppUiTest {
         composeTestRule.onNodeWithContentDescription("Zurück zum Chat").performClick()
         composeTestRule.onNodeWithContentDescription("Chat einklappen").performClick()
 
-        // The bell opens the anchored preview and the full notice modal even
-        // when the offline cache is empty.
-        composeTestRule.onNodeWithTag("app_header_notifications").performClick()
-        composeTestRule.onNodeWithTag("maritime_notice_quicklook").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Mehr anzeigen").performClick()
-        composeTestRule.onNodeWithTag("maritime_notice_sheet").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Fertig").performClick()
-        composeTestRule.waitForIdle()
-
         composeTestRule.onNodeWithTag("nav_revier").performClick()
         composeTestRule.onNodeWithTag("nav_revier").assertIsSelected()
         composeTestRule.onNodeWithTag("screen_weather").assertIsDisplayed()
@@ -129,6 +120,9 @@ class FullAppUiTest {
         // Settings opens directly; there is no intermediate menu.
         composeTestRule.onNodeWithTag("app_header_settings").performClick()
         composeTestRule.onNodeWithTag("boat_name_input").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Crewspace-Konto").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Auf diesem Gerät gespeichert").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Firebase Auth").assertDoesNotExist()
         val newBoatName = "Flying Dutchman"
         composeTestRule.onNodeWithTag("boat_name_input").performTextReplacement(newBoatName)
         composeTestRule.onNodeWithTag("boat_name_headline").assertTextEquals(newBoatName)
@@ -144,6 +138,12 @@ class FullAppUiTest {
                 .performClick()
             composeTestRule.waitForIdle()
         }
+        composeTestRule.onNodeWithText("FULL RELEASE").assertIsDisplayed()
+        composeTestRule
+            .onNodeWithText(
+                "Organisiere Rollen und teile Termine mit deiner Crew. " +
+                    "Die Chat-Funktion folgt mit dem Full Release.",
+            ).assertIsDisplayed()
         composeTestRule.onNodeWithTag("onboarding_continue").assertIsNotEnabled()
         composeTestRule.onNodeWithTag("onboarding_disclaimer_checkbox")
             .performScrollTo()

@@ -9,27 +9,20 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import com.example.trnberechnung.model.OnboardingPreferences
 import com.example.trnberechnung.messaging.ChatNavigationState
 import com.example.trnberechnung.messaging.CrewspaceMessagingService
 import com.example.trnberechnung.repository.TideRepository
 import com.example.trnberechnung.routing.v2.SeaMask
-import com.example.trnberechnung.ui.LoginScreen
 import com.example.trnberechnung.ui.MainAppScreen
 import com.example.trnberechnung.ui.OnboardingScreen
 import com.example.trnberechnung.ui.theme.TörnberechnungTheme
@@ -86,8 +79,6 @@ class MainActivity : ComponentActivity() {
                 db.crewMemberDao(),
                 db.checklistDao(),
                 db.plannerEventDao(),
-                db.seafarerMessageDao(),
-                tideNodeApplication.maritimeNoticeRepository,
             )
         val factory = TideViewModelFactory(repository)
 
@@ -120,7 +111,6 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 } else {
-                    val rootNavController = rememberNavController()
                     val viewModel: TideViewModel = viewModel(factory = factory)
                     val crewspaceFactory =
                         CrewspaceViewModelFactory(repository, chatRepository, authRepo)
@@ -129,38 +119,18 @@ class MainActivity : ComponentActivity() {
                         viewModel.loadData()
                     }
 
-                    val startDestination = "main"
-
-                    NavHost(navController = rootNavController, startDestination = startDestination) {
-                        composable("main") {
-                            MainAppScreen(
-                                viewModel = viewModel,
-                                crewspaceViewModelFactory = crewspaceFactory,
-                                authRepo = authRepo,
-                                onNavigateToLogin = {
-                                    chatRepository.deactivate()
-                                    rootNavController.navigate("login") {
-                                        popUpTo("main") { inclusive = true }
-                                    }
-                                },
-                                onLogout = {
-                                    lifecycleScope.launch {
-                                        chatRepository.logout()
-                                        rootNavController.navigate("login") {
-                                            popUpTo("main") { inclusive = true }
-                                        }
-                                    }
-                                },
-                                onToggleDarkMode = { mode ->
-                                    isDarkMode = mode
-                                    authRepo.isDarkMode = mode
-                                },
-                                onReplayOnboarding = {
-                                    onboardingCompleted = false
-                                }
-                            )
-                        }
-                    }
+                    MainAppScreen(
+                        viewModel = viewModel,
+                        crewspaceViewModelFactory = crewspaceFactory,
+                        authRepo = authRepo,
+                        onToggleDarkMode = { mode ->
+                            isDarkMode = mode
+                            authRepo.isDarkMode = mode
+                        },
+                        onReplayOnboarding = {
+                            onboardingCompleted = false
+                        },
+                    )
                 }
             }
         }

@@ -48,10 +48,6 @@ class TideViewModelTest {
     private fun setupViewModel() {
         every { repository.allLogs } returns flowOf(emptyList())
         every { repository.allCrew } returns flowOf(emptyList())
-        every { repository.unreadMessages } returns flowOf(emptyList())
-        every { repository.allActiveMessages } returns flowOf(emptyList())
-        every { repository.archivedMessages } returns flowOf(emptyList())
-        every { repository.unreadMessageCount } returns flowOf(0)
         viewModel = TideViewModel(repository)
     }
 

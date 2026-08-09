@@ -5,7 +5,6 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
-import retrofit2.http.Headers
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -109,22 +108,4 @@ interface SocialFeedApiService {
         @Header("Authorization") authHeader: String,
         @Body request: ApiPresignUploadRequest
     ): Response<ApiPresignUploadResponse>
-
-    // ══════════════════════════════════════════════════════════
-    // Maritime Notices
-    // ══════════════════════════════════════════════════════════
-
-    @Headers("Accept: application/json")
-    @GET("maritime-notices")
-    suspend fun listMaritimeNotices(
-        @Query("status") status: String = "all",
-        @Query("limit") limit: Int = 100,
-        @Header("If-None-Match") ifNoneMatch: String? = null,
-    ): Response<MaritimeNoticeListResponseDto>
-
-    @Headers("Accept: application/json")
-    @GET("maritime-notices/{id}")
-    suspend fun getMaritimeNotice(
-        @Path("id") noticeId: String,
-    ): Response<MaritimeNoticeDetailDto>
 }

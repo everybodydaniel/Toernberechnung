@@ -133,19 +133,4 @@ class ChatMigration9To10Test {
             assertEquals(2, cursor.getInt(0))
         }
     }
-
-    @Test
-    fun directMigrationFromVersion8AlsoCreatesSeafarerTable() {
-        val db = helper.writableDatabase
-
-        AppDatabase.MIGRATION_8_10.migrate(db)
-
-        db.query(
-            "SELECT COUNT(*) FROM sqlite_master " +
-                "WHERE type = 'table' AND name = 'seafarer_messages'",
-        ).use { cursor ->
-            assertTrue(cursor.moveToFirst())
-            assertEquals(1, cursor.getInt(0))
-        }
-    }
 }

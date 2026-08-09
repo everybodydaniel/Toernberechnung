@@ -14,8 +14,6 @@ import com.example.trnberechnung.navigation.VoyageServiceDependencies
 import com.example.trnberechnung.navigation.VoyageServiceHost
 import com.example.trnberechnung.repository.ActiveVoyageRepository
 import com.example.trnberechnung.repository.ChatRepository
-import com.example.trnberechnung.repository.MaritimeNoticeForegroundPoller
-import com.example.trnberechnung.repository.MaritimeNoticeRepository
 import com.example.trnberechnung.repository.NautiConversationRepository
 import com.example.trnberechnung.repository.RoomActiveVoyagePersistence
 import kotlinx.coroutines.CoroutineScope
@@ -41,6 +39,7 @@ class TideNodeApplication :
                 AppDatabase.MIGRATION_10_11,
                 AppDatabase.MIGRATION_11_12,
                 AppDatabase.MIGRATION_12_13,
+                AppDatabase.MIGRATION_13_14,
             )
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
@@ -53,21 +52,6 @@ class TideNodeApplication :
             context = this,
             chatDao = database.chatDao(),
             authRepository = authRepository,
-        )
-    }
-
-    val maritimeNoticeRepository: MaritimeNoticeRepository by lazy {
-        MaritimeNoticeRepository(
-            noticeDao = database.seafarerMessageDao(),
-            syncDao = database.maritimeNoticeSyncDao(),
-        )
-    }
-
-    private val maritimeNoticeForegroundPoller: MaritimeNoticeForegroundPoller by lazy {
-        MaritimeNoticeForegroundPoller(
-            application = this,
-            repository = maritimeNoticeRepository,
-            scope = applicationScope,
         )
     }
 
@@ -104,7 +88,6 @@ class TideNodeApplication :
     override fun onCreate() {
         super.onCreate()
         createChatNotificationChannel()
-        maritimeNoticeForegroundPoller.start()
         if (authRepository.isLoggedIn) {
             applicationScope.launch { runCatching { chatRepository.activate() } }
         }

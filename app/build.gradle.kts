@@ -44,6 +44,16 @@ android {
                 .replace("\\", "\\\\")
                 .replace("\"", "\\\"")
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+
+        // Configurable because Google retires Gemini models faster than app releases ship: the
+        // previously hardcoded "gemini-2.5-flash" now answers HTTP 404 "no longer available to new
+        // users". Override with -PGEMINI_MODEL=... without touching Kotlin.
+        val geminiModel =
+            providers
+                .gradleProperty("GEMINI_MODEL")
+                .orElse("gemini-3.6-flash")
+                .get()
+        buildConfigField("String", "GEMINI_MODEL", "\"$geminiModel\"")
     }
 
     buildTypes {
@@ -96,7 +106,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
-    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    // Gemini is called over Retrofit (see network/GeminiApiService.kt) rather than through the
+    // archived com.google.ai.client.generativeai SDK, which could not express thinkingLevel or a
+    // request timeout and pinned older ktor/coroutines versions than this app forces.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     implementation(platform(libs.androidx.compose.bom))
@@ -139,6 +151,11 @@ dependencies {
     testImplementation(libs.junit.jupiter.params)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
+
+    // `useJUnitPlatform()` below only discovers tests through a registered engine. Without the
+    // vintage engine every JUnit 4 test (the vast majority of this suite) is silently skipped
+    // while the build still reports SUCCESS. Do not remove.
+    testRuntimeOnly(libs.junit.vintage.engine)
 
     // MockK, Kotest, Coroutines, Turbine
     testImplementation(libs.mockk)

@@ -16,11 +16,12 @@
     <string name="onboarding_weather_high_low">H: 23°  T: 17°</string>
     <string name="onboarding_weather_wind">Wind 11 kn     •     Böen 15 kn</string>
     <string name="onboarding_crew_eyebrow">GEMEINSAM AN BORD</string>
-    <string name="onboarding_crew_title">Crew, Chats und\nTermine verbinden.</string>
-    <string name="onboarding_crew_body">Organisiere Rollen, tausche Nachrichten aus und teile Termine mit deiner Crewspace-Gruppe.</string>
+    <string name="onboarding_crew_title">Crew und Termine\nverbinden.</string>
+    <string name="onboarding_crew_body">Organisiere Rollen und teile Termine mit deiner Crew. Die Chat-Funktion folgt mit dem Full Release.</string>
     <string name="onboarding_crew_question">Törn um 14 Uhr?</string>
     <string name="onboarding_crew_reply">Bin dabei.</string>
     <string name="onboarding_crew_chat">Chat</string>
+    <string name="onboarding_crew_chat_release">FULL RELEASE</string>
     <string name="onboarding_crew_dates">Termine</string>
     <string name="onboarding_crew_roles">Rollen</string>
     <string name="onboarding_disclaimer">Ich habe verstanden, dass TideNode nur eine Planungshilfe ist und keine amtlichen nautischen Veröffentlichungen, aktuellen Bekanntmachungen, Revierinformationen, Wetterbeurteilung oder die Verantwortung der Schiffsführung ersetzt.</string>

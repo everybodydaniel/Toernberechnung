@@ -766,23 +766,6 @@
           }
           return { ok: false, details: `Errechnet: ${minDepth}` };
         }
-      },
-      {
-        id: "TC12",
-        category: "logbook",
-        name: "Seefahrer-Nachrichten Ungelesen-Zähler Filter Test",
-        run: () => {
-          const messages = [
-            { id: "1", read: false },
-            { id: "2", read: true },
-            { id: "3", read: false }
-          ];
-          const unreadCount = messages.filter(m => !m.read).length;
-          if (unreadCount === 2) {
-            return { ok: true, details: `Zahl ungelesener Meldungen korrekt: 2 von 3` };
-          }
-          return { ok: false, details: `Gezählt: ${unreadCount}` };
-        }
       }
     ];
 

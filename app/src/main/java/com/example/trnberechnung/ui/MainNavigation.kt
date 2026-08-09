@@ -37,9 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -74,12 +72,9 @@ import com.example.trnberechnung.ui.components.TideNodeInk
 import com.example.trnberechnung.ui.components.tideNodeGlass
 import com.example.trnberechnung.ui.map.MapTabScreen
 import com.example.trnberechnung.ui.navigation.FullScreenNavigationScreen
-import com.example.trnberechnung.ui.notices.MaritimeNoticeQuickLook
-import com.example.trnberechnung.ui.notices.MaritimeNoticesSheet
 import com.example.trnberechnung.ui.theme.NauticalBackground
 import com.example.trnberechnung.viewmodel.CrewspaceViewModel
 import com.example.trnberechnung.viewmodel.CrewspaceViewModelFactory
-import com.example.trnberechnung.viewmodel.MaritimeNoticeViewModel
 import com.example.trnberechnung.viewmodel.NautiViewModel
 import com.example.trnberechnung.viewmodel.TideViewModel
 
@@ -108,8 +103,6 @@ fun MainAppScreen(
     viewModel: TideViewModel,
     crewspaceViewModelFactory: CrewspaceViewModelFactory? = null,
     authRepo: AuthRepository? = null,
-    onNavigateToLogin: () -> Unit = {},
-    onLogout: () -> Unit = {},
     onToggleDarkMode: (Boolean) -> Unit = {},
     onReplayOnboarding: () -> Unit = {},
 ) {
@@ -124,13 +117,6 @@ fun MainAppScreen(
         crewspaceViewModelFactory?.let {
             viewModel<CrewspaceViewModel>(factory = it)
         }
-    val noticeViewModel: MaritimeNoticeViewModel =
-        viewModel(
-            factory =
-                remember(application) {
-                    MaritimeNoticeViewModel.Factory(application.maritimeNoticeRepository)
-                },
-        )
     val nautiViewModel: NautiViewModel =
         viewModel(
             factory =
@@ -164,10 +150,7 @@ fun MainAppScreen(
             )
         }
 
-    val unreadCount by noticeViewModel.unreadCount.collectAsState()
     val activeVoyageState by application.activeVoyageManager.state.collectAsState()
-    var showNoticeQuickLook by remember { mutableStateOf(false) }
-    var showNoticeSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         application.activeVoyageManager.restoreActiveVoyage()
@@ -239,8 +222,6 @@ fun MainAppScreen(
                     if (crewspaceViewModel != null) {
                         CrewspaceScreen(
                             viewModel = crewspaceViewModel,
-                            authRepo = authRepo,
-                            onNavigateToLogin = onNavigateToLogin,
                             topOverlayClearance = topClearance,
                             bottomOverlayClearance = bottomOverlayClearance,
                         )
@@ -267,11 +248,6 @@ fun MainAppScreen(
                 ) {
                     DashboardScreen(
                         authRepo = authRepo,
-                        onNavigateToLogin = onNavigateToLogin,
-                        onLogout = onLogout,
-                        onStartNavigation = {
-                            navController.navigateMainTab(Screen.MapRoute.route)
-                        },
                         onToggleDarkMode = onToggleDarkMode,
                         onReplayOnboarding = onReplayOnboarding,
                     )
@@ -302,14 +278,11 @@ fun MainAppScreen(
 
         if (isMainTab) {
             TideNodeAppHeader(
-                unreadCount = unreadCount,
-                onNotifications = { showNoticeQuickLook = !showNoticeQuickLook },
                 onRefresh = {
                     toggleScreenOrientation(context)
                     refreshCoordinator.refresh(currentRoute)
                 },
                 onSettings = {
-                    showNoticeQuickLook = false
                     navController.navigate(Screen.Settings.route) { launchSingleTop = true }
                 },
                 modifier =
@@ -362,21 +335,6 @@ fun MainAppScreen(
                 )
             }
         }
-
-        if (showNoticeQuickLook && isMainTab) {
-            MaritimeNoticeQuickLook(
-                viewModel = noticeViewModel,
-                onDismiss = { showNoticeQuickLook = false },
-                onShowAll = { showNoticeSheet = true },
-            )
-        }
-    }
-
-    if (showNoticeSheet) {
-        MaritimeNoticesSheet(
-            viewModel = noticeViewModel,
-            onDismiss = { showNoticeSheet = false },
-        )
     }
 }
 

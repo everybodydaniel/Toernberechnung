@@ -9,12 +9,11 @@ import com.example.trnberechnung.nauti.NautiAction
 import com.example.trnberechnung.nauti.NautiActionCodec
 import com.example.trnberechnung.nauti.NautiActionValidator
 import com.example.trnberechnung.nauti.NautiDeterministicIntentRouter
+import com.example.trnberechnung.nauti.NautiErrorMapper
 import com.example.trnberechnung.nauti.NautiInferenceClient
-import com.example.trnberechnung.nauti.NautiPromptMessage
+import com.example.trnberechnung.nauti.NautiPromptBuilder
 import com.example.trnberechnung.nauti.NautiReply
-import com.example.trnberechnung.nauti.NautiRole
 import com.example.trnberechnung.repository.NautiConversationRepository
-import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -193,7 +192,10 @@ class NautiViewModel(
         _uiState.update { it.copy(draft = "", isSending = true, error = null) }
         viewModelScope.launch {
             try {
-                val existingMessages = messages.value
+                // Read straight from Room rather than `messages.value`: that flow is
+                // stateIn(WhileSubscribed), so it is empty whenever the panel is not collecting and
+                // the model would silently lose the conversation context.
+                val existingMessages = repository.messages(conversationId).first()
                 repository.addMessage(
                     conversationId = conversationId,
                     role = NautiConversationRepository.ROLE_USER,
@@ -209,36 +211,16 @@ class NautiViewModel(
                 }
 
                 val deterministic = deterministicRouter.route(text)
-                val reply =
-                    deterministic ?: inferenceClient
-                        .reply(
-                            (existingMessages +
-                                NautiMessageEntity(
-                                    ownerId = "",
-                                    id = UUID.randomUUID().toString(),
-                                    conversationId = conversationId,
-                                    role = NautiConversationRepository.ROLE_USER,
-                                    content = text,
-                                    createdAt = System.currentTimeMillis(),
-                                )).map {
-                                NautiPromptMessage(
-                                    role =
-                                        if (it.role == NautiConversationRepository.ROLE_USER) {
-                                            NautiRole.USER
-                                        } else {
-                                            NautiRole.ASSISTANT
-                                        },
-                                    text = it.content,
-                                )
-                            },
-                        ).getOrElse { error ->
-                            NautiReply(
-                                text =
-                                    error.message
-                                        ?: "Nauti konnte gerade keine freie Antwort erzeugen.",
-                            )
-                        }
-                persistReply(conversationId, reply)
+                if (deterministic != null) {
+                    persistReply(conversationId, deterministic)
+                } else {
+                    inferenceClient
+                        .reply(NautiPromptBuilder.build(existingMessages, text))
+                        .fold(
+                            onSuccess = { reply -> persistReply(conversationId, reply) },
+                            onFailure = { throwable -> persistFailure(conversationId, throwable) },
+                        )
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
@@ -320,9 +302,31 @@ class NautiViewModel(
             requiresConfirmation = action?.let(NautiActionCodec::requiresConfirmation) == true,
             actionState = if (action == null) null else "pending",
         )
-        if (action != null && !NautiActionCodec.requiresConfirmation(action)) {
+        if (action != null && NautiActionCodec.autoDispatches(action)) {
             _actions.emit(action)
         }
+    }
+
+    /**
+     * Records a failed inference as a visible, clearly marked error row.
+     *
+     * Stored with `isError = true` for two reasons: the bubble renders it as a warning rather than as
+     * something Nauti claimed, and [NautiPromptBuilder] keeps it out of later prompts. Before this,
+     * the raw exception text was persisted as an ordinary assistant answer and fed straight back into
+     * the model as conversation context.
+     */
+    private suspend fun persistFailure(
+        conversationId: String,
+        throwable: Throwable,
+    ) {
+        val error = NautiErrorMapper.map(throwable)
+        repository.addMessage(
+            conversationId = conversationId,
+            role = NautiConversationRepository.ROLE_ASSISTANT,
+            content = error.userMessage,
+            isError = true,
+        )
+        _uiState.update { it.copy(error = error.userMessage) }
     }
 
     class Factory(

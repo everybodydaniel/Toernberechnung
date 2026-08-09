@@ -546,7 +546,11 @@ private fun CrewIllustration() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            CrewFeature(Modifier.weight(1f), stringResource(R.string.onboarding_crew_chat)) {
+            CrewFeature(
+                modifier = Modifier.weight(1f),
+                label = stringResource(R.string.onboarding_crew_chat),
+                status = stringResource(R.string.onboarding_crew_chat_release),
+            ) {
                 ChatBubblesIcon()
             }
             CrewFeature(Modifier.weight(1f), stringResource(R.string.onboarding_crew_dates)) {
@@ -633,7 +637,12 @@ private fun ChatBubblesIcon() =
     }
 
 @Composable
-private fun CrewFeature(modifier: Modifier, label: String, iconContent: @Composable () -> Unit) =
+private fun CrewFeature(
+    modifier: Modifier,
+    label: String,
+    status: String? = null,
+    iconContent: @Composable () -> Unit,
+) =
     Column(
         modifier = modifier
             .height(86.dp)
@@ -645,6 +654,20 @@ private fun CrewFeature(modifier: Modifier, label: String, iconContent: @Composa
         iconContent()
         Spacer(Modifier.height(5.dp))
         Text(label, color = OnboardingInk, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+        status?.let {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = it,
+                color = OnboardingBlue,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(OnboardingBlue.copy(alpha = .12f))
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+            )
+        }
     }
 
 @Composable

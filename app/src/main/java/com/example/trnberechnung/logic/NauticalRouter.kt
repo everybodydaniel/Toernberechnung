@@ -15,7 +15,7 @@ object NauticalRouter {
 
     private const val TAG = "NauticalRouter"
 
-    data class WP(val id: String, val lat: Double, val lon: Double, val chartDepth: Double = 5.0)
+    data class WP(val id: String, val lat: Double, val lon: Double, val chartDepth: Double = -1.5)
 
     sealed interface FairwayPathResult {
         data class Success(val waypoints: List<WP>) : FairwayPathResult
@@ -32,7 +32,7 @@ object NauticalRouter {
     // Tiefen aus OpenSeaMap + BSH-Pegeln (Chart Datum LAT).
     // Zusätzliche Fahrwasser können via FairwayLoader aus GeoJSON ergänzt werden.
     // ─────────────────────────────────────────────────────────────────────
-    private val baseWaypoints = listOf(
+    private val baseWaypoints = mutableListOf(
         // === EMS-FAHRWASSER (Süd→Nord) ===
         WP("emden_port",      53.345, 7.200, 7.0),
         WP("emden_outer",     53.330, 7.185, 8.5),
@@ -49,13 +49,13 @@ object NauticalRouter {
         // === MEMMERTBALJE (Borkum-Ost → Memmert ← Juist-Süd) ===
         // Echte Pricken-Kette aus OpenSeaMap (M*-Tonnen); umgeht Memmert-Vogelinsel
         // großflächig im Süden, da Nationalpark-Ruhezone 1.
-        WP("memmert_n1",      53.598, 6.812, 1.8),
-        WP("memmert_n2",      53.612, 6.838, 1.5),
-        WP("memmert_w",       53.620, 6.850, 1.2),
-        WP("memmert_e1",      53.634, 6.892, 0.9),
-        WP("memmert_e2",      53.650, 6.928, 0.7),
-        WP("memmert_e3",      53.660, 6.965, 0.6),
-        WP("memmert_juist_s", 53.665, 6.992, 0.8),
+        WP("memmert_n1",      53.598, 6.812, 0.5),
+        WP("memmert_n2",      53.612, 6.838, 0.2),
+        WP("memmert_w",       53.620, 6.850, -0.2),
+        WP("memmert_e1",      53.634, 6.892, -0.5),
+        WP("memmert_e2",      53.650, 6.928, -0.8),
+        WP("memmert_e3",      53.660, 6.965, -1.1),
+        WP("memmert_juist_s", 53.665, 6.992, -0.4),
 
         // === OSTEREMS (O-Tonnen Nord→Süd) ===
         WP("O1",  53.675, 7.080, 3.5),
@@ -74,20 +74,20 @@ object NauticalRouter {
         WP("osterems",        53.670, 7.100, 4.0),
 
         // === BUSETIEF (Norddeich ↔ Norderney) ===
-        WP("norddeich_off",   53.617, 7.162, 3.0),
-        WP("busetief_s",      53.635, 7.160, 2.5),
-        WP("busetief_mid",    53.652, 7.162, 2.0),
-        WP("busetief_n",      53.670, 7.165, 2.0),
-        WP("norderney_s",     53.683, 7.200, 1.5),
+        WP("norddeich_off",   53.617, 7.162, 1.8),
+        WP("busetief_s",      53.635, 7.160, 1.5),
+        WP("busetief_mid",    53.652, 7.162, 1.2),
+        WP("busetief_n",      53.670, 7.165, 1.2),
+        WP("norderney_s",     53.683, 7.200, 1.0),
 
         // === WATTFAHRWASSER (Innenkanal, Küste Ost) ===
-        WP("watt_norden",     53.660, 7.250, 0.5),
-        WP("watt_nesskana",   53.670, 7.330, 0.2),
-        WP("watt_dornum",     53.680, 7.400, 0.0),
-        WP("watt_bensersiel", 53.700, 7.520, 0.3),
-        WP("watt_neuharling", 53.720, 7.650, 0.5),
-        WP("watt_harlesiel",  53.730, 7.800, 0.8),
-        WP("watt_wangerooge", 53.740, 7.920, 0.5),
+        WP("watt_norden",     53.660, 7.250, -1.4),
+        WP("watt_nesskana",   53.670, 7.330, -1.5),
+        WP("watt_dornum",     53.680, 7.400, -1.6),
+        WP("watt_bensersiel", 53.700, 7.520, -1.3),
+        WP("watt_neuharling", 53.720, 7.650, -1.2),
+        WP("watt_harlesiel",  53.730, 7.800, -0.5),
+        WP("watt_wangerooge", 53.740, 7.920, -1.1),
 
         // === BORKUM-UMFAHRUNG ===
         WP("borkum_south",    53.550, 6.680, 4.0),
@@ -111,30 +111,30 @@ object NauticalRouter {
         WP("seegat_wangerooge", 53.800, 8.020, 4.0),  // Blaue Balje
 
         // === LEYBUCHT (Ems ↔ Norddeich) ===
-        WP("leybucht_w",      53.530, 6.920, 2.0),
-        WP("leybucht_e",      53.560, 7.020, 1.5),
-        WP("leybucht_coast",  53.590, 7.100, 1.0),
-        WP("norddeich_appr",  53.610, 7.140, 2.0),
+        WP("leybucht_w",      53.530, 6.920, -0.3),
+        WP("leybucht_e",      53.560, 7.020, -0.8),
+        WP("leybucht_coast",  53.590, 7.100, -1.2),
+        WP("norddeich_appr",  53.610, 7.140, 0.5),
 
         // === HAFEN-WAYPOINTS — 1:1 mit TideViewModel.LOCAL_HARBOURS ===
         // (keine *_p-Duplikate mehr)
         WP("borkum_hbr",      53.5572, 6.7525, 4.0),
-        WP("juist_hbr",       53.6732, 7.0015, 1.2),
-        WP("norderney_hbr",   53.7012, 7.1585, 3.5),
-        WP("baltrum_hbr",     53.7215, 7.3715, 1.0),
-        WP("langeoog_hbr",    53.7285, 7.5095, 1.5),
-        WP("spiekeroog_hbr",  53.7645, 7.6955, 1.8),
-        WP("wangerooge_hbr",  53.7852, 7.8965, 1.5),
+        WP("juist_hbr",       53.6732, 7.0015, -1.2),
+        WP("norderney_hbr",   53.7012, 7.1585, 1.5),
+        WP("baltrum_hbr",     53.7215, 7.3715, -1.0),
+        WP("langeoog_hbr",    53.7285, 7.5095, -0.5),
+        WP("spiekeroog_hbr",  53.7645, 7.6955, -0.8),
+        WP("wangerooge_hbr",  53.7852, 7.8965, -0.6),
         WP("emden_hbr",       53.3382, 7.1945, 7.0),
-        WP("norddeich_hbr",   53.6265, 7.1615, 2.5),
-        WP("nessmersiel_hbr", 53.6865, 7.3615, 0.5),
-        WP("dornum_hbr",      53.6865, 7.4785, 0.5),
-        WP("bensersiel_hbr",  53.6785, 7.5705, 2.0),
-        WP("neuharling_hbr",  53.7015, 7.7055, 2.0),
-        WP("harlesiel_hbr",   53.7125, 7.8105, 2.0),
-        WP("horumersiel_hbr", 53.6862, 8.0195, 1.0),
-        WP("hooksiel_hbr",    53.6425, 8.0825, 2.0),
-        WP("dangast_hbr",     53.4472, 8.1175, 0.5),
+        WP("norddeich_hbr",   53.6265, 7.1615, 1.5),
+        WP("nessmersiel_hbr", 53.6865, 7.3615, -1.5),
+        WP("dornum_hbr",      53.6865, 7.4785, -1.5),
+        WP("bensersiel_hbr",  53.6785, 7.5705, 1.2),
+        WP("neuharling_hbr",  53.7015, 7.7055, 1.0),
+        WP("harlesiel_hbr",   53.7125, 7.8105, 1.0),
+        WP("horumersiel_hbr", 53.6862, 8.0195, 0.5),
+        WP("hooksiel_hbr",    53.6425, 8.0825, 1.5),
+        WP("dangast_hbr",     53.4472, 8.1175, -0.5),
         WP("whv_hbr",         53.5142, 8.1465, 5.0),
 
         // === JADE-FAHRWASSER ===
@@ -342,6 +342,19 @@ object NauticalRouter {
     val waypointMap: Map<String, WP>
         get() = waypoints.associateBy { it.id }
 
+    /**
+     * Updates the depth of a specific waypoint. Used by live services.
+     */
+    fun updateWaypointDepth(id: String, newDepth: Double) {
+        val index = baseWaypoints.indexOfFirst { it.id == id }
+        if (index != -1) {
+            // Re-creating the base list with updated depth
+            val oldWp = baseWaypoints[index]
+            (baseWaypoints as MutableList)[index] = oldWp.copy(chartDepth = newDepth)
+            Log.d(TAG, "Updated waypoint $id depth to $newDepth")
+        }
+    }
+
     // ── Public API ─────────────────────────────────────────────────
 
     fun calculateRoute(start: LatLng, end: LatLng): List<LatLng> {
@@ -454,13 +467,34 @@ object NauticalRouter {
             val wp1 = wpMap[pathIds[i]]!!
             val wp2 = wpMap[pathIds[i+1]]!!
 
-            // For a segment between two points, we take the minimum depth of both
-            val minDepth = kotlin.math.min(wp1.chartDepth, wp2.chartDepth) + tideOffset
+            // Konservative Tiefenprüfung: Wir nutzen die SeaMask-Tiefen zwischen den Punkten
+            // um sicherzustellen, dass keine Watt-Hochs übersehen werden.
+            val p1 = LatLng(wp1.lat, wp1.lon)
+            val p2 = LatLng(wp2.lat, wp2.lon)
+
+            val dist = haversineNm(p1.latitude, p1.longitude, p2.latitude, p2.longitude)
+            val steps = (dist * 1852.0 / 100.0).toInt().coerceAtLeast(1)
+
+            var minSegmentDepth = min(wp1.chartDepth, wp2.chartDepth)
+
+            for (step in 0..steps) {
+                val f = step.toDouble() / steps
+                val lat = p1.latitude + (p2.latitude - p1.latitude) * f
+                val lon = p1.longitude + (p2.longitude - p1.longitude) * f
+
+                // Falls SeaMask bereit ist, nehmen wir den realen Bodenwert
+                if (com.example.trnberechnung.routing.v2.SeaMask.ready) {
+                    val realDepth = com.example.trnberechnung.routing.v2.SeaMask.depthAtLatLng(lat, lon)
+                    if (realDepth < minSegmentDepth) minSegmentDepth = realDepth
+                }
+            }
+
+            val effectiveMinDepth = minSegmentDepth + tideOffset
 
             segments.add(RouteSegment(
-                points = listOf(LatLng(wp1.lat, wp1.lon), LatLng(wp2.lat, wp2.lon)),
-                type = classifyDepth(minDepth, draft, margin),
-                minDepth = minDepth
+                points = listOf(p1, p2),
+                type = classifyDepth(effectiveMinDepth, draft, margin),
+                minDepth = effectiveMinDepth
             ))
         }
 
@@ -491,7 +525,7 @@ object NauticalRouter {
                     .replace(Regex("\\+\\d{2}:\\d{2}$"), "") // Handle +HH:mm
                     .replace(Regex("\\+\\d{2}$"), "") // Handle +HH
                     .trim()
-                
+
                 // Try multiple patterns
                 val dt = try {
                     java.time.LocalDateTime.parse(cleanTs, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
@@ -529,7 +563,7 @@ object NauticalRouter {
 
     private fun mergeAdjacentSegments(segments: List<RouteSegment>): List<RouteSegment> {
         if (segments.isEmpty()) return emptyList()
-        
+
         val merged = mutableListOf<RouteSegment>()
         var currentPoints = segments[0].points.toMutableList()
         var currentType = segments[0].type

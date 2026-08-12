@@ -47,11 +47,13 @@ data class BoatSettings(
     val draftMeters: Double = 1.1,
     val safetyMarginMeters: Double = 0.0,
     val speedKnots: Double = 6.0,
+    val dieselLitersPerNm: Double = 0.35,
 ) {
     init {
         require(draftMeters > 0) { "Der Tiefgang muss größer als 0 sein." }
         require(safetyMarginMeters >= 0) { "Der Sicherheitsabstand darf nicht negativ sein." }
         require(speedKnots > 0) { "Die Fahrtgeschwindigkeit muss größer als 0 sein." }
+        require(dieselLitersPerNm >= 0) { "Der Dieselverbrauch darf nicht negativ sein." }
     }
 }
 
@@ -84,7 +86,14 @@ data class RouteMetrics(
     val arrival: ZonedDateTime,
     val worstUnderKeelClearanceMeters: Double?,
     val dieselLiters: Double,
-)
+    val dieselReserveLiters: Double = 0.0,
+    val worstClearanceName: String? = null,
+    val worstHighWater: ZonedDateTime? = null,
+    val maxWindKnots: Double? = null,
+    val maxGustKnots: Double? = null,
+) {
+    val totalDieselLiters: Double get() = dieselLiters + dieselReserveLiters
+}
 
 data class PassageWindow(
     val start: ZonedDateTime,

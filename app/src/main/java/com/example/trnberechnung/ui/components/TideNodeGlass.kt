@@ -99,7 +99,7 @@ fun GlassIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 44.dp,
+    size: Dp = 48.dp,
     iconTint: Color = Color.Unspecified,
     badge: (@Composable BoxScope.() -> Unit)? = null,
 ) {

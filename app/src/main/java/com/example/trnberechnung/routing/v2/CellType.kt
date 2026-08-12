@@ -2,19 +2,19 @@ package com.example.trnberechnung.routing.v2
 
 enum class CellType(val cost: Double, val isBlocked: Boolean) {
 
-    OPEN_SEA(1.0, false),
+    OPEN_SEA(3.0, false),
 
-    FAIRWAY(0.85, false),
+    FAIRWAY(0.8, false),
 
-    HARBOUR(1.0, false),
+    HARBOUR(0.5, false),
 
-    WATTFAHRWASSER(0.95, false),
+    WATTFAHRWASSER(0.9, false),
 
     LAND(Double.MAX_VALUE, true),
 
     RESTRICTED(Double.MAX_VALUE, true),
 
-    RUHEZONE(2.0, false);
+    RUHEZONE(10.0, false);
 
     companion object {
 

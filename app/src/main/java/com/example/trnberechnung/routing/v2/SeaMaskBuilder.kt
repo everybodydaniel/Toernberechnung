@@ -24,7 +24,7 @@ internal object SeaMaskBuilder {
 
     private const val BUOY_RADIUS_M = 250.0
 
-    private const val DEFAULT_SEA_DEPTH_M = 5.0
+    private const val DEFAULT_SEA_DEPTH_M = 10.0 // Standardwert für offene See
 
     data class BuildResult(
         val cells: ByteArray,
@@ -39,7 +39,19 @@ internal object SeaMaskBuilder {
     fun build(context: Context): BuildResult {
         val n = GridConfig.ROWS * GridConfig.COLS
         val cells = ByteArray(n) { CellType.OPEN_SEA.ordinal.toByte() }
+        // Standard: Tiefe Nordsee
         val depth = ShortArray(n) { (DEFAULT_SEA_DEPTH_M * SeaMask.DEPTH_SCALE).toInt().toShort() }
+
+        // Das gesamte Wattenmeer (südlich der Inseln) standardmäßig auf trockenfallend setzen
+        // Dies verhindert "Safe"-Fenster während Niedrigwasser in Gebieten ohne explizite Daten.
+        for (r in 0 until GridConfig.ROWS) {
+            val lat = GridConfig.rowToLat(r)
+            if (lat < 53.78) { // Linie nördlich der Inselkette (Borkum bis Wangerooge)
+                for (c in 0 until GridConfig.COLS) {
+                    depth[GridConfig.index(r, c)] = ((-1.5) * SeaMask.DEPTH_SCALE).toInt().toShort()
+                }
+            }
+        }
 
         val fairwayPolys = mutableListOf<Polygon>()
         val harbourPolys = mutableListOf<Polygon>()
@@ -64,7 +76,7 @@ internal object SeaMaskBuilder {
         try {
             context.assets.open(DEMO_ASSET).use { inputStream ->
                 JsonReader(BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))).use { reader ->
-                    parseDemoLineStringFairways(reader, cells)
+                    parseDemoLineStringFairways(reader, cells, depth)
                 }
             }
         } catch (_: Exception) {
@@ -122,11 +134,21 @@ internal object SeaMaskBuilder {
 
         for (ln in IslandPolygons.MANUAL_FAIRWAY_ROUTES) {
             stampLineStringBuffer(
-                ln, cells, CellType.FAIRWAY,
+                ln, cells, CellType.WATTFAHRWASSER,
                 NORDSBEFV_ROUTE_BUFFER_M,
                 overwriteRestricted = true, overwriteLand = true
             )
+            // Auch für manuelle Routen eine plausible Watttiefe setzen, falls nichts anderes definiert
+            applyDepthToLine(ln, -1.0, depth)
         }
+
+        applyDepthToLine(IslandPolygons.DORNUNERSIEL_APPROACH, -1.2, depth)
+        applyDepthToLine(IslandPolygons.BALTRUM_WATT_HOCH, -1.3, depth)
+        applyDepthToLine(IslandPolygons.LANGEOOG_WATT_HOCH, -1.4, depth)
+        applyDepthToLine(IslandPolygons.SPIEKEROOG_WATT_HOCH, -1.5, depth)
+        applyDepthToLine(IslandPolygons.WANGEROOGE_WATT_HOCH, -1.6, depth)
+        applyDepthToLine(IslandPolygons.MEMMERT_WATT_HOCH, -1.4, depth)
+        applyDepthToLine(IslandPolygons.JUIST_WATT_HOCH, -1.5, depth)
 
         val buoyFlat = FloatArray(buoys.size * 2)
         buoys.forEachIndexed { i, b ->
@@ -401,14 +423,14 @@ internal object SeaMaskBuilder {
         }
     }
 
-    private fun parseDemoLineStringFairways(reader: JsonReader, cells: ByteArray) {
+    private fun parseDemoLineStringFairways(reader: JsonReader, cells: ByteArray, depth: ShortArray) {
         reader.beginObject()
         while (reader.hasNext()) {
             val n = reader.nextName()
             if (n == "features") {
                 reader.beginArray()
                 while (reader.hasNext()) {
-                    val pendingLine = parseLineStringFeature(reader)
+                    val pendingLine = parseLineStringFeature(reader, depth)
                     if (pendingLine.size >= 2) {
                         stampLineStringBuffer(pendingLine, cells, CellType.FAIRWAY, bufferM = 200.0)
                     }
@@ -421,11 +443,15 @@ internal object SeaMaskBuilder {
         reader.endObject()
     }
 
-    private fun parseLineStringFeature(reader: JsonReader): List<LatLng> {
+    private fun parseLineStringFeature(reader: JsonReader, depth: ShortArray): List<LatLng> {
         reader.beginObject()
         var pts: List<LatLng> = emptyList()
+        var minDepth: Double? = null
         while (reader.hasNext()) {
             when (reader.nextName()) {
+                "properties" -> {
+                    minDepth = parsePropertiesForMinDepth(reader)
+                }
                 "geometry" -> {
                     if (reader.peek() == JsonToken.NULL) {
                         reader.nextNull()
@@ -454,7 +480,74 @@ internal object SeaMaskBuilder {
             }
         }
         reader.endObject()
+
+        if (pts.isNotEmpty() && minDepth != null) {
+            applyDepthToLine(pts, minDepth, depth)
+        }
+
         return pts
+    }
+
+    private fun parsePropertiesForMinDepth(reader: JsonReader): Double? {
+        if (reader.peek() == JsonToken.NULL) {
+            reader.nextNull()
+            return null
+        }
+        reader.beginObject()
+        var depth: Double? = null
+        while (reader.hasNext()) {
+            if (reader.nextName() == "minDepth") {
+                depth = if (reader.peek() == JsonToken.NUMBER) reader.nextDouble() else {
+                    reader.skipValue()
+                    null
+                }
+            } else {
+                reader.skipValue()
+            }
+        }
+        reader.endObject()
+        return depth
+    }
+
+    private fun applyDepthToLine(line: List<LatLng>, depthMeters: Double, depth: ShortArray) {
+        val bufferM = 150.0
+        val metersPerRow = GridConfig.LAT_STEP * 111_320.0
+        val midLatRad = (GridConfig.MIN_LAT + GridConfig.MAX_LAT) / 2.0 * PI / 180.0
+        val metersPerCol = GridConfig.LON_STEP * 111_320.0 * cos(midLatRad)
+        val rowRadius = (bufferM / metersPerRow).roundToInt().coerceAtLeast(1)
+        val colRadius = (bufferM / metersPerCol).roundToInt().coerceAtLeast(1)
+        val bufferM2 = bufferM * bufferM
+
+        val scaledDepth = (depthMeters * SeaMask.DEPTH_SCALE).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+
+        for (i in 0 until line.size - 1) {
+            val a = line[i]
+            val b = line[i + 1]
+            val segLen = GridConfig.approxMeters(a.latitude, a.longitude, b.latitude, b.longitude)
+            val steps = max(2, (segLen / 50.0).toInt())
+            for (s in 0..steps) {
+                val t = s.toDouble() / steps
+                val lat = a.latitude + (b.latitude - a.latitude) * t
+                val lon = a.longitude + (b.longitude - a.longitude) * t
+                if (!GridConfig.inBounds(lat, lon)) continue
+                val r0 = GridConfig.latToRow(lat)
+                val c0 = GridConfig.lonToCol(lon)
+                val rMin = max(0, r0 - rowRadius)
+                val rMax = min(GridConfig.ROWS - 1, r0 + rowRadius)
+                val cMin = max(0, c0 - colRadius)
+                val cMax = min(GridConfig.COLS - 1, c0 + colRadius)
+                for (r in rMin..rMax) {
+                    val rowLat = GridConfig.rowToLat(r)
+                    for (c in cMin..cMax) {
+                        val colLon = GridConfig.colToLon(c)
+                        val d = GridConfig.approxMeters(lat, lon, rowLat, colLon)
+                        if (d * d <= bufferM2) {
+                            depth[GridConfig.index(r, c)] = scaledDepth
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun rasterizePolygon(
@@ -484,8 +577,8 @@ internal object SeaMaskBuilder {
         val landByte = CellType.LAND.ordinal.toByte()
 
         val n = polygon.size
-        val xs = DoubleArray(n) 
-        val ys = DoubleArray(n) 
+        val xs = DoubleArray(n)
+        val ys = DoubleArray(n)
         for (i in 0 until n) {
             ys[i] = (polygon[i].latitude - GridConfig.MIN_LAT) / GridConfig.LAT_STEP
             xs[i] = (polygon[i].longitude - GridConfig.MIN_LON) / GridConfig.LON_STEP

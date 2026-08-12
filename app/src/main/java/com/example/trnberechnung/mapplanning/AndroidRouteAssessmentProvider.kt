@@ -37,13 +37,13 @@ object SeaMaskChartDepthProvider : ChartDepthProvider {
  */
 class AndroidRouteAssessmentProvider(
     private val stationSnapshotProvider: TideStationSnapshotProvider,
-    private val sampleSpacingMeters: Double = 500.0,
+    private val sampleSpacingMeters: Double = 100.0,
     private val chartDepthProvider: ChartDepthProvider = SeaMaskChartDepthProvider,
     private val fairwayRouteResolver: FairwayRouteResolver? = null,
 ) : RouteAssessmentProvider {
     constructor(
         stations: StateFlow<List<TideStationData>>,
-        sampleSpacingMeters: Double = 500.0,
+        sampleSpacingMeters: Double = 100.0,
         chartDepthProvider: ChartDepthProvider = SeaMaskChartDepthProvider,
         fairwayRouteResolver: FairwayRouteResolver? = null,
     ) : this(
@@ -95,21 +95,23 @@ class AndroidRouteAssessmentProvider(
                     RouteMetricsCalculator.haversineNm(sample.point, it.coordinate)
                 }
             val tideHeight = station?.tideHeightAt(arrival)
-            val chartDepth =
-                if (sample.hasCatalogDepth) {
-                    sample.chartDepthMeters
-                } else {
-                    chartDepthProvider.depthMetersAt(sample.point)
+
+            // WICHTIG: Wir bevorzugen IMMER die SeaMask-Tiefe, da diese live aktualisiert wird.
+            // Nur wenn der Punkt außerhalb des Grids liegt, nutzen wir den Katalogwert.
+            val chartDepth = chartDepthProvider.depthMetersAt(sample.point) ?: sample.chartDepthMeters
+
+            val clearance = tideHeight?.let { height ->
+                chartDepth?.let { depth ->
+                    depth + height - input.request.boatSettings.draftMeters
                 }
+            }
+
+            android.util.Log.d("RouteAssessment", "Point: ${sample.point}, Depth: $chartDepth, Tide: $tideHeight, Clearance: $clearance, Draft: ${input.request.boatSettings.draftMeters}")
+
             clearances +=
                 ClearanceSample(
                     waypointName = station?.source?.gaugeLabel ?: station?.source?.area ?: "Route",
-                    clearanceMeters =
-                        tideHeight?.let { height ->
-                            chartDepth?.let { depth ->
-                                depth + height - input.request.boatSettings.draftMeters
-                            }
-                        },
+                    clearanceMeters = clearance,
                     isValid = station != null && tideHeight != null && chartDepth != null,
                     waterLevelQuality =
                         if (station != null && tideHeight != null && chartDepth != null) {
@@ -122,11 +124,16 @@ class AndroidRouteAssessmentProvider(
             weather += station?.weatherAt(arrival)
         }
 
+        val maxWind = weather.filterNotNull().maxByOrNull { it.windKnots }?.windKnots
+        val maxGust = weather.filterNotNull().maxByOrNull { it.gustKnots }?.gustKnots
+
         return RouteSafetyAssessment(
             expectedWaypointCount = samples.size,
             clearanceSamples = clearances,
             allLegsValid = true,
             weatherStatus = WeatherSafetyEvaluator.evaluateAll(weather),
+            maxWindKnots = maxWind,
+            maxGustKnots = maxGust,
             messages =
                 buildList {
                     if (clearances.any { it.clearanceMeters == null }) {
@@ -205,22 +212,56 @@ class AndroidRouteAssessmentProvider(
 
     private fun fairwaySamples(waypoints: List<RouteSafetyWaypoint>): List<RouteSample> {
         if (waypoints.size < 2) return emptyList()
+        val result = mutableListOf<RouteSample>()
         var cumulativeDistanceNm = 0.0
-        return waypoints.mapIndexed { index, waypoint ->
-            if (index > 0) {
-                cumulativeDistanceNm +=
-                    RouteMetricsCalculator.haversineNm(
-                        waypoints[index - 1].coordinate,
-                        waypoint.coordinate,
-                    )
-            }
+
+        // Startpunkt hinzufügen
+        result +=
             RouteSample(
-                point = waypoint.coordinate,
-                cumulativeDistanceNm = cumulativeDistanceNm,
-                chartDepthMeters = waypoint.chartDepthMeters,
+                point = waypoints.first().coordinate,
+                cumulativeDistanceNm = 0.0,
+                chartDepthMeters = waypoints.first().chartDepthMeters,
                 hasCatalogDepth = true,
             )
+
+        for (i in 0 until waypoints.size - 1) {
+            val start = waypoints[i]
+            val end = waypoints[i + 1]
+            val legDistanceNm = RouteMetricsCalculator.haversineNm(start.coordinate, end.coordinate)
+
+            val steps =
+                ceil(legDistanceNm * METERS_PER_NAUTICAL_MILE / sampleSpacingMeters)
+                    .toInt()
+                    .coerceAtLeast(1)
+
+            for (step in 1..steps) {
+                val fraction = step.toDouble() / steps
+                val point =
+                    GeoPoint(
+                        latitude = start.coordinate.latitude + (end.coordinate.latitude - start.coordinate.latitude) * fraction,
+                        longitude = start.coordinate.longitude + (end.coordinate.longitude - start.coordinate.longitude) * fraction,
+                    )
+
+                val startDepth = start.chartDepthMeters
+                val endDepth = end.chartDepthMeters
+                val interpolatedDepth =
+                    if (startDepth != null && endDepth != null) {
+                        startDepth + (endDepth - startDepth) * fraction
+                    } else {
+                        startDepth ?: endDepth
+                    }
+
+                result +=
+                    RouteSample(
+                        point = point,
+                        cumulativeDistanceNm = cumulativeDistanceNm + legDistanceNm * fraction,
+                        chartDepthMeters = interpolatedDepth,
+                        hasCatalogDepth = true,
+                    )
+            }
+            cumulativeDistanceNm += legDistanceNm
         }
+        return result
     }
 
     private fun incompleteAssessment(

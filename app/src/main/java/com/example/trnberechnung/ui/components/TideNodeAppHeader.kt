@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,7 +47,7 @@ fun TideNodeAppHeader(
     val headerHeight = if (isLandscape) 52.dp else 78.dp
     val logoSize = if (isLandscape) 30.dp else 42.dp
     val titleFontSize = if (isLandscape) 20.sp else 28.sp
-    val buttonSize = if (isLandscape) 36.dp else 44.dp
+    val buttonSize = if (isLandscape) 44.dp else 48.dp
 
     Box(
         modifier =
@@ -61,7 +63,7 @@ fun TideNodeAppHeader(
         ) {
             Image(
                 painter = painterResource(R.drawable.tidenode_mark),
-                contentDescription = "TideNode Logo",
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier =
                     Modifier
@@ -76,7 +78,7 @@ fun TideNodeAppHeader(
                 fontSize = titleFontSize,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.8).sp,
-                modifier = Modifier.testTag("app_header_wordmark"),
+                modifier = Modifier.testTag("app_header_wordmark").semantics { heading() },
             )
             Spacer(Modifier.weight(1f))
             Row(

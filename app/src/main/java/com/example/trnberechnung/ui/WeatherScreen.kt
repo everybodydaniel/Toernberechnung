@@ -30,6 +30,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -158,10 +161,13 @@ fun WeatherTabSwitcher(selectedTab: Int, onTabSelected: (Int) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .height(44.dp)
-            .clip(RoundedCornerShape(22.dp))
+            .height(48.dp)
+            .clip(RoundedCornerShape(24.dp))
             .background(Color.White.copy(alpha = 0.15f))
             .padding(4.dp)
+            .semantics {
+                contentDescription = "Ansicht auswählen"
+            }
     ) {
         TabItem(
             text = "Wetter",
@@ -187,15 +193,18 @@ fun TabItem(text: String, icon: String, isSelected: Boolean, modifier: Modifier,
             .fillMaxHeight()
             .clip(RoundedCornerShape(20.dp))
             .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-            .clickable(onClick = onClick),
+            .clickable(
+                onClickLabel = "$text anzeigen",
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(icon, fontSize = 14.sp)
+            Text(icon, fontSize = 14.sp, modifier = Modifier.semantics { contentDescription = "" })
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text,
-                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.6f),
+                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.7f),
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 fontSize = 14.sp
             )
@@ -235,7 +244,10 @@ fun WeatherContent(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
-                modifier = Modifier.clickable(onClick = onStationClick),
+                modifier = Modifier.clickable(
+                    onClickLabel = "Standort ändern",
+                    onClick = onStationClick
+                ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
@@ -248,13 +260,13 @@ fun WeatherContent(
                 )
                 Icon(
                     Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
+                    contentDescription = "Standort wählen",
                     tint = Color.White.copy(alpha = 0.7f)
                 )
             }
             Text(
                 "${weather?.temperature?.toInt() ?: "--"}°",
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Aktuelle Temperatur: ${weather?.temperature?.toInt() ?: "--"} Grad" },
                 fontSize = 86.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.White,
@@ -271,9 +283,9 @@ fun WeatherContent(
             val today = dailyForecast.firstOrNull()
             if (today != null) {
                 Text(
-                    "H: ${today.highTemp}°  L: ${today.lowTemp}°",
+                    "Höchstwert: ${today.highTemp}°  Tiefstwert: ${today.lowTemp}°",
                     modifier = Modifier.fillMaxWidth(),
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = Color.White.copy(alpha = 0.8f),
                     fontSize = 15.sp,
                     textAlign = TextAlign.Center
                 )
@@ -294,23 +306,39 @@ fun WeatherContent(
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Info, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Info, "Vorhersage Info", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("48-STUNDEN-VORHERSAGE", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                Text(
+                    "48-STUNDEN-VORHERSAGE",
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() }
+                )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier.semantics { contentDescription = "Stündliche Vorhersage" }
+            ) {
                 items(filteredForecast.take(24)) { hour ->
                     val time = try {
                         OffsetDateTime.parse(hour.timestamp).atZoneSameInstant(ZoneId.of("Europe/Berlin")).format(DateTimeFormatter.ofPattern("HH:mm"))
                     } catch (e: Exception) { "--:--" }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.semantics(mergeDescendants = true) {}
+                    ) {
                         Text(time, color = Color.White, fontSize = 12.sp)
-                        Text(iconToEmoji(hour.icon ?: hour.condition), fontSize = 24.sp, modifier = Modifier.padding(vertical = 4.dp))
+                        Text(
+                            iconToEmoji(hour.icon ?: hour.condition),
+                            fontSize = 24.sp,
+                            modifier = Modifier.padding(vertical = 4.dp).semantics { contentDescription = translateCondition(hour.condition) }
+                        )
                         Text("${hour.temperature?.toInt() ?: "--"}°", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("${(hour.windSpeed?.div(1.852))?.toInt() ?: "--"} kn", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
-                        Text("B ${(hour.windGustSpeed?.div(1.852))?.toInt() ?: "--"}", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
+                        Text("${(hour.windSpeed?.div(1.852))?.toInt() ?: "--"} kn", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
+                        Text("B ${(hour.windGustSpeed?.div(1.852))?.toInt() ?: "--"}", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
                     }
                 }
             }
@@ -321,12 +349,28 @@ fun WeatherContent(
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Air, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Air, "Wind Icon", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("WIND IM REVIER", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                Text(
+                    "WIND IM REVIER",
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() }
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics(mergeDescendants = true) {
+                        val speed = (weather?.windSpeed?.div(1.852))?.toInt() ?: "--"
+                        val gusts = (weather?.windGustSpeed?.div(1.852))?.toInt() ?: "--"
+                        val dir = windDirectionToText(weather?.windDirection ?: 0)
+                        contentDescription = "Wind: $speed Knoten aus $dir. Böen bis $gusts Knoten."
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(modifier = Modifier.size(110.dp), contentAlignment = Alignment.Center) {
                     WindCompass(degrees = weather?.windDirection ?: 0)
                 }
@@ -346,16 +390,24 @@ fun WeatherContent(
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Map, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Map, "Karte", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("WINDKARTE OSTFRIESLAND", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                Text(
+                    "WINDKARTE OSTFRIESLAND",
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() }
+                )
             }
 
             // Time Selector for Wind Map
             Spacer(modifier = Modifier.height(12.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentDescription = "Zeitpunkt für Windkarte wählen" }
             ) {
                 items(12) { i ->
                     val forecastItem = if (i == 0) null else filteredForecast.getOrNull(i - 1)
@@ -376,8 +428,11 @@ fun WeatherContent(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .background(if (selectedWindHour == i) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-                            .clickable { selectedWindHour = i }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .clickable(
+                                onClickLabel = "Windkarte für $time anzeigen",
+                                onClick = { selectedWindHour = i }
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp), // Increased vertical padding for touch target
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(day, color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
@@ -412,9 +467,15 @@ fun WeatherContent(
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Timeline, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Timeline, "Graph", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("WIND UND BÖEN", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                Text(
+                    "WIND UND BÖEN",
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() }
+                )
             }
             Spacer(modifier = Modifier.height(6.dp))
             Row(
@@ -425,7 +486,9 @@ fun WeatherContent(
                 Text("● BÖEN", color = Color(0xFFFFB74D), fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(24.dp))
-            WindGustGraph(filteredForecast.take(12))
+            Box(modifier = Modifier.semantics { contentDescription = "Grafik der Wind- und Böenvorhersage für die nächsten 12 Stunden." }) {
+                WindGustGraph(filteredForecast.take(12))
+            }
         }
     }
 
@@ -434,9 +497,15 @@ fun WeatherContent(
         GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.DateRange, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.DateRange, "Kalender", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("7-TAGE-VORHERSAGE", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                    Text(
+                        "7-TAGE-VORHERSAGE",
+                        fontSize = 10.sp,
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.semantics { heading() }
+                    )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 val weekMin = dailyForecast.minOf { it.lowTemp }
@@ -801,21 +870,25 @@ fun TideContent(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.clickable { onStationClick() }
+                    modifier = Modifier.clickable(
+                        onClickLabel = "Station wählen",
+                        onClick = { onStationClick() }
+                    )
                 ) {
                     Text(
                         station?.gaugeLabel ?: station?.area ?: "Unbekannt",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.semantics { heading() }
                     )
-                    Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.KeyboardArrowDown, "Station wählen", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
                 }
                 Text(
                     "BSH ${station?.gaugeLabel?.take(4) ?: "PEGEL"}",
                     fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.6f),
+                    color = Color.White.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
                 )
             }
@@ -825,14 +898,14 @@ fun TideContent(
             // Tide Arrow Icon
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(48.dp) // Increased touch/focal area
                     .clip(CircleShape)
                     .background(Color.White.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     if (isRising) Icons.Default.ArrowOutward else Icons.Default.SouthEast,
-                    null,
+                    contentDescription = if (isRising) "Steigendes Wasser" else "Fallendes Wasser",
                     tint = Color.White,
                     modifier = Modifier.size(28.dp)
                 )
@@ -840,9 +913,14 @@ fun TideContent(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.semantics(mergeDescendants = true) {
+                    contentDescription = "$statusText. $nextEventLabel um ${nextEventPair?.second?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "--:--"}. $countdownText"
+                }
+            ) {
                 Text(statusText, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
-                Text(nextEventLabel, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, textAlign = TextAlign.Center)
+                Text(nextEventLabel, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, textAlign = TextAlign.Center)
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -853,7 +931,7 @@ fun TideContent(
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
-                Text(countdownText, color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, textAlign = TextAlign.Center)
+                Text(countdownText, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, textAlign = TextAlign.Center)
             }
         }
     }
@@ -878,12 +956,21 @@ fun TideContent(
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.History, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.History, "Uhrzeit", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("ASTRONOMISCHE GEZEITEN", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                Text(
+                    "ASTRONOMISCHE GEZEITEN",
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() }
+                )
             }
             Spacer(modifier = Modifier.height(12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.semantics { contentDescription = "Liste der nächsten Gezeitenereignisse" }
+            ) {
                 val upcoming = eventsWithTime.filter { it.second.isAfter(now.minusHours(2)) }.take(4)
                 items(upcoming) { (ev, dt) ->
                     TideEventTile(
@@ -901,9 +988,15 @@ fun TideContent(
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Straighten, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Straighten, "Maßstab", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("GEZEITENGRUNDWERTE", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                Text(
+                    "GEZEITENGRUNDWERTE",
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() }
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -921,9 +1014,15 @@ fun TideContent(
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.SsidChart, null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.SsidChart, "Graph", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("WASSERSTANDSVORHERSAGE", fontSize = 10.sp, color = Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
+                Text(
+                    "WASSERSTANDSVORHERSAGE",
+                    fontSize = 10.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() }
+                )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -932,6 +1031,7 @@ fun TideContent(
                     .fillMaxWidth()
                     .height(220.dp)
                     .padding(horizontal = 4.dp)
+                    .semantics { contentDescription = "Grafische Darstellung der Wasserstandsvorhersage." }
             ) {
                 if (windowEvents.size < 2) {
                     Text(

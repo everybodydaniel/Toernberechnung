@@ -120,7 +120,30 @@ class PassageWindowScannerTest {
             window?.waterLevelQuality shouldBe WaterLevelQuality.OUTSIDE_FORECAST_HORIZON
         }
 
-    private fun assessment(safe: Boolean): PassageCandidateAssessment =
+    @Test
+    fun `window respects safety margin`() =
+        runTest {
+            val margin = 0.5
+            val window =
+                scanner.findSafeWindow(
+                    center = center,
+                    evaluator =
+                        PassageCandidateEvaluator { departure ->
+                            PassageCandidateAssessment(
+                                expectedWaypointCount = 1,
+                                waypointClearances = listOf(
+                                    ClearanceSample("Point", 0.4)
+                                ),
+                                allLegsValid = true,
+                                safetyMarginMeters = margin
+                            )
+                        },
+                )
+
+            window shouldBe null
+        }
+
+    private fun assessment(safe: Boolean, margin: Double = 0.0): PassageCandidateAssessment =
         PassageCandidateAssessment(
             expectedWaypointCount = 2,
             waypointClearances =
@@ -136,5 +159,6 @@ class PassageWindowScannerTest {
                     )
                 },
             allLegsValid = true,
+            safetyMarginMeters = margin
         )
 }

@@ -1,5 +1,10 @@
 package com.example.trnberechnung.ui.map
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -39,6 +44,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -142,52 +148,69 @@ fun RouteResultDashboardContent(
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isWorking = uiState.isCalculating || uiState.isSearchingPassageWindow
+
     Column(
         modifier =
             modifier
                 .fillMaxWidth()
                 .tideNodeGlass(cornerRadius = 32.dp, elevation = 16.dp, alpha = 0.82f)
-                .padding(horizontal = 18.dp, vertical = 10.dp)
+                .padding(bottom = 14.dp) // padding top and sides handled inside to allow full-width progress bar
                 .testTag("route_result_dashboard"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        DashboardDragHandle(
-            mode = mode,
-            onModeChange = onModeChange,
-        )
-
-        if (mode != RouteDashboardMode.COMPACT) {
-            RouteStatusHeader(uiState)
-        }
-
-        NautiDashboardRow(
-            compact = mode == RouteDashboardMode.COMPACT,
-            onClick = onOpenNauti,
-        )
-
-        if (mode != RouteDashboardMode.COMPACT) {
-            DashboardPassageRow(
-                uiState = uiState,
-                onRefresh = onRefreshPassageWindow,
+        if (isWorking) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)),
+                color = TideNodeCyan,
+                trackColor = Color.Transparent,
             )
-            DashboardMetrics(uiState)
+        } else {
+            Spacer(Modifier.height(3.dp))
         }
 
-        if (mode == RouteDashboardMode.FULL) {
-            if (uiState.messages.isNotEmpty()) {
-                Text(
-                    uiState.messages.first(),
-                    color = Color(0xFF696D74),
-                    fontSize = 12.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            DashboardDragHandle(
+                mode = mode,
+                onModeChange = onModeChange,
+            )
+
+            if (mode != RouteDashboardMode.COMPACT) {
+                RouteStatusHeader(uiState)
+            }
+
+            NautiDashboardRow(
+                compact = mode == RouteDashboardMode.COMPACT,
+                onClick = onOpenNauti,
+            )
+
+            if (mode != RouteDashboardMode.COMPACT) {
+                DashboardPassageRow(
+                    uiState = uiState,
+                    onRefresh = onRefreshPassageWindow,
+                )
+                DashboardMetrics(uiState)
+            }
+
+            if (mode == RouteDashboardMode.FULL) {
+                if (uiState.messages.isNotEmpty()) {
+                    Text(
+                        uiState.messages.first(),
+                        color = Color(0xFF696D74),
+                        fontSize = 12.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                DashboardActions(
+                    uiState = uiState,
+                    onNavigate = onNavigate,
+                    onSave = onSave,
                 )
             }
-            DashboardActions(
-                uiState = uiState,
-                onNavigate = onNavigate,
-                onSave = onSave,
-            )
         }
     }
 }
@@ -366,6 +389,15 @@ private fun DashboardPassageRow(
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 17.sp,
             )
+            uiState.passageWindow?.bottleneckName?.let { name ->
+                Text(
+                    "Engstelle: $name",
+                    color = labelColor.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         if (uiState.isSearchingPassageWindow) {
             CircularProgressIndicator(
@@ -388,6 +420,8 @@ private fun DashboardPassageRow(
 @Composable
 private fun DashboardMetrics(uiState: RoutePlanningUiState) {
     val metrics = uiState.routeMetrics
+    val isLoading = uiState.isCalculating
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -396,6 +430,7 @@ private fun DashboardMetrics(uiState: RoutePlanningUiState) {
             label = "REISEZEIT",
             value = metrics?.travelTime?.toTravelText() ?: "–",
             icon = Icons.Default.HourglassTop,
+            isLoading = isLoading,
             modifier = Modifier.weight(1f),
         )
         DashboardMetric(
@@ -405,17 +440,19 @@ private fun DashboardMetrics(uiState: RoutePlanningUiState) {
                     DateTimeFormatter.ofPattern("HH:mm", Locale.GERMANY),
                 ) ?: "–",
             icon = Icons.Default.Flag,
+            isLoading = isLoading,
             modifier = Modifier.weight(1f),
         )
         DashboardMetric(
             label = "DISTANZ",
             value = metrics?.distanceNm?.let { String.format(Locale.GERMANY, "%.1f nm", it) } ?: "–",
             icon = Icons.Default.Straighten,
+            isLoading = isLoading,
             modifier = Modifier.weight(1f),
         )
     }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         DashboardMetric(
@@ -425,18 +462,26 @@ private fun DashboardMetrics(uiState: RoutePlanningUiState) {
                     String.format(Locale.GERMANY, "%.2f m", it)
                 } ?: "–",
             icon = Icons.Default.Water,
+            isLoading = isLoading,
             modifier = Modifier.weight(1f),
         )
         DashboardMetric(
             label = "DIESEL",
             value =
-                metrics?.dieselLiters?.let {
+                metrics?.totalDieselLiters?.let {
                     String.format(Locale.GERMANY, "%.1f l", it)
                 } ?: "–",
             icon = Icons.Default.LocalGasStation,
+            isLoading = isLoading,
             modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.weight(1f))
+        DashboardMetric(
+            label = "ENGSTELLE",
+            value = metrics?.worstClearanceName ?: "–",
+            icon = Icons.Default.Navigation,
+            isLoading = isLoading,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -445,6 +490,7 @@ private fun DashboardMetric(
     label: String,
     value: String,
     icon: ImageVector,
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -453,6 +499,17 @@ private fun DashboardMetric(
     val iconTint = if (isDark) Color(0xFF60A5FA) else TideNodeBlue
     val labelColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF676B72)
     val valueColor = if (isDark) Color.White else TideNodeInk
+
+    val infiniteTransition = rememberInfiniteTransition(label = "skeleton")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
 
     Column(
         modifier =
@@ -478,13 +535,23 @@ private fun DashboardMetric(
             fontSize = 10.sp,
             maxLines = 1,
         )
-        Text(
-            value,
-            color = valueColor,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 17.sp,
-            maxLines = 1,
-        )
+        if (isLoading && value == "–") {
+            Box(
+                Modifier
+                    .width(40.dp)
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(labelColor.copy(alpha = 0.3f * alpha))
+            )
+        } else {
+            Text(
+                value,
+                color = valueColor.copy(alpha = if (isLoading) alpha else 1f),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 17.sp,
+                maxLines = 1,
+            )
+        }
     }
 }
 

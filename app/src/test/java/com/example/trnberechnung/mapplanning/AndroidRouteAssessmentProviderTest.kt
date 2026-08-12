@@ -66,7 +66,7 @@ class AndroidRouteAssessmentProviderTest {
                     RouteMetricsCalculator.calculate(
                         geometry,
                         departure,
-                        request.boatSettings.speedKnots,
+                        request.boatSettings,
                     ),
                 )
 
@@ -134,7 +134,7 @@ class AndroidRouteAssessmentProviderTest {
                     RouteMetricsCalculator.calculate(
                         geometry,
                         departure,
-                        request.boatSettings.speedKnots,
+                        request.boatSettings,
                     ),
                 )
             val assessment =

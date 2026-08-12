@@ -24,7 +24,7 @@ object HarbourCatalog {
                 name = "Juist, Hafen",
                 subtitle = "Juist, Hafen",
                 coordinate = GeoPoint(53.6722, 6.9982),
-                chartDepthMeters = 1.8,
+                chartDepthMeters = -1.2,
                 tideStationId = "794P",
             ),
             Harbour(
@@ -32,7 +32,7 @@ object HarbourCatalog {
                 name = "Norderney, Hafen",
                 subtitle = "Norderney, Riffgat",
                 coordinate = GeoPoint(53.7024, 7.1637),
-                chartDepthMeters = 2.5,
+                chartDepthMeters = 1.5,
                 tideStationId = "111P",
             ),
             Harbour(
@@ -40,7 +40,7 @@ object HarbourCatalog {
                 name = "Baltrum, Hafen",
                 subtitle = "Baltrum, Westende",
                 coordinate = GeoPoint(53.7229, 7.3669),
-                chartDepthMeters = 1.2,
+                chartDepthMeters = -1.0,
                 tideStationId = "784P",
             ),
             Harbour(
@@ -48,7 +48,7 @@ object HarbourCatalog {
                 name = "Langeoog, Hafen",
                 subtitle = "Langeoog, Hafeneinfahrt",
                 coordinate = GeoPoint(53.7263, 7.4968),
-                chartDepthMeters = 1.5,
+                chartDepthMeters = -0.5,
                 tideStationId = "781P",
             ),
             Harbour(
@@ -56,7 +56,7 @@ object HarbourCatalog {
                 name = "Spiekeroog, Hafen",
                 subtitle = "Spiekeroog",
                 coordinate = GeoPoint(53.7632, 7.6955),
-                chartDepthMeters = 1.0,
+                chartDepthMeters = -0.8,
                 tideStationId = "779P",
             ),
             Harbour(
@@ -64,7 +64,7 @@ object HarbourCatalog {
                 name = "Wangerooge, Hafen",
                 subtitle = "Wangerooge, Hafen",
                 coordinate = GeoPoint(53.7755, 7.8683),
-                chartDepthMeters = 1.4,
+                chartDepthMeters = -0.6,
                 tideStationId = "777P",
             ),
         )

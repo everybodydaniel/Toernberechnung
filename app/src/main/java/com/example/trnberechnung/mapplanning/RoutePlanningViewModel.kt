@@ -6,12 +6,14 @@ import java.time.Clock
 import java.time.ZonedDateTime
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class RoutePlanningViewModel(
     private val routeGeometryProvider: RouteGeometryProvider = NauticalRouterV2GeometryProvider(),
@@ -243,7 +245,10 @@ class RoutePlanningViewModel(
             viewModelScope.launch {
                 try {
                     val harbours = request.harbourChain.map(HarbourCatalog::get)
-                    when (val geometryResult = routeGeometryProvider.calculate(harbours)) {
+                    val geometryResult = withContext(Dispatchers.Default) {
+                        routeGeometryProvider.calculate(harbours)
+                    }
+                    when (geometryResult) {
                         is RouteGeometryResult.Incomplete -> {
                             updateForGeneration(generation) {
                                 it.copy(
@@ -294,11 +299,15 @@ class RoutePlanningViewModel(
         request: RoutePlanningRequest,
         routeGeometry: List<GeoPoint>,
     ) {
+        val fairwayResult = withContext(Dispatchers.Default) {
+            metricRouteResolver?.resolve(request)
+        }
+
         val metricGeometry =
-            when (val fairway = metricRouteResolver?.resolve(request)) {
+            when (fairwayResult) {
                 null -> routeGeometry
                 is FairwayRouteResult.Success ->
-                    fairway.waypoints.map(RouteSafetyWaypoint::coordinate)
+                    fairwayResult.waypoints.map(RouteSafetyWaypoint::coordinate)
                 is FairwayRouteResult.Incomplete -> {
                     updateForGeneration(generation) {
                         it.copy(
@@ -310,19 +319,20 @@ class RoutePlanningViewModel(
                             passageWindow = null,
                             isCalculating = false,
                             isSearchingPassageWindow = false,
-                            messages = listOf(fairway.reason),
-                            error = fairway.reason,
+                            messages = listOf(fairwayResult.reason),
+                            error = fairwayResult.reason,
                         )
                     }
                     return
                 }
             }
-        val initialMetrics =
+        val initialMetrics = withContext(Dispatchers.Default) {
             RouteMetricsCalculator.calculate(
                 routeGeometry = metricGeometry,
                 departure = request.departure,
-                speedKnots = request.boatSettings.speedKnots,
+                boatSettings = request.boatSettings,
             )
+        }
         if (initialMetrics == null) {
             updateForGeneration(generation) {
                 it.copy(
@@ -336,7 +346,7 @@ class RoutePlanningViewModel(
             return
         }
 
-        val assessment =
+        val assessment = withContext(Dispatchers.Default) {
             routeAssessmentProvider.assess(
                 RouteAssessmentInput(
                     request = request,
@@ -344,6 +354,7 @@ class RoutePlanningViewModel(
                     routeMetrics = initialMetrics,
                 ),
             )
+        }
         val hasExpectedSamples =
             assessment.clearanceSamples.size == assessment.expectedWaypointCount
         val tidalStatus =
@@ -356,6 +367,7 @@ class RoutePlanningViewModel(
         val metrics =
             initialMetrics.copy(
                 worstUnderKeelClearanceMeters = assessment.worstClearanceMeters,
+                worstClearanceName = assessment.worstClearanceSample?.waypointName,
             )
 
         updateForGeneration(generation) {
@@ -373,12 +385,13 @@ class RoutePlanningViewModel(
             )
         }
 
-        val passageWindow =
+        val passageWindow = withContext(Dispatchers.Default) {
             findPassageWindow(
                 request = request,
                 routeGeometry = routeGeometry,
                 distanceNm = metrics.distanceNm,
             )
+        }
         updateForGeneration(generation) {
             it.copy(
                 passageWindow = passageWindow,
@@ -401,7 +414,7 @@ class RoutePlanningViewModel(
                         RouteMetricsCalculator.fromDistance(
                             distanceNm = distanceNm,
                             departure = candidateDeparture,
-                            speedKnots = request.boatSettings.speedKnots,
+                            boatSettings = request.boatSettings,
                         )
                     val assessment =
                         routeAssessmentProvider.assess(
@@ -415,6 +428,7 @@ class RoutePlanningViewModel(
                         expectedWaypointCount = assessment.expectedWaypointCount,
                         waypointClearances = assessment.clearanceSamples,
                         allLegsValid = assessment.allLegsValid,
+                        safetyMarginMeters = request.boatSettings.safetyMarginMeters,
                     )
                 },
         )

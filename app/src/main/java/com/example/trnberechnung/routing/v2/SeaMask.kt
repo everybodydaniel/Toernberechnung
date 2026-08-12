@@ -2,8 +2,11 @@ package com.example.trnberechnung.routing.v2
 
 import android.content.Context
 import com.example.trnberechnung.logic.RouterLog
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 object SeaMask {
 
@@ -42,6 +45,11 @@ object SeaMask {
                     "${buoyPositions.size / 2} buoys indexed"
             )
             _isReady.value = true
+
+            // Trigger live update of tidal depths in background
+            CoroutineScope(Dispatchers.Default).launch {
+                TidalDepthService.refreshDepths()
+            }
         } catch (e: Exception) {
             RouterLog.w(TAG, "SeaMask build failed", e)
         } finally {
@@ -61,13 +69,20 @@ object SeaMask {
     }
 
     fun depthAt(row: Int, col: Int): Double {
-        if (!::chartDepth.isInitialized) return 5.0
+        if (!::chartDepth.isInitialized) return -1.5
         if (!GridConfig.inBounds(row, col)) return 10.0
         return chartDepth[GridConfig.index(row, col)].toDouble() / DEPTH_SCALE
     }
 
     fun depthAtLatLng(lat: Double, lon: Double): Double {
-        if (!GridConfig.inBounds(lat, lon)) return 10.0
+        // Konservativer Fallback für das Wattgebiet, falls Grid nicht bereit oder Punkt außerhalb
+        if (lat < 53.78) {
+            if (!::chartDepth.isInitialized) return -1.5
+            if (!GridConfig.inBounds(lat, lon)) return -1.5 // Außerhalb des Grids im Watt = flach
+        }
+
+        if (!GridConfig.inBounds(lat, lon)) return 10.0 // Offene See außerhalb des Grids = tief
+
         return depthAt(GridConfig.latToRow(lat), GridConfig.lonToCol(lon))
     }
 
@@ -75,13 +90,13 @@ object SeaMask {
 
     fun isNavigable(lat: Double, lon: Double): Boolean = !cellAtLatLng(lat, lon).isBlocked
 
-    internal fun setCell(row: Int, col: Int, type: CellType) {
+    fun setCell(row: Int, col: Int, type: CellType) {
         if (!::cells.isInitialized) return
         if (!GridConfig.inBounds(row, col)) return
         cells[GridConfig.index(row, col)] = type.ordinal.toByte()
     }
 
-    internal fun setDepth(row: Int, col: Int, depthMeters: Double) {
+    fun setDepth(row: Int, col: Int, depthMeters: Double) {
         if (!::chartDepth.isInitialized) return
         if (!GridConfig.inBounds(row, col)) return
         val scaled = (depthMeters * DEPTH_SCALE).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())

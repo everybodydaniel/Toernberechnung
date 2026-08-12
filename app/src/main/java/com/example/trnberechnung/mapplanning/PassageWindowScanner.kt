@@ -9,6 +9,7 @@ data class PassageCandidateAssessment(
     val expectedWaypointCount: Int,
     val waypointClearances: List<ClearanceSample>,
     val allLegsValid: Boolean,
+    val safetyMarginMeters: Double = 0.0,
 ) {
     val isSafe: Boolean
         get() =
@@ -18,7 +19,7 @@ data class PassageCandidateAssessment(
                 waypointClearances.all { sample ->
                     sample.isValid &&
                         sample.clearanceMeters != null &&
-                        sample.clearanceMeters >= 0
+                        sample.clearanceMeters >= safetyMarginMeters
                 }
 
     val bottleneck: ClearanceSample?

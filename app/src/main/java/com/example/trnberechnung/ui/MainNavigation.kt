@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -399,6 +405,7 @@ private fun TideNodeBottomNavigation(
                 .fillMaxWidth()
                 .height(navHeight)
                 .tideNodeGlass(cornerRadius = if (isLandscape) 24.dp else 34.dp, elevation = 14.dp, alpha = 0.80f)
+                .selectableGroup()
                 .padding(horizontal = 8.dp, vertical = if (isLandscape) 3.dp else 5.dp)
                 .testTag("global_bottom_navigation"),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -423,6 +430,7 @@ private fun TideNodeBottomNavigation(
                         .selectable(
                             selected = selected,
                             onClick = { navController.navigateMainTab(screen.route) },
+                            role = Role.Tab,
                         )
                         .testTag("nav_${screen.route}"),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -430,7 +438,7 @@ private fun TideNodeBottomNavigation(
             ) {
                 Icon(
                     imageVector = screen.icon,
-                    contentDescription = screen.title,
+                    contentDescription = null,
                     tint = if (selected) TideNodeBlue else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(25.dp).testTag("nav_icon_${screen.route}"),
                 )
@@ -457,7 +465,11 @@ private fun ActiveVoyageResumePill(
             modifier
                 .fillMaxWidth()
                 .tideNodeGlass(cornerRadius = 25.dp, elevation = 10.dp, alpha = 0.88f)
-                .clickable(onClick = onClick)
+                .clickable(
+                    onClick = onClick,
+                    onClickLabel = "Aktive Navigation fortsetzen",
+                    role = Role.Button,
+                )
                 .padding(horizontal = 18.dp, vertical = 12.dp)
                 .testTag("active_voyage_resume"),
         verticalAlignment = Alignment.CenterVertically,
@@ -476,7 +488,13 @@ private fun ActiveVoyageResumePill(
                 fontSize = 12.sp,
             )
         }
-        Text("›", color = TideNodeBlue, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "›",
+            color = TideNodeBlue,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.clearAndSetSemantics { }
+        )
     }
 }
 

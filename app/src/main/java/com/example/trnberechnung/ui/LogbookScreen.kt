@@ -30,6 +30,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
@@ -118,9 +121,10 @@ fun LogbookScreen(
             "LOGBUCH",
             modifier = Modifier
                 .padding(start = 16.dp, top = if (isLandscape) 2.dp else 8.dp, bottom = if (isLandscape) 2.dp else 4.dp)
-                .testTag("screen_header_logbook"),
+                .testTag("screen_header_logbook")
+                .semantics { heading() },
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f), // Slightly higher contrast
             letterSpacing = 1.sp
         )
 
@@ -261,11 +265,12 @@ private fun LogbookActionBar(
             FilledTonalButton(
                 onClick = onCreateBlankPdf,
                 shape = RoundedCornerShape(28.dp),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier.height(48.dp) // Accessibility: min height
             ) {
-                Icon(Icons.Default.AddCircle, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.AddCircle, contentDescription = "PDF erstellen", modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Leerer\nTörnverlauf", fontWeight = FontWeight.Bold)
+                Text("Leerer\nTörnverlauf", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
     }
@@ -345,7 +350,8 @@ private fun LogbookOverviewCard(
                 emoji = "📋",
                 title = "Logbuchdaten anzeigen",
                 expanded = detailsExpanded,
-                onClick = { detailsExpanded = !detailsExpanded }
+                onClick = { detailsExpanded = !detailsExpanded },
+                contentDescription = if (detailsExpanded) "Details ausblenden" else "Details für ${log.routeDesc} anzeigen"
             )
             AnimatedVisibility(detailsExpanded,
                 enter = expandVertically(), exit = shrinkVertically()) {
@@ -368,7 +374,8 @@ private fun LogbookOverviewCard(
                 emoji = "✅",
                 title = "Checkliste vor Abfahrt",
                 expanded = checklistExpanded,
-                onClick = { checklistExpanded = !checklistExpanded }
+                onClick = { checklistExpanded = !checklistExpanded },
+                contentDescription = if (checklistExpanded) "Checkliste ausblenden" else "Checkliste für Abfahrt anzeigen"
             )
             AnimatedVisibility(checklistExpanded,
                 enter = expandVertically(), exit = shrinkVertically()) {
@@ -501,16 +508,26 @@ private fun LogbookOverviewCard(
 }
 
 @Composable
-private fun ExpanderRow(emoji: String, title: String, expanded: Boolean, onClick: () -> Unit) {
+private fun ExpanderRow(
+    emoji: String,
+    title: String,
+    expanded: Boolean,
+    onClick: () -> Unit,
+    contentDescription: String? = null
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp) // Accessibility
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .clickable(
+                onClickLabel = contentDescription,
+                onClick = onClick
+            )
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(emoji, fontSize = 16.sp)
+        Text(emoji, fontSize = 16.sp, modifier = Modifier.semantics { this.contentDescription = "" })
         Spacer(modifier = Modifier.width(8.dp))
         Text(title, style = MaterialTheme.typography.bodyMedium,
              fontWeight = FontWeight.Medium, color = NauticalPrimary,
@@ -556,7 +573,11 @@ private fun ChecklistSection(
             items.forEachIndexed { i, label ->
                 Row(
                     modifier = Modifier.fillMaxWidth()
-                        .clickable { onToggle(i, !states[i]) }
+                        .heightIn(min = 48.dp) // Touch Target
+                        .clickable(
+                            onClickLabel = "Markiere $label als erledigt",
+                            onClick = { onToggle(i, !states[i]) }
+                        )
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

@@ -61,6 +61,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
@@ -146,6 +150,7 @@ fun DashboardScreen(
             fontSize = 19.sp,
             fontWeight = FontWeight.ExtraBold,
             color = SettingsTextColor,
+            modifier = Modifier.semantics { heading() }
         )
 
         // Hidden headline testTag for automated UI tests
@@ -158,12 +163,12 @@ fun DashboardScreen(
         // ══════════════════════════════════════════════════
         SettingsCard {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Image(
                     painter = painterResource(R.drawable.tidenode_mark),
-                    contentDescription = "TideNode Logo",
+                    contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier =
                         Modifier
@@ -200,16 +205,17 @@ fun DashboardScreen(
             Spacer(Modifier.height(14.dp))
 
             // Bootsname Field
-            SettingsInputField(
-                value = boatName,
-                onValueChange = {
-                    boatName = it
-                    repo.boatName = it
-                },
-                placeholder = "Bootsname",
-                leadingIcon = Icons.Default.Label,
-                modifier = Modifier.testTag("boat_name_input"),
-            )
+    SettingsInputField(
+        value = boatName,
+        onValueChange = {
+            boatName = it
+            repo.boatName = it
+        },
+        label = "Bootsname",
+        placeholder = "z.B. Morning Star",
+        leadingIcon = Icons.Default.Label,
+        modifier = Modifier.testTag("boat_name_input"),
+    )
 
             Spacer(Modifier.height(12.dp))
 
@@ -221,11 +227,15 @@ fun DashboardScreen(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
+                            .height(52.dp) // Adjusted to 52dp for better touch target
                             .clip(RoundedCornerShape(16.dp))
                             .background(SettingsInputBg)
                             .border(1.dp, SettingsInputBorder, RoundedCornerShape(16.dp))
-                            .clickable { boatTypeExpanded = true }
+                            .clickable(
+                                onClick = { boatTypeExpanded = true },
+                                role = Role.Button,
+                                onClickLabel = "Bootstyp auswählen"
+                            )
                             .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -267,7 +277,8 @@ fun DashboardScreen(
                     callSign = it
                     repo.callSign = it
                 },
-                placeholder = "Rufzeichen",
+                label = "Rufzeichen",
+                placeholder = "z.B. DA1234",
                 leadingIcon = Icons.Default.CellTower,
             )
 
@@ -285,6 +296,7 @@ fun DashboardScreen(
                         it.toFloatOrNull()?.let { v -> repo.draft = v }
                     },
                     icon = Icons.Default.ArrowDownward,
+                    label = "Tiefgang",
                     modifier = Modifier.weight(1f),
                 )
                 SettingsNumberBox(
@@ -294,6 +306,7 @@ fun DashboardScreen(
                         it.toFloatOrNull()?.let { v -> repo.length = v }
                     },
                     icon = Icons.Default.Straighten,
+                    label = "Länge",
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -311,6 +324,7 @@ fun DashboardScreen(
                         it.toFloatOrNull()?.let { v -> repo.safetyMargin = v }
                     },
                     icon = Icons.Default.Shield,
+                    label = "Sicherheitsabst.",
                     modifier = Modifier.fillMaxWidth(0.5f),
                 )
             }
@@ -429,10 +443,14 @@ fun DashboardScreen(
                         .clip(RoundedCornerShape(16.dp))
                         .background(SettingsInputBg)
                         .border(1.dp, SettingsInputBorder, RoundedCornerShape(16.dp))
-                        .clickable {
-                            onReplayOnboarding()
-                            showOnboardingDialog = true
-                        }
+                        .clickable(
+                            onClick = {
+                                onReplayOnboarding()
+                                showOnboardingDialog = true
+                            },
+                            role = Role.Button,
+                            onClickLabel = "Einführung starten"
+                        )
                         .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -548,7 +566,7 @@ private fun SettingsCardHeader(
 }
 
 @Composable
-private fun IconBadge(icon: ImageVector) {
+private fun IconBadge(icon: ImageVector, contentDescription: String? = null) {
     Box(
         modifier =
             Modifier
@@ -557,7 +575,7 @@ private fun IconBadge(icon: ImageVector) {
                 .background(SettingsBadgeBg),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = SettingsPrimaryBlue, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = contentDescription, tint = SettingsPrimaryBlue, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -565,6 +583,7 @@ private fun IconBadge(icon: ImageVector) {
 private fun SettingsInputField(
     value: String,
     onValueChange: (String) -> Unit,
+    label: String,
     placeholder: String,
     leadingIcon: ImageVector,
     modifier: Modifier = Modifier,
@@ -575,10 +594,11 @@ private fun SettingsInputField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
+        label = { Text(label) },
         placeholder = { Text(placeholder, color = SettingsSubtitle, fontSize = 14.sp) },
-        leadingIcon = { IconBadge(leadingIcon) },
+        leadingIcon = { IconBadge(leadingIcon, contentDescription = null) },
         trailingIcon = trailingIcon,
-        modifier = modifier.fillMaxWidth().height(52.dp),
+        modifier = modifier.fillMaxWidth().height(64.dp), // Increased height for label
         shape = RoundedCornerShape(16.dp),
         singleLine = true,
         visualTransformation = visualTransformation,
@@ -600,23 +620,25 @@ private fun SettingsNumberBox(
     value: String,
     onValueChange: (String) -> Unit,
     icon: ImageVector,
+    label: String,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier =
             modifier
-                .height(50.dp)
+                .height(56.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(SettingsInputBg)
                 .border(1.dp, SettingsInputBorder, RoundedCornerShape(16.dp))
                 .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBadge(icon)
+        IconBadge(icon, contentDescription = null)
         Spacer(Modifier.width(8.dp))
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
+            label = { Text(label) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),

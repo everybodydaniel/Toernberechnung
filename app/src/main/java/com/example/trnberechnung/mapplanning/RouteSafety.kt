@@ -154,9 +154,15 @@ data class RouteSafetyAssessment(
     val allLegsValid: Boolean,
     val weatherStatus: WeatherStatus,
     val messages: List<String> = emptyList(),
+    val maxWindKnots: Double? = null,
+    val maxGustKnots: Double? = null,
 ) {
+    val worstClearanceSample: ClearanceSample?
+        get() = clearanceSamples.filter { it.clearanceMeters != null }
+            .minByOrNull { it.clearanceMeters!! }
+
     val worstClearanceMeters: Double?
-        get() = clearanceSamples.mapNotNull(ClearanceSample::clearanceMeters).minOrNull()
+        get() = worstClearanceSample?.clearanceMeters
 }
 
 fun interface RouteAssessmentProvider {

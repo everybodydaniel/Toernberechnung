@@ -11,7 +11,7 @@ Die App automatisiert den komplexen Prozess der maritimen Routenplanung durch di
 - **Automatisches See-Routing:** Verwendet einen maßgeschneiderten, gitterbasierten A*-Routing-Algorithmus, um sicherzustellen, dass Routen strikt befahrbaren Wasserwegen folgen und Landmassen meiden.
 - **Sicherheitsbewertung:** Bietet automatische GO/NO-GO-Sicherheitsempfehlungen basierend auf dem Tiefgang, Echtzeit-Tiefendaten und aktuellen Wetterbedingungen.
 - **Gezeiten-Simulation:** Integriert Gezeitendaten, um die sichersten Abfahrtszeiten und Zeitfenster für die Überfahrt zu berechnen.
-- **Crewspace & Kollaboration:** Echtzeit-Chat (Firebase), gemeinsame Terminplanung (Kalender) und Crew-Verwaltung (Rollen, Notfallkontakte) für eine koordinierte Törn-Vorbereitung.
+- **Crew-Verwaltung:** Crewlisten mit Rollen und Notfallkontakten für eine koordinierte Törn-Vorbereitung. Die frühere Crewspace-Kollaboration (Echtzeit-Chat und geteilter Kalender über einen eigenen Server) wurde entfernt.
 - **Offline-First:** Speichert wichtige nautische Daten lokal mit der Room Database, um die Funktionalität auch ohne aktive Internetverbindung auf See zu gewährleisten.
 - **Daten-Authentizität:** Bezieht zuverlässige nautische und geografische Daten direkt von den WFS-Endpunkten des BSH (Bundesamt für Seeschifffahrt und Hydrographie).
 

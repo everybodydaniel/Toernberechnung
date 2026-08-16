@@ -2,17 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.google.services) apply false
     id("org.jetbrains.dokka")
     id("jacoco")
-}
-
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
-} else {
-    logger.warn(
-        "app/google-services.json fehlt: Firebase-Login und Push sind zur Laufzeit deaktiviert.",
-    )
 }
 
 android {
@@ -28,13 +19,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        val crewspaceBaseUrl =
-            providers
-                .gradleProperty("CREWSPACE_BASE_URL")
-                .orElse("https://example.invalid/")
-                .get()
-        buildConfigField("String", "CREWSPACE_BASE_URL", "\"$crewspaceBaseUrl\"")
 
         val geminiApiKey =
             providers
@@ -126,15 +110,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
-
-    implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-messaging")
-    implementation("com.google.firebase:firebase-installations")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 
     // MapLibre
     implementation("org.maplibre.gl:android-sdk:11.8.0")

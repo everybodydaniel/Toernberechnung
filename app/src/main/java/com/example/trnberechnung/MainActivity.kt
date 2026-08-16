@@ -1,7 +1,6 @@
 package com.example.trnberechnung
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -22,14 +21,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.trnberechnung.model.OnboardingPreferences
-import com.example.trnberechnung.messaging.ChatNavigationState
-import com.example.trnberechnung.messaging.CrewspaceMessagingService
 import com.example.trnberechnung.repository.TideRepository
 import com.example.trnberechnung.routing.v2.SeaMask
 import com.example.trnberechnung.ui.MainAppScreen
 import com.example.trnberechnung.ui.OnboardingScreen
 import com.example.trnberechnung.ui.theme.TörnberechnungTheme
-import com.example.trnberechnung.viewmodel.CrewspaceViewModelFactory
 import com.example.trnberechnung.viewmodel.TideViewModel
 import com.example.trnberechnung.viewmodel.TideViewModelFactory
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +39,6 @@ import org.maplibre.android.module.http.HttpRequestUtil
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handleChatIntent(intent)
 
         // 1. System-Agent setzen (für HttpURLConnection)
         val userAgent = "ToernberechnungApp/1.0 (https://example.com/toernberechnung; info@example.com) Android"
@@ -73,8 +68,7 @@ class MainActivity : ComponentActivity() {
 
         val tideNodeApplication = application as TideNodeApplication
         val db = tideNodeApplication.database
-        val authRepo = tideNodeApplication.authRepository
-        val chatRepository = tideNodeApplication.chatRepository
+        val appPreferences = tideNodeApplication.appPreferences
 
         val repository =
             TideRepository(
@@ -99,7 +93,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            var isDarkMode by remember { mutableStateOf(authRepo.isDarkMode) }
+            var isDarkMode by remember { mutableStateOf(appPreferences.isDarkMode) }
 
             TörnberechnungTheme(darkTheme = isDarkMode) {
                 val onboardingPreferences = remember { OnboardingPreferences(applicationContext) }
@@ -116,8 +110,6 @@ class MainActivity : ComponentActivity() {
                     )
                 } else {
                     val viewModel: TideViewModel = viewModel(factory = factory)
-                    val crewspaceFactory =
-                        CrewspaceViewModelFactory(repository, chatRepository, authRepo)
 
                     // Weather, tides and BSH data keep themselves current: reloaded on every
                     // return to the foreground and then every WEATHER_REFRESH_INTERVAL_MILLIS
@@ -136,11 +128,9 @@ class MainActivity : ComponentActivity() {
 
                     MainAppScreen(
                         viewModel = viewModel,
-                        crewspaceViewModelFactory = crewspaceFactory,
-                        authRepo = authRepo,
                         onToggleDarkMode = { mode ->
                             isDarkMode = mode
-                            authRepo.isDarkMode = mode
+                            appPreferences.isDarkMode = mode
                         },
                         onReplayOnboarding = {
                             onboardingCompleted = false
@@ -149,19 +139,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handleChatIntent(intent)
-    }
-
-    private fun handleChatIntent(intent: Intent?) {
-        ChatNavigationState.requestConversation(
-            intent?.getStringExtra(CrewspaceMessagingService.EXTRA_CONVERSATION_ID)
-                ?: intent?.getStringExtra("conversation_id"),
-        )
     }
 
     companion object {

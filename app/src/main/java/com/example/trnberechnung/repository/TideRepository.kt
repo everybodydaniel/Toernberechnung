@@ -119,7 +119,7 @@ class TideRepository(
     }
 
     // ══════════════════════════════════════════════════════════════
-    // PLANNER (Chat lives in the dedicated ChatRepository)
+    // PLANNER
     // ══════════════════════════════════════════════════════════════
 
     val allPlannerEvents: Flow<List<PlannerEventEntity>> =
@@ -133,49 +133,5 @@ class TideRepository(
         plannerEventDao.deleteEvent(event)
     }
 
-    // ── Server Sync Methods ──
-
-    suspend fun syncRemoteEvents(idToken: String) {
-        if (idToken.isBlank()) return
-        try {
-            val response =
-                com.example.trnberechnung.network.RetrofitInstance.crewspaceApi.events(
-                    "Bearer $idToken",
-                )
-            if (response.isSuccessful) {
-                response.body()?.forEach { ev ->
-                    val startDateTime = try {
-                        java.time.OffsetDateTime.parse(ev.startsAt)
-                    } catch (e: Exception) {
-                        null
-                    }
-                    val endDateTime = try {
-                        java.time.OffsetDateTime.parse(ev.endsAt)
-                    } catch (e: Exception) {
-                        null
-                    }
-
-                    val start = startDateTime?.toLocalDate() ?: java.time.LocalDate.now()
-                    val end = endDateTime?.toLocalDate() ?: start
-                    val startTimeStr = startDateTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-                    val endTimeStr = endDateTime?.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-
-                    val entity = PlannerEventEntity(
-                        id = ev.id,
-                        startDate = start,
-                        endDate = end,
-                        title = ev.title,
-                        description = ev.notes ?: "",
-                        location = ev.location,
-                        startTime = startTimeStr,
-                        endTime = endTimeStr
-                    )
-                    plannerEventDao.insertEvent(entity)
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("SYNC", "Error syncing events: ${e.message}")
-        }
-    }
 
 }

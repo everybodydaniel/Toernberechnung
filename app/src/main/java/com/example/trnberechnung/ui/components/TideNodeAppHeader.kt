@@ -81,7 +81,7 @@ fun TideNodeAppHeader(
             Text(
                 text = "TideNode",
                 // White wherever the header floats over the nautical chart or the Revier gradient,
-                // maritime blue on the plain surfaces of Crewspace and Logbuch (lightened in the
+                // maritime blue on the plain surfaces of Crew and Logbuch (lightened in the
                 // dark theme, where the deep blue loses its contrast).
                 color =
                     when {

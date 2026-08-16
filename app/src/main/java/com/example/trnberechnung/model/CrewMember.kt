@@ -32,8 +32,7 @@ data class CrewMember(
     val isOnBoard: Boolean,
     val medicalNote: String,
     val emergencyPhone: String,
-    // ── Neue Felder für Crewspace ──
-    val skipperId: String = "",          // Eindeutige Skipper-ID für Crewspace-Verknüpfung
+    val skipperId: String = "",          // Lokale Skipper-Kennung; seit dem Wegfall von Crewspace ungenutzt
     val role: String = "",               // CrewRole.name – z.B. "SKIPPER", "CO_SKIPPER"
     val emergencyContact: String = "",   // Name des Notfallkontakts
     val phone: String = "",              // Eigene Telefonnummer des Crewmitglieds

@@ -72,7 +72,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.trnberechnung.R
-import com.example.trnberechnung.model.AuthRepository
+import com.example.trnberechnung.model.AppPreferences
 import com.example.trnberechnung.model.BoatProfileRepository
 import com.example.trnberechnung.ui.components.TideNodeBlue
 import com.example.trnberechnung.ui.components.tideNodeGlass
@@ -108,7 +108,7 @@ private val SettingsTextColor: Color
 
 @Composable
 fun DashboardScreen(
-    authRepo: AuthRepository? = null,
+    appPreferences: AppPreferences? = null,
     onToggleDarkMode: (Boolean) -> Unit = {},
     onReplayOnboarding: () -> Unit = {},
 ) {
@@ -123,7 +123,7 @@ fun DashboardScreen(
     var length by remember { mutableStateOf(if (repo.length > 0) repo.length.toString() else "") }
     var safetyMargin by remember { mutableStateOf(if (repo.safetyMargin > 0) repo.safetyMargin.toString() else "") }
 
-    var isDark by remember { mutableStateOf(authRepo?.isDarkMode ?: false) }
+    var isDark by remember { mutableStateOf(appPreferences?.isDarkMode ?: false) }
     var boatTypeExpanded by remember { mutableStateOf(false) }
     var showOnboardingDialog by remember { mutableStateOf(false) }
 
@@ -359,7 +359,7 @@ fun DashboardScreen(
                             .background(if (!isDark) SettingsPrimaryBlue else Color.Transparent)
                             .clickable {
                                 isDark = false
-                                authRepo?.isDarkMode = false
+                                appPreferences?.isDarkMode = false
                                 onToggleDarkMode(false)
                             },
                     contentAlignment = Alignment.Center,
@@ -396,7 +396,7 @@ fun DashboardScreen(
                             .background(if (isDark) SettingsPrimaryBlue else Color.Transparent)
                             .clickable {
                                 isDark = true
-                                authRepo?.isDarkMode = true
+                                appPreferences?.isDarkMode = true
                                 onToggleDarkMode(true)
                             },
                     contentAlignment = Alignment.Center,
@@ -465,7 +465,7 @@ fun DashboardScreen(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Einführung erneut ansehen", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFFF8FAFC) else Color(0xFF0F172A))
-                    Text("Törnplanung, Wetter und Crewspace", fontSize = 12.sp, color = SettingsSubtitle)
+                    Text("Törnplanung, Wetter und Crew", fontSize = 12.sp, color = SettingsSubtitle)
                 }
                 Icon(Icons.Default.ChevronRight, null, tint = SettingsSubtitle, modifier = Modifier.size(20.dp))
             }

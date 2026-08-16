@@ -1,59 +1,36 @@
 package com.example.trnberechnung
 
 import android.app.Application
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.os.Build
 import androidx.room.Room
 import com.example.trnberechnung.database.AppDatabase
-import com.example.trnberechnung.model.AuthRepository
+import com.example.trnberechnung.model.AppPreferences
 import com.example.trnberechnung.navigation.ActiveVoyageManager
 import com.example.trnberechnung.navigation.FusedLocationProvider
 import com.example.trnberechnung.navigation.NavigationTracker
 import com.example.trnberechnung.navigation.VoyageServiceDependencies
 import com.example.trnberechnung.navigation.VoyageServiceHost
 import com.example.trnberechnung.repository.ActiveVoyageRepository
-import com.example.trnberechnung.repository.ChatRepository
 import com.example.trnberechnung.repository.NautiConversationRepository
 import com.example.trnberechnung.repository.RoomActiveVoyagePersistence
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import java.util.UUID
 
 class TideNodeApplication :
     Application(),
     VoyageServiceHost {
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     val database: AppDatabase by lazy {
         Room
             .databaseBuilder(
                 applicationContext,
                 AppDatabase::class.java,
                 "tide_database",
-            ).addMigrations(
-                AppDatabase.MIGRATION_8_10,
-                AppDatabase.MIGRATION_9_10,
-                AppDatabase.MIGRATION_10_11,
-                AppDatabase.MIGRATION_11_12,
-                AppDatabase.MIGRATION_12_13,
-                AppDatabase.MIGRATION_13_14,
             )
+            // No migration path on purpose: removing Crewspace dropped the chat tables and the app
+            // has never been published, so an existing install simply gets a fresh database.
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }
 
-    val authRepository: AuthRepository by lazy { AuthRepository(this) }
-
-    val chatRepository: ChatRepository by lazy {
-        ChatRepository(
-            context = this,
-            chatDao = database.chatDao(),
-            authRepository = authRepository,
-        )
-    }
+    val appPreferences: AppPreferences by lazy { AppPreferences(this) }
 
     val nautiConversationRepository: NautiConversationRepository by lazy {
         NautiConversationRepository(database.nautiDao(), ::localDataOwnerId)
@@ -85,37 +62,14 @@ class TideNodeApplication :
         )
     }
 
-    override fun onCreate() {
-        super.onCreate()
-        createChatNotificationChannel()
-        if (authRepository.isLoggedIn) {
-            applicationScope.launch { runCatching { chatRepository.activate() } }
-        }
-    }
-
-    private fun createChatNotificationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val channel =
-            NotificationChannel(
-                CHAT_NOTIFICATION_CHANNEL_ID,
-                "Crewspace-Nachrichten",
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = "Neue Direkt- und Gruppennachrichten"
-            }
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-    }
-
     /**
-     * Keeps local Nauti and voyage data account-isolated. Skipped sign-in uses
-     * one installation-stable guest namespace instead of leaking into a shared
-     * empty owner ID.
+     * Namespaces local Nauti and voyage data.
+     *
+     * Since the Crewspace account was removed there is no signed-in skipper to key on, so a single
+     * installation-stable ID is generated once and reused. The indirection stays because the Room
+     * entities are owner-scoped and reintroducing accounts should not require a migration.
      */
     fun localDataOwnerId(): String {
-        authRepository.skipperId
-            .trim()
-            .takeIf(String::isNotEmpty)
-            ?.let { return it }
         val preferences = getSharedPreferences(LOCAL_DATA_PREFS, MODE_PRIVATE)
         val existing = preferences.getString(GUEST_OWNER_KEY, null)
         if (!existing.isNullOrBlank()) return "guest:$existing"
@@ -125,7 +79,6 @@ class TideNodeApplication :
     }
 
     companion object {
-        const val CHAT_NOTIFICATION_CHANNEL_ID = "crewspace_messages"
         private const val LOCAL_DATA_PREFS = "local_data_owner"
         private const val GUEST_OWNER_KEY = "guest_owner_id"
     }

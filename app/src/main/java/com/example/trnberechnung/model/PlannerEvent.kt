@@ -4,7 +4,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 /**
- * Datenmodell für einen Planungstermin im Crewspace-Kalender.
+ * Datenmodell für einen Planungstermin im Törnkalender.
  * Wird vorerst als In-Memory-Mock verwendet.
  */
 data class PlannerEvent(

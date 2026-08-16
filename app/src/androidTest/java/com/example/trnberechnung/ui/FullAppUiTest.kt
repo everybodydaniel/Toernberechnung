@@ -108,9 +108,8 @@ class FullAppUiTest {
 
         composeTestRule.onNodeWithTag("nav_crew").performClick()
         composeTestRule.onNodeWithTag("nav_crew").assertIsSelected()
-        composeTestRule.onNodeWithTag("screen_crewspace").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("screen_header_crew").assertIsDisplayed()
         composeTestRule.onNodeWithText("KI-Assistent").assertDoesNotExist()
-        assertTabSurfaceFitsBetweenOverlays("screen_crewspace")
 
         composeTestRule.onNodeWithTag("nav_logbook").performClick()
         composeTestRule.onNodeWithTag("nav_logbook").assertIsSelected()
@@ -120,9 +119,6 @@ class FullAppUiTest {
         // Settings opens directly; there is no intermediate menu.
         composeTestRule.onNodeWithTag("app_header_settings").performClick()
         composeTestRule.onNodeWithTag("boat_name_input").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Crewspace-Konto").assertDoesNotExist()
-        composeTestRule.onNodeWithText("Auf diesem Gerät gespeichert").assertDoesNotExist()
-        composeTestRule.onNodeWithText("Firebase Auth").assertDoesNotExist()
         val newBoatName = "Flying Dutchman"
         composeTestRule.onNodeWithTag("boat_name_input").performTextReplacement(newBoatName)
         composeTestRule.onNodeWithTag("boat_name_headline").assertTextEquals(newBoatName)

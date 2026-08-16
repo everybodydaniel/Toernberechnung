@@ -17,6 +17,8 @@ object RouteMetricsCalculator {
         routeGeometry: List<GeoPoint>,
         departure: ZonedDateTime,
         boatSettings: BoatSettings,
+        worstClearanceMeters: Double? = null,
+        worstClearanceName: String? = null,
     ): RouteMetrics? {
         if (routeGeometry.size < 2 || boatSettings.speedKnots <= 0) return null
 
@@ -28,6 +30,8 @@ object RouteMetricsCalculator {
             distanceNm = distanceNm,
             departure = departure,
             boatSettings = boatSettings,
+            worstClearanceMeters = worstClearanceMeters,
+            worstClearanceName = worstClearanceName,
         )
     }
 

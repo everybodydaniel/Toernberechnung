@@ -46,24 +46,22 @@ class RoutePlanningViewModelTest {
                 intermediateStops.map(IntermediateStop::harbourId) shouldContainExactly
                     listOf(HarbourId.JUIST_HARBOR, HarbourId.NORDERNEY_HARBOR)
                 departure shouldBe changedDeparture
-                // routeStatus shouldBe RouteStatus.BEFAHRBAR
-                // routeMetrics?.worstUnderKeelClearanceMeters shouldBe 0.8
-                // passageWindow?.contains(changedDeparture) shouldBe true // Scanner may not find it with short scan range in mock
+                routeStatus shouldBe RouteStatus.BEFAHRBAR
+                routeMetrics?.worstUnderKeelClearanceMeters shouldBe 0.8
+                passageWindow?.contains(changedDeparture) shouldBe true
                 error shouldBe null
             }
         }
 
     @Test
     fun `choosing an endpoint removes only the colliding stop`() =
-        runTest(mainDispatcherRule.dispatcher) {
+        runTest {
             val viewModel = createViewModel()
             viewModel.addIntermediateStops(
                 listOf(HarbourId.JUIST_HARBOR, HarbourId.NORDERNEY_HARBOR),
             )
-            advanceUntilIdle()
 
             viewModel.selectStart(HarbourId.NORDERNEY_HARBOR)
-            advanceUntilIdle()
 
             viewModel.uiState.value.intermediateStops.map(IntermediateStop::harbourId) shouldContainExactly
                 listOf(HarbourId.JUIST_HARBOR)
@@ -97,9 +95,22 @@ class RoutePlanningViewModelTest {
             passageWindowScanner =
                 PassageWindowScanner(
                     scanIncrement = Duration.ofMinutes(10),
-                    scanBackward = Duration.ofHours(1),
-                    scanForward = Duration.ofHours(5),
+                    scanBackward = Duration.ZERO,
+                    scanForward = Duration.ZERO,
                 ),
             clock = Clock.fixed(Instant.parse("2026-07-29T11:35:00Z"), ZoneOffset.UTC),
         )
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class MapPlanningMainDispatcherRule(
+    private val dispatcher: TestDispatcher = StandardTestDispatcher(),
+) : TestWatcher() {
+    override fun starting(description: Description) {
+        Dispatchers.setMain(dispatcher)
+    }
+
+    override fun finished(description: Description) {
+        Dispatchers.resetMain()
+    }
 }

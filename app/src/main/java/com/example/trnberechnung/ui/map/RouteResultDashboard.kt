@@ -70,12 +70,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.trnberechnung.mapplanning.RoutePlanningUiState
 import com.example.trnberechnung.mapplanning.RoutePlanningViewModel
 import com.example.trnberechnung.mapplanning.RouteStatus
-import com.example.trnberechnung.ui.theme.TideNodeBlue
-import com.example.trnberechnung.ui.theme.TideNodeCyan
-import com.example.trnberechnung.ui.theme.TideNodeDanger
-import com.example.trnberechnung.ui.theme.TideNodeInk
-import com.example.trnberechnung.ui.theme.TideNodeSuccess
-import com.example.trnberechnung.ui.theme.TideNodeWarning
+import com.example.trnberechnung.ui.components.TideNodeBlue
+import com.example.trnberechnung.ui.components.TideNodeCyan
+import com.example.trnberechnung.ui.components.TideNodeDanger
+import com.example.trnberechnung.ui.components.TideNodeInk
+import com.example.trnberechnung.ui.components.TideNodeSuccess
+import com.example.trnberechnung.ui.components.TideNodeWarning
 import com.example.trnberechnung.ui.components.tideNodeGlass
 import java.time.Duration
 import java.time.format.DateTimeFormatter
@@ -97,10 +97,8 @@ fun RouteResultDashboard(
     modifier: Modifier = Modifier,
 ) {
     var mode by rememberSaveable { mutableStateOf(RouteDashboardMode.FULL) }
-    val metrics = state.routeMetrics
-    val hasInput = state.hasCompleteRouteInput
-    LaunchedEffect(hasInput, metrics != null) {
-        if ((metrics != null || hasInput) && mode == RouteDashboardMode.COMPACT) {
+    LaunchedEffect(state.hasCompleteRouteInput, state.routeMetrics != null) {
+        if ((state.routeMetrics != null || state.hasCompleteRouteInput) && mode == RouteDashboardMode.COMPACT) {
             mode = RouteDashboardMode.FULL
         }
     }

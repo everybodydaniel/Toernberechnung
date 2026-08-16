@@ -106,14 +106,15 @@ object NautiActionCodec {
     /**
      * Whether the action may fire the moment the reply arrives, without any tap.
      *
-     * Deliberately narrower than `!requiresConfirmation`: weather and tide requests are answered by
-     * a widget inside the chat, so they must not also yank the skipper off the map. The widget
-     * carries its own "open in Revier" affordance instead.
+     * Deliberately narrower than `!requiresConfirmation`: every data request - weather, tides and
+     * BSH water level - is answered by a widget inside the chat, so none of them may yank the
+     * skipper off the map. The widget carries its own "Im Revier öffnen" affordance instead.
      */
     fun autoDispatches(action: NautiAction): Boolean =
         !requiresConfirmation(action) &&
             action !is NautiAction.ShowWeather &&
-            action !is NautiAction.ShowTides
+            action !is NautiAction.ShowTides &&
+            action !is NautiAction.ShowBshWaterLevel
 
     const val TYPE_OPEN_TRIP_PLANNER = "open_trip_planner"
     const val TYPE_PLAN_TRIP = "plan_trip"

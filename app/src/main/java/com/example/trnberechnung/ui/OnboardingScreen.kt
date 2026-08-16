@@ -1,8 +1,10 @@
 package com.example.trnberechnung.ui
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloat
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.draw.scale
@@ -57,12 +60,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +79,7 @@ import com.example.trnberechnung.ui.theme.OnboardingInk
 import com.example.trnberechnung.ui.theme.OnboardingMuted
 import com.example.trnberechnung.ui.theme.OnboardingOrange
 import com.example.trnberechnung.ui.theme.OnboardingTeal
+import kotlin.math.atan2
 import kotlinx.coroutines.launch
 
 private const val ONBOARDING_PAGES = 3
@@ -207,11 +211,22 @@ private fun IllustrationCard(page: Int) =
         animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse),
         label = "boatBob"
     )
-    val dashPhase by transition.animateFloat(
+    // The boat sails the route instead of sitting at its end and bobbing. It eases away from the
+    // start marker, arrives at the destination, holds there for a moment so the arrival reads as an
+    // arrival, and then the passage begins again.
+    val voyage by transition.animateFloat(
         initialValue = 0f,
-        targetValue = -120f,
-        animationSpec = infiniteRepeatable(tween(3000), RepeatMode.Restart),
-        label = "dashPhase"
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 6800
+                0f at 0 using FastOutSlowInEasing
+                1f at 5200
+                1f at 6800
+            },
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "voyage"
     )
     val waveOffset by transition.animateFloat(
         initialValue = -8f,
@@ -247,33 +262,64 @@ private fun IllustrationCard(page: Int) =
         }
 
         val start = Offset(size.width * .14f, size.height * .70f)
-        val boat = Offset(size.width * .83f, size.height * .33f + boatBob)
+        val destination = Offset(size.width * .83f, size.height * .33f)
         val markerRadius = scale * .043f
         val completeRoute = Path().apply {
             moveTo(start.x, start.y)
-            cubicTo(size.width * .42f, size.height * .80f, size.width * .57f, size.height * .30f, boat.x, boat.y)
+            cubicTo(
+                size.width * .42f,
+                size.height * .80f,
+                size.width * .57f,
+                size.height * .30f,
+                destination.x,
+                destination.y,
+            )
         }
         val routeMeasure = androidx.compose.ui.graphics.PathMeasure().apply {
             setPath(completeRoute, forceClosed = false)
         }
-        val visibleRoute = Path()
         val routeStartDistance = markerRadius + 6.dp.toPx()
-        val routeEndDistance = routeMeasure.length - scale * .043f - 6.dp.toPx()
+        // The boat sails the route to its very end - it comes to rest on the destination itself,
+        // never short of it. The destination is drawn as a ring wide enough to hold the hull, so
+        // arriving means mooring inside the mark rather than covering it up.
+        val destinationRadius = scale * .088f
+        val boatDistance =
+            routeStartDistance + (routeMeasure.length - routeStartDistance) * voyage
+
+        // Two strokes tell the story without a word: the wake behind the boat is solid, the water
+        // still ahead of it stays dashed. Both stop at the ring, where the boat takes over.
+        val strokeWidth = scale * .014f
+        val routeEndDistance =
+            (routeMeasure.length - destinationRadius).coerceAtLeast(routeStartDistance)
+        val wakeEnd = boatDistance.coerceIn(routeStartDistance, routeEndDistance)
+        val sailed = Path()
         routeMeasure.getSegment(
             startDistance = routeStartDistance,
-            stopDistance = routeEndDistance.coerceAtLeast(routeStartDistance),
-            destination = visibleRoute,
+            stopDistance = wakeEnd,
+            destination = sailed,
             startWithMoveTo = true,
         )
         drawPath(
-            path = visibleRoute,
+            path = sailed,
             color = Color.White.copy(alpha = .92f),
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+        )
+        val ahead = Path()
+        routeMeasure.getSegment(
+            startDistance = wakeEnd,
+            stopDistance = routeEndDistance,
+            destination = ahead,
+            startWithMoveTo = true,
+        )
+        drawPath(
+            path = ahead,
+            color = Color.White.copy(alpha = .52f),
             style = Stroke(
-                width = scale * .014f,
+                width = strokeWidth,
                 cap = StrokeCap.Round,
                 pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
                     floatArrayOf(scale * .034f, scale * .024f),
-                    phase = dashPhase
+                    phase = 0f,
                 ),
             ),
         )
@@ -327,40 +373,67 @@ private fun IllustrationCard(page: Int) =
             center = Offset(start.x, start.y - pinHeight * .13f),
         )
 
+        // The destination: a mooring ring the arriving boat settles into. Wide enough that the hull
+        // sits inside it, so the mark stays readable at the end of the passage.
+        drawCircle(
+            color = Color.White.copy(alpha = .22f),
+            radius = destinationRadius,
+            center = destination,
+        )
+        drawCircle(
+            color = Color.White.copy(alpha = .92f),
+            radius = destinationRadius,
+            center = destination,
+            style = Stroke(width = scale * .010f),
+        )
+
+        val boat = routeMeasure.getPosition(boatDistance)
+        val tangent = routeMeasure.getTangent(boatDistance)
+        // Damped so the hull leans into the curve instead of standing on its bow.
+        val heading = Math.toDegrees(atan2(tangent.y, tangent.x).toDouble()).toFloat() * 0.55f
         val x = boat.x
-        val y = boat.y
-        drawPath(
-            Path().apply {
-                moveTo(x + scale * .002f, y + scale * .023f)
-                lineTo(x + scale * .002f, y - scale * .075f)
-                cubicTo(x + scale * .023f, y - scale * .062f, x + scale * .042f, y - scale * .021f, x + scale * .047f, y + scale * .022f)
-                cubicTo(x + scale * .030f, y + scale * .019f, x + scale * .016f, y + scale * .020f, x + scale * .002f, y + scale * .023f)
-                close()
-            },
-            Color.White,
-        )
-        drawPath(
-            Path().apply {
-                moveTo(x - scale * .005f, y + scale * .021f)
-                lineTo(x - scale * .005f, y - scale * .052f)
-                cubicTo(x - scale * .022f, y - scale * .042f, x - scale * .037f, y - scale * .012f, x - scale * .043f, y + scale * .021f)
-                close()
-            },
-            Color(0xFFE8F8FF),
-        )
-        drawPath(
-            Path().apply {
-                moveTo(x - scale * .043f, y + scale * .029f)
-                quadraticTo(x, y + scale * .036f, x + scale * .047f, y + scale * .027f)
-                lineTo(x + scale * .022f, y + scale * .051f)
-                quadraticTo(x - scale * .002f, y + scale * .055f, x - scale * .029f, y + scale * .048f)
-                close()
-            },
-            Color.White,
-        )
+        // The swell fades out as the boat comes in, so it settles at the destination instead of
+        // bobbing on the spot during the hold at the end of the loop.
+        val y = boat.y + boatBob * (1f - voyage)
+
+        rotate(degrees = heading, pivot = Offset(x, y)) {
+            drawPath(
+                Path().apply {
+                    moveTo(x + scale * .002f, y + scale * .023f)
+                    lineTo(x + scale * .002f, y - scale * .075f)
+                    cubicTo(x + scale * .023f, y - scale * .062f, x + scale * .042f, y - scale * .021f, x + scale * .047f, y + scale * .022f)
+                    cubicTo(x + scale * .030f, y + scale * .019f, x + scale * .016f, y + scale * .020f, x + scale * .002f, y + scale * .023f)
+                    close()
+                },
+                Color.White,
+            )
+            drawPath(
+                Path().apply {
+                    moveTo(x - scale * .005f, y + scale * .021f)
+                    lineTo(x - scale * .005f, y - scale * .052f)
+                    cubicTo(x - scale * .022f, y - scale * .042f, x - scale * .037f, y - scale * .012f, x - scale * .043f, y + scale * .021f)
+                    close()
+                },
+                Color(0xFFE8F8FF),
+            )
+            drawPath(
+                Path().apply {
+                    moveTo(x - scale * .043f, y + scale * .029f)
+                    quadraticTo(x, y + scale * .036f, x + scale * .047f, y + scale * .027f)
+                    lineTo(x + scale * .022f, y + scale * .051f)
+                    quadraticTo(x - scale * .002f, y + scale * .055f, x - scale * .029f, y + scale * .048f)
+                    close()
+                },
+                Color.White,
+            )
+        }
     }
 }
 
+/**
+ * The weather card. Only the sun moves - the temperature block and the hourly strip stay put, so
+ * the card reads as a weather panel rather than something drifting on the page.
+ */
 @Composable
 private fun WeatherIllustration() {
     val transition = rememberInfiniteTransition(label = "weather")
@@ -375,12 +448,6 @@ private fun WeatherIllustration() {
         targetValue = 1.10f,
         animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse),
         label = "sunPulse"
-    )
-    val cardFloat by transition.animateFloat(
-        initialValue = -3f,
-        targetValue = 3f,
-        animationSpec = infiniteRepeatable(tween(2400), RepeatMode.Reverse),
-        label = "cardFloat"
     )
 
     Box(
@@ -422,10 +489,7 @@ private fun WeatherIllustration() {
                 )
             }
             Spacer(Modifier.height(16.dp))
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                modifier = Modifier.graphicsLayer(translationY = cardFloat)
-            ) {
+            Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     stringResource(R.string.onboarding_weather_temperature),
                     color = Color.White,
@@ -452,7 +516,6 @@ private fun WeatherIllustration() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer(translationY = -cardFloat * 0.5f)
                     .clip(RoundedCornerShape(22.dp))
                     .background(Color.White.copy(alpha = .16f))
                     .padding(vertical = 8.dp),
@@ -466,12 +529,22 @@ private fun WeatherIllustration() {
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                         )
-                        Text(
-                            if (index < 2) "☀" else "☾",
-                            color = if (index < 2) Color(0xFFFFC400) else Color.White,
-                            fontSize = 24.sp,
-                            modifier = Modifier.padding(vertical = 4.dp),
-                        )
+                        // The sun and moon glyphs have different heights, so letting them size
+                        // their own row put them - and the temperatures underneath - on different
+                        // baselines. A fixed box centres both on one line.
+                        Box(
+                            modifier = Modifier
+                                .padding(vertical = 4.dp)
+                                .height(30.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                if (index < 2) "☀" else "☾",
+                                color = if (index < 2) Color(0xFFFFC400) else Color.White,
+                                fontSize = 24.sp,
+                                lineHeight = 24.sp,
+                            )
+                        }
                         Text(
                             "${21 - index}°",
                             color = Color.White,
@@ -546,12 +619,8 @@ private fun CrewIllustration() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            CrewFeature(
-                modifier = Modifier.weight(1f),
-                label = stringResource(R.string.onboarding_crew_chat),
-                status = stringResource(R.string.onboarding_crew_chat_release),
-            ) {
-                ChatBubblesIcon()
+            CrewFeature(Modifier.weight(1f), stringResource(R.string.onboarding_crew_crew)) {
+                Icon(Icons.Default.Groups, null, tint = OnboardingBlue, modifier = Modifier.size(28.dp))
             }
             CrewFeature(Modifier.weight(1f), stringResource(R.string.onboarding_crew_dates)) {
                 Icon(Icons.Default.DateRange, null, tint = OnboardingOrange, modifier = Modifier.size(28.dp))
@@ -600,47 +669,9 @@ private fun CrewConnectionLine(modifier: Modifier = Modifier, dashPhase: Float =
 @Composable private fun CrewAvatar(color: Color, message: String) = Column(horizontalAlignment=Alignment.CenterHorizontally) { Text(message, color=Color.White, fontSize=15.sp, fontWeight=FontWeight.Bold, modifier=Modifier.clip(RoundedCornerShape(20.dp)).background(color).padding(horizontal=14.dp, vertical=10.dp)); Spacer(Modifier.height(10.dp)); Box(Modifier.size(82.dp).clip(RoundedCornerShape(41.dp)).background(color), contentAlignment=Alignment.Center) { Icon(Icons.Default.Person, null, tint=Color.White, modifier=Modifier.size(42.dp)) } }
 
 @Composable
-private fun ChatBubblesIcon() =
-    Canvas(Modifier.size(28.dp)) {
-        val backColor = OnboardingBlue.copy(alpha = .55f)
-        val radius = CornerRadius(size.minDimension * .13f, size.minDimension * .13f)
-        drawRoundRect(
-            color = backColor,
-            topLeft = Offset(size.width * .05f, size.height * .10f),
-            size = Size(size.width * .68f, size.height * .54f),
-            cornerRadius = radius,
-        )
-        drawPath(
-            Path().apply {
-                moveTo(size.width * .18f, size.height * .60f)
-                lineTo(size.width * .20f, size.height * .77f)
-                lineTo(size.width * .36f, size.height * .63f)
-                close()
-            },
-            backColor,
-        )
-        drawRoundRect(
-            color = OnboardingBlue,
-            topLeft = Offset(size.width * .27f, size.height * .29f),
-            size = Size(size.width * .68f, size.height * .54f),
-            cornerRadius = radius,
-        )
-        drawPath(
-            Path().apply {
-                moveTo(size.width * .70f, size.height * .80f)
-                lineTo(size.width * .84f, size.height * .94f)
-                lineTo(size.width * .84f, size.height * .80f)
-                close()
-            },
-            OnboardingBlue,
-        )
-    }
-
-@Composable
 private fun CrewFeature(
     modifier: Modifier,
     label: String,
-    status: String? = null,
     iconContent: @Composable () -> Unit,
 ) =
     Column(
@@ -654,20 +685,6 @@ private fun CrewFeature(
         iconContent()
         Spacer(Modifier.height(5.dp))
         Text(label, color = OnboardingInk, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-        status?.let {
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = it,
-                color = OnboardingBlue,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.ExtraBold,
-                modifier =
-                    Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(OnboardingBlue.copy(alpha = .12f))
-                        .padding(horizontal = 5.dp, vertical = 1.dp),
-            )
-        }
     }
 
 @Composable

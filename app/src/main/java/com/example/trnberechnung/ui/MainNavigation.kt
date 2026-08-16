@@ -1,9 +1,6 @@
 package com.example.trnberechnung.ui
 
 import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -73,8 +70,8 @@ import com.example.trnberechnung.navigation.SensorHeadingProvider
 import com.example.trnberechnung.navigation.VoyageServiceController
 import com.example.trnberechnung.ui.components.GlassIconButton
 import com.example.trnberechnung.ui.components.TideNodeAppHeader
-import com.example.trnberechnung.ui.theme.TideNodeBlue
-import com.example.trnberechnung.ui.theme.TideNodeInk
+import com.example.trnberechnung.ui.components.TideNodeBlue
+import com.example.trnberechnung.ui.components.TideNodeInk
 import com.example.trnberechnung.ui.components.tideNodeGlass
 import com.example.trnberechnung.ui.map.MapTabScreen
 import com.example.trnberechnung.ui.navigation.FullScreenNavigationScreen
@@ -161,20 +158,6 @@ fun MainAppScreen(
     LaunchedEffect(Unit) {
         application.activeVoyageManager.restoreActiveVoyage()
     }
-
-    val refreshCoordinator =
-        remember(viewModel, crewspaceViewModel, routePlanningViewModel) {
-            AppRefreshCoordinator(
-                refreshMap = {
-                    viewModel.loadData()
-                    routePlanningViewModel.refresh()
-                    routePlanningViewModel.refreshPassageWindow()
-                },
-                refreshWeather = viewModel::loadData,
-                refreshCrewspace = { crewspaceViewModel?.refresh() },
-                refreshLogbook = viewModel::loadData,
-            )
-        }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val headerHeight = if (isLandscape) 52.dp else 78.dp
@@ -280,17 +263,15 @@ fun MainAppScreen(
             }
         }
 
-        val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-
         if (isMainTab) {
             TideNodeAppHeader(
-                onRefresh = {
-                    toggleScreenOrientation(context)
-                    refreshCoordinator.refresh(currentRoute)
-                },
                 onSettings = {
                     navController.navigate(Screen.Settings.route) { launchSingleTop = true }
                 },
+                // Map and Revier draw their own full-bleed background behind the header - the
+                // nautical chart and the blue gradient - so the wordmark goes white there.
+                onColoredBackground =
+                    currentRoute == Screen.MapRoute.route || currentRoute == Screen.Revier.route,
                 modifier =
                     Modifier
                         .align(Alignment.TopCenter)
@@ -506,18 +487,3 @@ private fun NavHostController.navigateMainTab(route: String) {
     }
 }
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
-
-private fun toggleScreenOrientation(context: Context) {
-    val activity = context.findActivity() ?: return
-    val currentOrientation = activity.resources.configuration.orientation
-    activity.requestedOrientation = if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE) {
-        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-    } else {
-        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-    }
-}

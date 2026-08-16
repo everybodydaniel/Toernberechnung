@@ -2,7 +2,6 @@ package com.example.trnberechnung.ui.components
 
 import android.content.res.Configuration
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,11 +34,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.trnberechnung.R
 
+/**
+ * The global app header.
+ *
+ * There is intentionally no refresh button any more. The one that used to sit next to the settings
+ * gear was doubly bound - it reloaded the visible tab *and* toggled the screen orientation - and the
+ * data it reloaded now refreshes on its own (see the lifecycle-bound loop in `MainActivity`).
+ * Orientation is back to the system's auto-rotate, which the manifest never overrode.
+ */
 @Composable
 fun TideNodeAppHeader(
-    onRefresh: () -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onColoredBackground: Boolean = false,
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -74,32 +80,28 @@ fun TideNodeAppHeader(
             Spacer(Modifier.size(if (isLandscape) 6.dp else 9.dp))
             Text(
                 text = "TideNode",
-                color = if (isDark) Color.White else Color(0xFF0F172A),
+                // White wherever the header floats over the nautical chart or the Revier gradient,
+                // maritime blue on the plain surfaces of Crewspace and Logbuch (lightened in the
+                // dark theme, where the deep blue loses its contrast).
+                color =
+                    when {
+                        onColoredBackground -> Color.White
+                        isDark -> TideNodeBlueLight
+                        else -> TideNodeBlue
+                    },
                 fontSize = titleFontSize,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = (-0.8).sp,
                 modifier = Modifier.testTag("app_header_wordmark").semantics { heading() },
             )
             Spacer(Modifier.weight(1f))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 6.dp else 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                GlassIconButton(
-                    icon = Icons.Default.Refresh,
-                    contentDescription = "Bildschirm drehen / Aktualisieren",
-                    onClick = onRefresh,
-                    size = buttonSize,
-                    modifier = Modifier.testTag("app_header_refresh"),
-                )
-                GlassIconButton(
-                    icon = Icons.Default.Settings,
-                    contentDescription = "Einstellungen",
-                    onClick = onSettings,
-                    size = buttonSize,
-                    modifier = Modifier.testTag("app_header_settings"),
-                )
-            }
+            GlassIconButton(
+                icon = Icons.Default.Settings,
+                contentDescription = "Einstellungen",
+                onClick = onSettings,
+                size = buttonSize,
+                modifier = Modifier.testTag("app_header_settings"),
+            )
         }
     }
 }

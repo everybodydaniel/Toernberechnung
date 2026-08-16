@@ -14,7 +14,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -30,6 +33,7 @@ import com.example.trnberechnung.viewmodel.CrewspaceViewModelFactory
 import com.example.trnberechnung.viewmodel.TideViewModel
 import com.example.trnberechnung.viewmodel.TideViewModelFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.maplibre.android.MapLibre
@@ -115,8 +119,19 @@ class MainActivity : ComponentActivity() {
                     val crewspaceFactory =
                         CrewspaceViewModelFactory(repository, chatRepository, authRepo)
 
-                    LaunchedEffect(Unit) {
-                        viewModel.loadData()
+                    // Weather, tides and BSH data keep themselves current: reloaded on every
+                    // return to the foreground and then every WEATHER_REFRESH_INTERVAL_MILLIS
+                    // while visible. Bound to RESUMED on purpose - nothing polls in the
+                    // background. This replaces the manual refresh button that used to sit in
+                    // the app header.
+                    val lifecycleOwner = LocalLifecycleOwner.current
+                    LaunchedEffect(viewModel, lifecycleOwner) {
+                        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                            while (true) {
+                                viewModel.loadData()
+                                delay(WEATHER_REFRESH_INTERVAL_MILLIS)
+                            }
+                        }
                     }
 
                     MainAppScreen(
@@ -151,5 +166,14 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val NOTIFICATION_PERMISSION_REQUEST = 4102
+
+        /**
+         * How often the foreground app reloads nautical data.
+         *
+         * Ten minutes matches how coarsely the upstream sources move: Bright Sky publishes hourly
+         * observations and the BSH forecast updates a few times a day. Polling faster would only
+         * burn battery and quota.
+         */
+        private const val WEATHER_REFRESH_INTERVAL_MILLIS = 10 * 60 * 1000L
     }
 }

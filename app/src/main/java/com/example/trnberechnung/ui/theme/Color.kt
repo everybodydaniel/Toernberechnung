@@ -35,16 +35,6 @@ val RouteLineStart = Color(0xFF0066FF)
 val RouteLineEnd = Color(0xFF00CCFF)
 val RouteLineGlow = Color(0xFF0088FF)
 
-// TideNode Palette (Glass Design)
-val TideNodeInk = Color(0xFF111318)
-val TideNodeBlue = Color(0xFF24579F)
-val TideNodeCyan = Color(0xFF09B7D6)
-val TideNodeTeal = Color(0xFF12B8A6)
-val TideNodeWarning = Color(0xFFF59E0B)
-val TideNodeDanger = Color(0xFFDC2626)
-val TideNodeSuccess = Color(0xFF15803D)
-val TideNodeGlassBorder = Color.White.copy(alpha = 0.68f)
-
 val Purple80 = NauticalPrimary
 val PurpleGrey80 = NauticalSecondary
 val Pink80 = NauticalAccentWarm

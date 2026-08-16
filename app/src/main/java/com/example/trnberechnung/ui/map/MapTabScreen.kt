@@ -64,8 +64,8 @@ import com.example.trnberechnung.navigation.ActiveVoyageManager
 import com.example.trnberechnung.navigation.FusedLocationProvider
 import com.example.trnberechnung.navigation.LocationAccess
 import com.example.trnberechnung.navigation.VoyageServiceController
-import com.example.trnberechnung.ui.theme.TideNodeBlue
-import com.example.trnberechnung.ui.theme.TideNodeInk
+import com.example.trnberechnung.ui.components.TideNodeBlue
+import com.example.trnberechnung.ui.components.TideNodeInk
 import com.example.trnberechnung.ui.components.tideNodeGlass
 import com.example.trnberechnung.ui.nauti.NautiDrawer
 import com.example.trnberechnung.viewmodel.NautiPanelMode
@@ -221,10 +221,7 @@ fun MapTabScreen(
     LaunchedEffect(nautiViewModel) {
         nautiViewModel.actions.collect { action ->
             when (action) {
-                NautiAction.OpenTripPlanner -> {
-                    showPlanner = true
-                    nautiViewModel.showCompact()
-                }
+                NautiAction.OpenTripPlanner -> showPlanner = true
                 is NautiAction.PlanTrip -> {
                     val start = HarbourId.fromRawValue(action.startHarbourId)
                     val destination = HarbourId.fromRawValue(action.destinationHarbourId)
@@ -238,7 +235,6 @@ fun MapTabScreen(
                         planningViewModel.addIntermediateStops(stops)
                         action.departure?.let(planningViewModel::updateDeparture)
                         showPlanner = true
-                        nautiViewModel.showCompact()
                     }
                 }
                 NautiAction.StartNavigation -> currentNavigationStarter(Unit)
@@ -248,7 +244,6 @@ fun MapTabScreen(
                     val preflight = nautiVoyageLauncher.planAndPreflight(action)
                     // Always reveal what was actually computed, whatever the outcome.
                     showPlanner = true
-                    nautiViewModel.showCompact()
                     when (preflight.outcome) {
                         VoyagePreflight.READY -> {
                             // Reuses the existing permission -> startVoyage -> foreground service
@@ -270,23 +265,19 @@ fun MapTabScreen(
                 NautiAction.ShowPassageWindow -> {
                     if (currentRouteState.hasCompleteRouteInput) {
                         planningViewModel.refreshPassageWindow()
-                        nautiViewModel.showCompact()
                     } else {
                         showPlanner = true
                     }
                 }
-                is NautiAction.ShowWeather -> {
+                // Data questions are answered by a widget inside the chat bubble, so these only
+                // keep the Revier tab pointed at the same harbour - they never navigate. Jumping
+                // tabs mid-conversation is exactly what the widget replaced.
+                is NautiAction.ShowWeather ->
                     selectNautiStation(action.harbourId, stations, tideViewModel)
-                    onOpenWeather()
-                }
-                is NautiAction.ShowTides -> {
+                is NautiAction.ShowTides ->
                     selectNautiStation(action.harbourId, stations, tideViewModel)
-                    onOpenWeather()
-                }
-                is NautiAction.ShowBshWaterLevel -> {
+                is NautiAction.ShowBshWaterLevel ->
                     selectNautiStation(action.harbourId, stations, tideViewModel)
-                    onOpenWeather()
-                }
             }
         }
     }
@@ -297,15 +288,9 @@ fun MapTabScreen(
             routeColor = routeState.mapRouteColor(),
             harbours = routeState.mapHarbourMarkers(),
             modifier = Modifier.fillMaxSize(),
-            onHarbourClick = { rawId ->
-                val selected = HarbourId.fromRawValue(rawId) ?: return@FullBleedMap
-                when {
-                    routeState.startHarbourId == null -> planningViewModel.selectStart(selected)
-                    routeState.destinationHarbourId == null &&
-                        routeState.startHarbourId != selected -> planningViewModel.selectDestination(selected)
-                    else -> showPlanner = true
-                }
-            },
+            // Only harbours that are already part of the plan carry a marker, so a tap can no
+            // longer be a "pick this as start/destination" gesture - it opens the planner instead.
+            onHarbourClick = { showPlanner = true },
         )
 
         val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -332,9 +317,16 @@ fun MapTabScreen(
                     ),
         )
 
+        val openRevierForHarbour: (String?) -> Unit = { harbourId ->
+            selectNautiStation(harbourId, stations, tideViewModel)
+            onOpenWeather()
+        }
+
         if (nautiState.mode != NautiPanelMode.COMPACT) {
             NautiDrawer(
                 viewModel = nautiViewModel,
+                stations = stations,
+                onOpenRevier = openRevierForHarbour,
                 modifier =
                     Modifier
                         .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
@@ -382,6 +374,8 @@ fun MapTabScreen(
         } else {
             NautiDrawer(
                 viewModel = nautiViewModel,
+                stations = stations,
+                onOpenRevier = openRevierForHarbour,
                 modifier =
                     Modifier
                         .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)

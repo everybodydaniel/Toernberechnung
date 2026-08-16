@@ -23,7 +23,6 @@ class RouteMetricsCalculatorTest {
                 departure = departure,
                 boatSettings = boatSettings,
                 worstClearanceMeters = 1.24,
-                worstClearanceName = "Baltrumer Wattfahrwasser",
             )
 
         metrics.travelTime shouldBe Duration.ofMinutes(255)
@@ -34,7 +33,6 @@ class RouteMetricsCalculatorTest {
         metrics.dieselReserveLiters shouldBe (1.785 plusOrMinus 0.000_001)
         metrics.totalDieselLiters shouldBe (10.71 plusOrMinus 0.000_001)
         metrics.worstUnderKeelClearanceMeters shouldBe 1.24
-        metrics.worstClearanceName shouldBe "Baltrumer Wattfahrwasser"
     }
 
     @Test

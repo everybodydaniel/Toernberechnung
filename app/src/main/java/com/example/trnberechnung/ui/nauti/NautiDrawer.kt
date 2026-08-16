@@ -83,19 +83,28 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.trnberechnung.database.NautiConversationEntity
 import com.example.trnberechnung.database.NautiMessageEntity
+import com.example.trnberechnung.model.TideStationData
 import com.example.trnberechnung.nauti.NautiActionCodec
 import com.example.trnberechnung.repository.NautiConversationRepository
-import com.example.trnberechnung.ui.theme.TideNodeBlue
-import com.example.trnberechnung.ui.theme.TideNodeCyan
-import com.example.trnberechnung.ui.theme.TideNodeInk
+import com.example.trnberechnung.ui.components.TideNodeBlue
+import com.example.trnberechnung.ui.components.TideNodeCyan
+import com.example.trnberechnung.ui.components.TideNodeInk
 import com.example.trnberechnung.ui.components.tideNodeGlass
 import com.example.trnberechnung.viewmodel.NautiPanelMode
 import com.example.trnberechnung.viewmodel.NautiViewModel
 import java.util.Locale
 
+/**
+ * @param stations the Revier station list, used to fill the in-chat weather/tide widgets. Passing
+ *   the same list the Revier screen renders is what keeps a widget from disagreeing with the tab it
+ *   links to.
+ * @param onOpenRevier opens the Revier tab on the harbour a widget is showing.
+ */
 @Composable
 fun NautiDrawer(
     viewModel: NautiViewModel,
+    stations: List<TideStationData>,
+    onOpenRevier: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -143,14 +152,18 @@ fun NautiDrawer(
                         title = active?.title ?: "Neuer Chat",
                         messages = messages,
                         draft = uiState.draft,
+                        conversationId = uiState.activeConversationId,
                         isSending = uiState.isSending,
                         error = uiState.error,
+                        stations = stations,
+                        onOpenRevier = onOpenRevier,
                         onHistory = viewModel::showHistory,
                         onNew = viewModel::createNewChat,
                         onCollapse = viewModel::showCompact,
                         onDraft = viewModel::updateDraft,
                         onSend = viewModel::send,
                         onConfirmAction = viewModel::confirmAction,
+
                     )
                 }
             }
@@ -226,13 +239,16 @@ private fun NautiChat(
     title: String,
     messages: List<NautiMessageEntity>,
     draft: String,
+    conversationId: String?,
     isSending: Boolean,
     error: String?,
+    stations: List<TideStationData>,
+    onOpenRevier: (String?) -> Unit,
     onHistory: () -> Unit,
     onNew: () -> Unit,
     onCollapse: () -> Unit,
     onDraft: (String) -> Unit,
-    onSend: () -> Unit,
+    onSend: (String) -> Unit,
     onConfirmAction: (NautiMessageEntity) -> Unit,
 ) {
     val listState = rememberLazyListState()
@@ -291,7 +307,12 @@ private fun NautiChat(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(messages, key = NautiMessageEntity::id) { message ->
-                NautiMessageBubble(message, onConfirmAction)
+                NautiMessageBubble(
+                    message = message,
+                    stations = stations,
+                    onConfirmAction = onConfirmAction,
+                    onOpenRevier = onOpenRevier,
+                )
             }
             if (isSending) {
                 item {
@@ -314,6 +335,7 @@ private fun NautiChat(
         }
         NautiComposer(
             draft = draft,
+            conversationId = conversationId,
             enabled = !isSending,
             onDraft = onDraft,
             onSend = onSend,
@@ -324,7 +346,9 @@ private fun NautiChat(
 @Composable
 private fun NautiMessageBubble(
     message: NautiMessageEntity,
+    stations: List<TideStationData>,
     onConfirmAction: (NautiMessageEntity) -> Unit,
+    onOpenRevier: (String?) -> Unit,
 ) {
     val fromUser = message.role == NautiConversationRepository.ROLE_USER
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -374,7 +398,18 @@ private fun NautiMessageBubble(
                 lineHeight = 21.sp,
             )
             val action = NautiActionCodec.decode(message.actionType, message.actionPayloadJson)
-            if (action != null) {
+            val widgetKind = action?.let(::widgetKindOf)
+            if (widgetKind != null) {
+                // A data question is answered right here. Nauti itself must not name figures, so
+                // this card is the answer - not a button that throws the skipper onto another tab.
+                Spacer(Modifier.height(10.dp))
+                NautiDataWidget(
+                    kind = widgetKind,
+                    harbourId = harbourIdOf(action),
+                    stations = stations,
+                    onOpenRevier = onOpenRevier,
+                )
+            } else if (action != null) {
                 Spacer(Modifier.height(10.dp))
                 Button(
                     onClick = { onConfirmAction(message) },
@@ -406,19 +441,64 @@ private fun NautiMessageBubble(
     }
 }
 
+/**
+ * The message input, and the sole owner of the text being typed.
+ *
+ * The text used to be hoisted all the way out to `NautiViewModel` and read back through a
+ * `StateFlow`. That put two things in the way of every single keystroke: the value only caught up a
+ * frame later (which resets the IME's composing region, so characters from the accent and umlaut
+ * popups were silently dropped - "Törn" and "Böen" were not typeable), and mirroring the draft into
+ * `uiState` recomposed the entire chat panel, message list and data widgets included, once per
+ * character.
+ *
+ * Now the field is the single synchronous source of truth. The ViewModel is still told about each
+ * change so it can keep the per-conversation draft in Room, but it no longer feeds the value back,
+ * and `send` receives the text as an argument instead of reading it from state.
+ *
+ * [draft] is therefore only what the conversation was loaded with. [conversationId] is what pulls it
+ * in: switching conversations is an external change, a keystroke is not.
+ */
 @Composable
 private fun NautiComposer(
     draft: String,
+    conversationId: String?,
     enabled: Boolean,
     onDraft: (String) -> Unit,
-    onSend: () -> Unit,
+    onSend: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    var text by remember(conversationId) { mutableStateOf(draft) }
+    var lastPushed by remember(conversationId) { mutableStateOf(draft) }
+
+    // Adopt an externally driven draft - a conversation's restored text, or the reset to "" that
+    // `send()` performs - while ignoring the echo of our own keystrokes. Without that distinction
+    // a lagging echo could overwrite characters typed since, which is the very failure this
+    // composer is meant to avoid.
+    LaunchedEffect(conversationId, draft) {
+        if (draft != lastPushed) {
+            text = draft
+            lastPushed = draft
+        }
+    }
+
+    fun update(value: String) {
+        text = value
+        lastPushed = value
+        onDraft(value)
+    }
+
+    fun submit() {
+        if (!enabled || text.isBlank()) return
+        onSend(text)
+        text = ""
+        lastPushed = ""
+    }
+
     val speech =
         rememberNautiSpeechInput(
             onTranscript = { transcript ->
-                val separator = if (draft.isBlank()) "" else " "
-                onDraft(draft.trimEnd() + separator + transcript)
+                val separator = if (text.isBlank()) "" else " "
+                update(text.trimEnd() + separator + transcript)
             },
         )
     val permissionLauncher =
@@ -442,13 +522,13 @@ private fun NautiComposer(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         OutlinedTextField(
-            value = draft,
-            onValueChange = onDraft,
+            value = text,
+            onValueChange = ::update,
             placeholder = { Text("Nachrichten", color = placeholderColor) },
             enabled = enabled,
             maxLines = 4,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(onSend = { if (draft.isNotBlank()) onSend() }),
+            keyboardActions = KeyboardActions(onSend = { submit() }),
             colors =
                 OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color.Transparent,
@@ -480,15 +560,17 @@ private fun NautiComposer(
                 tint = if (speech.isListening) Color(0xFFDC2626) else TideNodeInk,
             )
         }
-        IconButton(onClick = onSend, enabled = enabled && draft.isNotBlank()) {
+        IconButton(onClick = ::submit, enabled = enabled && text.isNotBlank()) {
             Icon(
                 Icons.AutoMirrored.Filled.Send,
                 "Senden",
-                tint = if (enabled && draft.isNotBlank()) TideNodeCyan else Color(0xFFB1B4B8),
+                tint = if (enabled && text.isNotBlank()) TideNodeCyan else Color(0xFFB1B4B8),
             )
         }
     }
 }
+
+
 
 @Composable
 private fun NautiHistory(
@@ -502,8 +584,8 @@ private fun NautiHistory(
     onPin: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
 ) {
-    val renameTarget = remember { mutableStateOf<NautiConversationEntity?>(null) }
-    val deleteTarget = remember { mutableStateOf<NautiConversationEntity?>(null) }
+    var renameTarget by remember { mutableStateOf<NautiConversationEntity?>(null) }
+    var deleteTarget by remember { mutableStateOf<NautiConversationEntity?>(null) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val titleColor = if (isDark) Color(0xFFF8FAFC) else TideNodeInk
@@ -587,10 +669,10 @@ private fun NautiHistory(
                             tint = if (conversation.isPinned) TideNodeCyan else iconTint,
                         )
                     }
-                    IconButton(onClick = { renameTarget.value = conversation }) {
+                    IconButton(onClick = { renameTarget = conversation }) {
                         Icon(Icons.Default.Edit, "Umbenennen", tint = iconTint)
                     }
-                    IconButton(onClick = { deleteTarget.value = conversation }) {
+                    IconButton(onClick = { deleteTarget = conversation }) {
                         Icon(Icons.Default.Delete, "Löschen", tint = if (isDark) Color(0xFFF87171) else Color(0xFFB91C1C))
                     }
                 }
@@ -598,10 +680,10 @@ private fun NautiHistory(
         }
     }
 
-    renameTarget.value?.let { conversation ->
+    renameTarget?.let { conversation ->
         var value by remember(conversation.id) { mutableStateOf(conversation.title) }
         AlertDialog(
-            onDismissRequest = { renameTarget.value = null },
+            onDismissRequest = { renameTarget = null },
             title = { Text("Chat umbenennen") },
             text = {
                 OutlinedTextField(value = value, onValueChange = { value = it }, singleLine = true)
@@ -610,37 +692,37 @@ private fun NautiHistory(
                 TextButton(
                     onClick = {
                         onRename(conversation.id, value)
-                        renameTarget.value = null
+                        renameTarget = null
                     },
                 ) {
                     Text("Speichern")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { renameTarget.value = null }) {
+                TextButton(onClick = { renameTarget = null }) {
                     Text("Abbrechen")
                 }
             },
         )
     }
 
-    deleteTarget.value?.let { conversation ->
+    deleteTarget?.let { conversation ->
         AlertDialog(
-            onDismissRequest = { deleteTarget.value = null },
+            onDismissRequest = { deleteTarget = null },
             title = { Text("Chat löschen?") },
             text = { Text("„${conversation.title}“ wird dauerhaft von diesem Gerät entfernt.") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         onDelete(conversation.id)
-                        deleteTarget.value = null
+                        deleteTarget = null
                     },
                 ) {
                     Text("Löschen", color = Color(0xFFB91C1C))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deleteTarget.value = null }) {
+                TextButton(onClick = { deleteTarget = null }) {
                     Text("Abbrechen")
                 }
             },

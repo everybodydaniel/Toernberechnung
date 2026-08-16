@@ -47,12 +47,11 @@ class RoutePlanningViewModel(
                 start = harbourId,
                 destination = current.destinationHarbourId,
             )
-        _uiState.update {
-            it.copy(
+        _uiState.value =
+            current.copy(
                 startHarbourId = harbourId,
                 intermediateStops = sanitizedStops,
             )
-        }
         routeInputChanged()
     }
 
@@ -65,12 +64,11 @@ class RoutePlanningViewModel(
                 start = current.startHarbourId,
                 destination = harbourId,
             )
-        _uiState.update {
-            it.copy(
+        _uiState.value =
+            current.copy(
                 destinationHarbourId = harbourId,
                 intermediateStops = sanitizedStops,
             )
-        }
         routeInputChanged()
     }
 
@@ -85,7 +83,7 @@ class RoutePlanningViewModel(
             )
         val additions = updated.size - current.intermediateStops.size
         if (additions > 0) {
-            _uiState.update { it.copy(intermediateStops = updated) }
+            _uiState.value = current.copy(intermediateStops = updated)
             routeInputChanged()
         }
         return additions
@@ -105,7 +103,7 @@ class RoutePlanningViewModel(
                 destination = current.destinationHarbourId,
             ) ?: return false
         if (updated != current.intermediateStops) {
-            _uiState.update { it.copy(intermediateStops = updated) }
+            _uiState.value = current.copy(intermediateStops = updated)
             routeInputChanged()
         }
         return true
@@ -115,7 +113,7 @@ class RoutePlanningViewModel(
         val current = _uiState.value
         val updated = current.intermediateStops.filterNot { it.id == stopId }
         if (updated != current.intermediateStops) {
-            _uiState.update { it.copy(intermediateStops = updated) }
+            _uiState.value = current.copy(intermediateStops = updated)
             routeInputChanged()
         }
     }
@@ -238,8 +236,6 @@ class RoutePlanningViewModel(
             it.copy(
                 isCalculating = true,
                 isSearchingPassageWindow = false,
-                routeMetrics = null,
-                passageWindow = null,
                 messages = emptyList(),
                 error = null,
             )
@@ -409,35 +405,33 @@ class RoutePlanningViewModel(
         routeGeometry: List<GeoPoint>,
         distanceNm: Double,
     ): PassageWindow? =
-        withContext(Dispatchers.Default) {
-            passageWindowScanner.findSafeWindow(
-                center = request.departure,
-                evaluator =
-                    PassageCandidateEvaluator { candidateDeparture ->
-                        val shiftedRequest = request.copy(departure = candidateDeparture)
-                        val shiftedMetrics =
-                            RouteMetricsCalculator.fromDistance(
-                                distanceNm = distanceNm,
-                                departure = candidateDeparture,
-                                boatSettings = request.boatSettings,
-                            )
-                        val assessment =
-                            routeAssessmentProvider.assess(
-                                RouteAssessmentInput(
-                                    request = shiftedRequest,
-                                    routeGeometry = routeGeometry,
-                                    routeMetrics = shiftedMetrics,
-                                ),
-                            )
-                        PassageCandidateAssessment(
-                            expectedWaypointCount = assessment.expectedWaypointCount,
-                            waypointClearances = assessment.clearanceSamples,
-                            allLegsValid = assessment.allLegsValid,
-                            safetyMarginMeters = request.boatSettings.safetyMarginMeters,
+        passageWindowScanner.findSafeWindow(
+            center = request.departure,
+            evaluator =
+                PassageCandidateEvaluator { candidateDeparture ->
+                    val shiftedRequest = request.copy(departure = candidateDeparture)
+                    val shiftedMetrics =
+                        RouteMetricsCalculator.fromDistance(
+                            distanceNm = distanceNm,
+                            departure = candidateDeparture,
+                            boatSettings = request.boatSettings,
                         )
-                    },
-            )
-        }
+                    val assessment =
+                        routeAssessmentProvider.assess(
+                            RouteAssessmentInput(
+                                request = shiftedRequest,
+                                routeGeometry = routeGeometry,
+                                routeMetrics = shiftedMetrics,
+                            ),
+                        )
+                    PassageCandidateAssessment(
+                        expectedWaypointCount = assessment.expectedWaypointCount,
+                        waypointClearances = assessment.clearanceSamples,
+                        allLegsValid = assessment.allLegsValid,
+                        safetyMarginMeters = request.boatSettings.safetyMarginMeters,
+                    )
+                },
+        )
 
     private inline fun updateForGeneration(
         generation: Long,

@@ -116,8 +116,15 @@ class NautiViewModel(
         _uiState.update { it.copy(historyQuery = value) }
     }
 
+    /**
+     * Persists the draft without touching [uiState].
+     *
+     * The composer owns its own text (see `NautiComposer`). Mirroring every keystroke into
+     * [uiState] used to recompose the whole chat panel - message list, action widgets and all -
+     * once per character, which dropped keystrokes on slower devices. [NautiUiState.draft] is now
+     * only what a conversation was *loaded* with, so the composer can restore it.
+     */
     fun updateDraft(value: String) {
-        _uiState.update { it.copy(draft = value) }
         val conversationId = _uiState.value.activeConversationId ?: return
         draftWriteJob?.cancel()
         draftWriteJob =
@@ -184,10 +191,11 @@ class NautiViewModel(
         }
     }
 
-    fun send() {
+    /** @param draft the composer's current text - the composer, not [uiState], owns it. */
+    fun send(draft: String) {
         val state = _uiState.value
         val conversationId = state.activeConversationId ?: return
-        val text = state.draft.trim()
+        val text = draft.trim()
         if (text.isBlank() || state.isSending) return
         _uiState.update { it.copy(draft = "", isSending = true, error = null) }
         viewModelScope.launch {

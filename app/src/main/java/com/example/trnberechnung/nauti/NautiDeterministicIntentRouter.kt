@@ -72,9 +72,11 @@ class NautiDeterministicIntentRouter(
             )
         }
 
+        // The texts below stay free of figures on purpose: the widget the app renders under the
+        // bubble carries the actual measurements, and two sources for one number is one too many.
         if (normalized.contains("wasserstand") || normalized.contains("bsh")) {
             return NautiReply(
-                text = "Ich öffne die BSH-Wasserstandsdaten.",
+                text = "Hier ist der BSH-Wasserstand.",
                 action = NautiAction.ShowBshWaterLevel(harbourIds.firstOrNull()),
             )
         }
@@ -86,7 +88,7 @@ class NautiDeterministicIntentRouter(
             normalized.contains("niedrig wasser")
         ) {
             return NautiReply(
-                text = "Ich öffne die Gezeiten für das gewünschte Revier.",
+                text = "Hier sind die Gezeiten für dein Revier.",
                 action = NautiAction.ShowTides(harbourIds.firstOrNull()),
             )
         }
@@ -98,7 +100,7 @@ class NautiDeterministicIntentRouter(
             normalized.contains("sicht")
         ) {
             return NautiReply(
-                text = "Ich öffne die maritimen Wetterdaten.",
+                text = "Hier sind die aktuellen Wetterdaten.",
                 action = NautiAction.ShowWeather(harbourIds.firstOrNull()),
             )
         }

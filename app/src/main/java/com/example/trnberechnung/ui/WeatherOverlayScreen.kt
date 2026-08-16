@@ -741,7 +741,8 @@ private fun WeekForecastRow(day: DailyForecast, weekMin: Int, weekMax: Int) {
     }
 }
 
-private fun iconToEmoji(iconOrCondition: String?): String = when (iconOrCondition) {
+/** Shared with the Nauti in-chat weather widget so both show the same glyph for the same sky. */
+internal fun iconToEmoji(iconOrCondition: String?): String = when (iconOrCondition) {
     "clear-day", "clear-night", "dry" -> "☀️"
     "partly-cloudy-day", "partly-cloudy-night" -> "⛅"
     "cloudy" -> "☁️"

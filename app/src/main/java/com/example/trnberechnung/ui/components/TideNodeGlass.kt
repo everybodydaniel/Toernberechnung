@@ -22,14 +22,18 @@ import androidx.compose.ui.unit.dp
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.luminance
-import com.example.trnberechnung.ui.theme.TideNodeBlue
-import com.example.trnberechnung.ui.theme.TideNodeCyan
-import com.example.trnberechnung.ui.theme.TideNodeDanger
-import com.example.trnberechnung.ui.theme.TideNodeInk
-import com.example.trnberechnung.ui.theme.TideNodeSuccess
-import com.example.trnberechnung.ui.theme.TideNodeTeal
-import com.example.trnberechnung.ui.theme.TideNodeWarning
-import com.example.trnberechnung.ui.theme.TideNodeGlassBorder
+
+val TideNodeInk = Color(0xFF111318)
+val TideNodeBlue = Color(0xFF24579F)
+
+/** [TideNodeBlue] lightened for dark surfaces, where the deep blue loses its contrast. */
+val TideNodeBlueLight = Color(0xFF60A5FA)
+val TideNodeCyan = Color(0xFF09B7D6)
+val TideNodeTeal = Color(0xFF12B8A6)
+val TideNodeWarning = Color(0xFFF59E0B)
+val TideNodeDanger = Color(0xFFDC2626)
+val TideNodeSuccess = Color(0xFF15803D)
+val TideNodeGlassBorder = Color.White.copy(alpha = 0.68f)
 
 @Composable
 fun Modifier.tideNodeGlass(
@@ -105,7 +109,7 @@ fun GlassIconButton(
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val bg = if (isDark) Color(0xFF1E293B) else Color.White.copy(alpha = 0.85f)
     val border = if (isDark) Color(0xFF334155) else Color.White.copy(alpha = 0.85f)
-    val resolvedTint = if (iconTint != Color.Unspecified) iconTint else if (isDark) Color(0xFF60A5FA) else TideNodeBlue
+    val resolvedTint = if (iconTint != Color.Unspecified) iconTint else if (isDark) TideNodeBlueLight else TideNodeBlue
 
     Box(
         modifier =

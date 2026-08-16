@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.trnberechnung.dto.WeatherDto
+import com.example.trnberechnung.logic.TideTimes
 import com.example.trnberechnung.model.TideEvent
 import com.example.trnberechnung.model.TideStationData
 import com.example.trnberechnung.ui.theme.*
@@ -66,6 +67,7 @@ fun WeatherScreen(
     val selectedStation by viewModel.selectedStation.collectAsState()
     val allStations by viewModel.allStations.collectAsState()
     val tideEvents by viewModel.currentTideEvents.collectAsState()
+    val lastWeatherUpdate by viewModel.lastWeatherUpdate.collectAsState()
     var showStationDialog by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
@@ -113,7 +115,10 @@ fun WeatherScreen(
                         ) {
                             if (targetTab == 0) {
                                 val isLoading by viewModel.weatherLoading.collectAsState()
-                                if (isLoading) {
+                                // Only a cold start shows the skeleton. The app reloads itself
+                                // every few minutes, and blanking the whole tab each time would
+                                // make it look broken.
+                                if (isLoading && weather == null) {
                                     WeatherSkeleton()
                                 } else {
                                     WeatherContent(
@@ -121,6 +126,7 @@ fun WeatherScreen(
                                         weather = weather,
                                         forecast = forecast,
                                         dailyForecast = dailyForecast,
+                                        lastUpdated = lastWeatherUpdate,
                                         onStationClick = { showStationDialog = true },
                                         viewModel = viewModel
                                     )
@@ -152,6 +158,32 @@ fun WeatherScreen(
                 showStationDialog = false
             }
         )
+    }
+}
+
+/**
+ * Turns the last successful load into a self-updating "wie frisch sind diese Daten" line.
+ *
+ * The header used to state "Aktualisiert vor 5 Min." as a literal, which was wrong the moment it
+ * was written. Now that the app reloads on its own every few minutes, this label is the skipper's
+ * only way to tell whether that is actually happening - so it ticks on its own once a minute
+ * instead of only redrawing when new weather arrives.
+ */
+@Composable
+private fun rememberFreshnessLabel(lastUpdated: Long?): String {
+    if (lastUpdated == null) return "Wird geladen …"
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(lastUpdated) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val minutes = ((now - lastUpdated).coerceAtLeast(0L) / 60_000L)
+    return when {
+        minutes < 1 -> "Gerade aktualisiert"
+        minutes < 60 -> "Aktualisiert vor $minutes Min."
+        else -> "Aktualisiert vor ${minutes / 60} Std."
     }
 }
 
@@ -218,6 +250,7 @@ fun WeatherContent(
     weather: WeatherDto?,
     forecast: List<WeatherDto>,
     dailyForecast: List<DailyForecast>,
+    lastUpdated: Long?,
     onStationClick: () -> Unit,
     viewModel: TideViewModel
 ) {
@@ -291,7 +324,7 @@ fun WeatherContent(
                 )
             }
             Text(
-                "Gefühlt ${weather?.dewPoint?.toInt() ?: "--"}° · Aktualisiert vor 5 Min.",
+                "Gefühlt ${weather?.dewPoint?.toInt() ?: "--"}° · ${rememberFreshnessLabel(lastUpdated)}",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
@@ -824,27 +857,7 @@ fun TideContent(
 ) {
     val now = LocalDateTime.now()
 
-    // Parse events with time
-    val eventsWithTime = remember(events) {
-        events.mapNotNull { event ->
-            try {
-                val cleanTs = event.timestamp
-                    .replace("T", " ")
-                    .replace(Regex("Z$"), "")
-                    .replace(Regex("\\+\\d{2}:\\d{2}$"), "")
-                    .replace(Regex("\\+\\d{2}$"), "")
-                    .trim()
-                val dt = try {
-                    LocalDateTime.parse(cleanTs, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                } catch (_: Exception) {
-                    LocalDateTime.parse(cleanTs, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                }
-                event to dt
-            } catch (_: Exception) {
-                null
-            }
-        }.sortedBy { it.second }
-    }
+    val eventsWithTime = remember(events) { TideTimes.sortedByTime(events) }
 
     val nextEventPair = eventsWithTime.firstOrNull { it.second.isAfter(now) }
     val lastEventPair = eventsWithTime.lastOrNull { it.second.isBefore(now) }
@@ -1431,19 +1444,9 @@ fun StationSelectionDialog(
     }
 }
 
-private fun iconToEmoji(iconOrCondition: String?): String = when (iconOrCondition) {
-    "clear-day", "clear-night", "dry" -> "☀️"
-    "partly-cloudy-day", "partly-cloudy-night" -> "⛅"
-    "cloudy" -> "☁️"
-    "fog" -> "🌫️"
-    "rain" -> "🌧️"
-    "sleet" -> "🌨️"
-    "snow" -> "❄️"
-    "hail" -> "🧊"
-    "thunderstorm" -> "⛈️"
-    "wind" -> "💨"
-    else -> "☀️"
-}
+// iconToEmoji lives in WeatherOverlayScreen.kt (same package) and is shared with the Nauti in-chat
+// widget. The copy that used to sit here differed only in its fallback, which quietly turned every
+// unrecognised sky into a sun.
 
 private fun aggregateToDays(hourlyData: List<WeatherDto>): List<DailyForecast> {
     if (hourlyData.isEmpty()) return emptyList()

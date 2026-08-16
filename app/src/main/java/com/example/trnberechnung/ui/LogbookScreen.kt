@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,6 +36,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -150,16 +152,25 @@ fun LogbookScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                    // The clearance below the card, not inside it: as a Spacer in the card's
+                    // Column it stretched the empty state by the full bottom-overlay height and
+                    // left a large blank area under the button.
+                    .padding(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 16.dp,
+                        bottom = maxOf(16.dp, bottomOverlayClearance),
+                    ),
                 contentAlignment = Alignment.TopCenter
             ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)
+                        containerColor = MaterialTheme.colorScheme.surface
                     ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(
                         modifier = Modifier
@@ -201,7 +212,6 @@ fun LogbookScreen(
                             Spacer(Modifier.width(12.dp))
                             Text("Leere PDF erstellen", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         }
-                        Spacer(modifier = Modifier.height(maxOf(16.dp, bottomOverlayClearance)))
                     }
                 }
             }
@@ -235,15 +245,19 @@ private fun LogbookActionBar(
     onCreateBlankPdf: () -> Unit
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // A flat surface with a hairline outline instead of an elevated, semi-transparent one. The
+    // drop shadow of the previous version read as a grey box sitting behind a white card, because
+    // the card's own fill was almost the same colour as the screen behind it.
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = if (isLandscape) 4.dp else 12.dp),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = if (isLandscape) 6.dp else 14.dp, bottom = if (isLandscape) 6.dp else 14.dp),
@@ -257,20 +271,27 @@ private fun LogbookActionBar(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    "Planungen und aufgezeichnete Fahrten",
+                    // Short enough to share the row with the button on a phone: the longer
+                    // wording wrapped to two lines and collided with it.
+                    "Planungen und Fahrten",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             FilledTonalButton(
                 onClick = onCreateBlankPdf,
                 shape = RoundedCornerShape(28.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                modifier = Modifier.height(48.dp) // Accessibility: min height
+                // heightIn, not height: the label used to be a hard-wrapped two-liner inside a
+                // fixed 48 dp button, so its second line was simply cut off. The minimum keeps the
+                // touch target accessible without capping the content.
+                modifier = Modifier.heightIn(min = 48.dp)
             ) {
                 Icon(Icons.Default.AddCircle, contentDescription = "PDF erstellen", modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Leerer\nTörnverlauf", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Leere Vorlage", fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
             }
         }
     }

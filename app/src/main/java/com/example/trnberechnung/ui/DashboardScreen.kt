@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,7 +74,7 @@ import androidx.compose.ui.unit.sp
 import com.example.trnberechnung.R
 import com.example.trnberechnung.model.AuthRepository
 import com.example.trnberechnung.model.BoatProfileRepository
-import com.example.trnberechnung.ui.theme.TideNodeBlue
+import com.example.trnberechnung.ui.components.TideNodeBlue
 import com.example.trnberechnung.ui.components.tideNodeGlass
 
 import androidx.compose.ui.window.Dialog
@@ -245,7 +246,7 @@ fun DashboardScreen(
                         text = boatType,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = SettingsTextColor,
+                        color = Color(0xFF0F172A),
                         modifier = Modifier.weight(1f),
                     )
                     Icon(Icons.Default.UnfoldMore, null, tint = SettingsPrimaryBlue, modifier = Modifier.size(20.dp))
@@ -313,21 +314,18 @@ fun DashboardScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            Row(
+            // Full row width: at half width the label wrapped and was clipped by the field's
+            // height. This is the longest label of the group, so it gets the whole line.
+            SettingsNumberBox(
+                value = safetyMargin,
+                onValueChange = {
+                    safetyMargin = it
+                    it.toFloatOrNull()?.let { v -> repo.safetyMargin = v }
+                },
+                icon = Icons.Default.Shield,
+                label = "Sicherheitsabstand (m)",
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SettingsNumberBox(
-                    value = safetyMargin,
-                    onValueChange = {
-                        safetyMargin = it
-                        it.toFloatOrNull()?.let { v -> repo.safetyMargin = v }
-                    },
-                    icon = Icons.Default.Shield,
-                    label = "Sicherheitsabst.",
-                    modifier = Modifier.fillMaxWidth(0.5f),
-                )
-            }
+            )
         }
 
         // ══════════════════════════════════════════════════
@@ -626,7 +624,9 @@ private fun SettingsNumberBox(
     Row(
         modifier =
             modifier
-                .height(56.dp)
+                // heightIn rather than a fixed height: a floating label that needs more room than
+                // 56 dp used to be cut off instead of making the field grow.
+                .heightIn(min = 56.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(SettingsInputBg)
                 .border(1.dp, SettingsInputBorder, RoundedCornerShape(16.dp))
@@ -638,7 +638,7 @@ private fun SettingsNumberBox(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            label = { Text(label) },
+            label = { Text(label, maxLines = 1) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),

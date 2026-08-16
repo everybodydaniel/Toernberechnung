@@ -138,11 +138,14 @@ class FullAppUiTest {
                 .performClick()
             composeTestRule.waitForIdle()
         }
-        composeTestRule.onNodeWithText("FULL RELEASE").assertIsDisplayed()
+        // The crew page no longer advertises a chat that is not coming: the tile reads "Crew" and
+        // carries no release badge.
+        composeTestRule.onNodeWithText("FULL RELEASE").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Crew").assertIsDisplayed()
         composeTestRule
             .onNodeWithText(
-                "Organisiere Rollen und teile Termine mit deiner Crew. " +
-                    "Die Chat-Funktion folgt mit dem Full Release.",
+                "Organisiere Rollen und teile Termine mit deiner Crew – " +
+                    "alle an Bord wissen, wann es losgeht und wer was übernimmt.",
             ).assertIsDisplayed()
         composeTestRule.onNodeWithTag("onboarding_continue").assertIsNotEnabled()
         composeTestRule.onNodeWithTag("onboarding_disclaimer_checkbox")

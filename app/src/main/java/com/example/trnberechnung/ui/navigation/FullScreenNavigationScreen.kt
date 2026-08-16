@@ -66,10 +66,10 @@ import com.example.trnberechnung.navigation.HeadingProvider
 import com.example.trnberechnung.navigation.HeadingSample
 import com.example.trnberechnung.navigation.LocationFix
 import com.example.trnberechnung.navigation.LocationProvider
-import com.example.trnberechnung.ui.theme.TideNodeCyan
-import com.example.trnberechnung.ui.theme.TideNodeDanger
-import com.example.trnberechnung.ui.theme.TideNodeSuccess
-import com.example.trnberechnung.ui.theme.TideNodeWarning
+import com.example.trnberechnung.ui.components.TideNodeCyan
+import com.example.trnberechnung.ui.components.TideNodeDanger
+import com.example.trnberechnung.ui.components.TideNodeSuccess
+import com.example.trnberechnung.ui.components.TideNodeWarning
 import com.example.trnberechnung.ui.components.tideNodeDarkGlass
 import com.example.trnberechnung.ui.map.FullBleedMap
 import com.example.trnberechnung.ui.map.MapHarbourMarker

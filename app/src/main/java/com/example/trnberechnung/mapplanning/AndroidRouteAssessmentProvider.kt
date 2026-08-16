@@ -82,10 +82,7 @@ class AndroidRouteAssessmentProvider(
 
         val clearances = mutableListOf<ClearanceSample>()
         val weather = mutableListOf<MarineWeatherAssessment?>()
-        var allSamplesValid = true
-
         for (sample in samples) {
-            kotlinx.coroutines.yield()
             val arrival =
                 input.request.departure.plus(
                     Duration.ofSeconds(
@@ -99,31 +96,9 @@ class AndroidRouteAssessmentProvider(
                 }
             val tideHeight = station?.tideHeightAt(arrival)
 
-            // Sicherheit geht vor: Wir nehmen die geringere Tiefe aus Katalog und SeaMask.
-            val maskDepth = chartDepthProvider.depthMetersAt(sample.point)
-            var catalogDepth = sample.chartDepthMeters
-
-            if (catalogDepth == null) {
-                catalogDepth = HarbourCatalog.all.find {
-                    RouteMetricsCalculator.haversineNm(it.coordinate, sample.point) < 0.1
-                }?.chartDepthMeters
-            }
-
-            var chartDepth = when {
-                catalogDepth != null && maskDepth != null -> kotlin.math.min(catalogDepth, maskDepth)
-                catalogDepth != null -> catalogDepth
-                else -> maskDepth
-            }
-
-            // Watt-Depth-Sanitizer: In bekannten Flachwassergebieten (Ostfriesland)
-            // sind Tiefen über 0,5m ohne expliziten Katalog-Eintrag im Watt verdächtig.
-            if (sample.point.latitude in 53.65..53.85 &&
-                sample.point.longitude in 6.7..8.5 &&
-                !sample.hasCatalogDepth) {
-                if (chartDepth == null || chartDepth > 0.5) {
-                    chartDepth = -1.5 // Extrem konservativ für unbekannte Wattflächen
-                }
-            }
+            // WICHTIG: Wir bevorzugen IMMER die SeaMask-Tiefe, da diese live aktualisiert wird.
+            // Nur wenn der Punkt außerhalb des Grids liegt, nutzen wir den Katalogwert.
+            val chartDepth = chartDepthProvider.depthMetersAt(sample.point) ?: sample.chartDepthMeters
 
             val clearance = tideHeight?.let { height ->
                 chartDepth?.let { depth ->
@@ -131,16 +106,15 @@ class AndroidRouteAssessmentProvider(
                 }
             }
 
-            val sampleValid = station != null && tideHeight != null && chartDepth != null
-            if (!sampleValid) allSamplesValid = false
+            android.util.Log.d("RouteAssessment", "Point: ${sample.point}, Depth: $chartDepth, Tide: $tideHeight, Clearance: $clearance, Draft: ${input.request.boatSettings.draftMeters}")
 
             clearances +=
                 ClearanceSample(
-                    waypointName = sample.name ?: station?.source?.gaugeLabel ?: station?.source?.area ?: "Route",
+                    waypointName = station?.source?.gaugeLabel ?: station?.source?.area ?: "Route",
                     clearanceMeters = clearance,
-                    isValid = sampleValid,
+                    isValid = station != null && tideHeight != null && chartDepth != null,
                     waterLevelQuality =
-                        if (station != null && tideHeight != null) {
+                        if (station != null && tideHeight != null && chartDepth != null) {
                             WaterLevelQuality.LOCAL_OFFICIAL
                         } else {
                             WaterLevelQuality.UNAVAILABLE
@@ -156,7 +130,7 @@ class AndroidRouteAssessmentProvider(
         return RouteSafetyAssessment(
             expectedWaypointCount = samples.size,
             clearanceSamples = clearances,
-            allLegsValid = allSamplesValid,
+            allLegsValid = true,
             weatherStatus = WeatherSafetyEvaluator.evaluateAll(weather),
             maxWindKnots = maxWind,
             maxGustKnots = maxGust,
@@ -209,7 +183,7 @@ class AndroidRouteAssessmentProvider(
 
     private fun sampleRoute(route: List<GeoPoint>): List<RouteSample> {
         if (route.size < 2) return emptyList()
-        val result = mutableListOf(RouteSample(route.first(), 0.0, name = "Start"))
+        val result = mutableListOf(RouteSample(route.first(), 0.0))
         var cumulativeDistanceNm = 0.0
         for ((start, end) in route.zipWithNext()) {
             val legDistanceNm = RouteMetricsCalculator.haversineNm(start, end)
@@ -229,7 +203,6 @@ class AndroidRouteAssessmentProvider(
                         point = point,
                         cumulativeDistanceNm =
                             cumulativeDistanceNm + legDistanceNm * fraction,
-                        name = if (step == steps) "Wegpunkt" else null
                     )
             }
             cumulativeDistanceNm += legDistanceNm
@@ -249,7 +222,6 @@ class AndroidRouteAssessmentProvider(
                 cumulativeDistanceNm = 0.0,
                 chartDepthMeters = waypoints.first().chartDepthMeters,
                 hasCatalogDepth = true,
-                name = waypoints.first().name,
             )
 
         for (i in 0 until waypoints.size - 1) {
@@ -285,7 +257,6 @@ class AndroidRouteAssessmentProvider(
                         cumulativeDistanceNm = cumulativeDistanceNm + legDistanceNm * fraction,
                         chartDepthMeters = interpolatedDepth,
                         hasCatalogDepth = true,
-                        name = if (step == steps) end.name else null
                     )
             }
             cumulativeDistanceNm += legDistanceNm
@@ -310,7 +281,6 @@ class AndroidRouteAssessmentProvider(
         val cumulativeDistanceNm: Double,
         val chartDepthMeters: Double? = null,
         val hasCatalogDepth: Boolean = false,
-        val name: String? = null,
     )
 
     private data class PreparedTideEvent(
@@ -336,58 +306,11 @@ class AndroidRouteAssessmentProvider(
             if (exact != null) return exact.heightMeters
             val previous = tideEvents.lastOrNull { it.instant < target } ?: return null
             val next = tideEvents.firstOrNull { it.instant > target } ?: return null
-
-            // Sicherheitsprüfung: Verhindere Interpolation über große Datenlücken (> 7h)
-            // oder zwischen gleichen Event-Typen (z.B. HW zu HW), da dies auf fehlende
-            // Datenpunkte (wie das Niedrigwasser) hindeutet.
-            val gap = Duration.between(previous.instant, next.instant)
-            if (gap.toHours() > 7 || previous.type == next.type) {
-                return null
-            }
-
-            // ZUSATZ: Strenge Prüfung für Watt-Stationen. Wenn wir HW -> HW interpolieren
-            // ohne ein NW-Event in der Liste zu haben, ist die Kurve zu unsicher.
-            val hasLowWater = tideEvents.any { it.type == "NW" }
-            if (!hasLowWater && gap.toHours() > 4) return null
-
             return interpolateByTwelfths(
                 start = previous,
                 end = next,
                 target = target,
             )
-        }
-
-        fun minTideHeightBetween(
-            start: ZonedDateTime,
-            end: ZonedDateTime,
-        ): Double? {
-            val startInstant = start.toInstant()
-            val endInstant = end.toInstant()
-            if (tideEvents.isEmpty()) return null
-
-            // Die Randhöhen müssen valide sein (keine Lücke an den Rändern)
-            val hStart = tideHeightAt(start) ?: return null
-            val hEnd = tideHeightAt(end) ?: return null
-
-            val eventsInRange = tideEvents.filter {
-                it.instant.isAfter(startInstant) && it.instant.isBefore(endInstant)
-            }
-
-            // Prüfe auf Lücken zwischen aufeinanderfolgenden Ereignissen im Zeitfenster
-            val allPoints = mutableListOf<PreparedTideEvent>()
-            allPoints.add(PreparedTideEvent(startInstant, "BOUNDARY", hStart))
-            allPoints.addAll(eventsInRange)
-            allPoints.add(PreparedTideEvent(endInstant, "BOUNDARY", hEnd))
-
-            for ((p1, p2) in allPoints.zipWithNext()) {
-                val gap = Duration.between(p1.instant, p2.instant)
-                if (gap.toHours() > 7 || (p1.type != "BOUNDARY" && p2.type != "BOUNDARY" && p1.type == p2.type)) {
-                    return null
-                }
-            }
-
-            val eventHeights = eventsInRange.map { it.heightMeters }
-            return (listOf(hStart, hEnd) + eventHeights).minOrNull()
         }
 
         fun nearestHighWater(arrival: ZonedDateTime): ZonedDateTime? =

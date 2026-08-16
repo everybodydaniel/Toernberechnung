@@ -47,8 +47,11 @@ import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
 import org.maplibre.android.utils.ColorUtils
 
+/**
+ * Every marker on the map belongs to a planned route. There is deliberately no "plain harbour"
+ * role: drawing the whole harbour catalog covered the chart in dots and labels.
+ */
 enum class MapHarbourRole {
-    NORMAL,
     START,
     STOP,
     DESTINATION,
@@ -59,7 +62,7 @@ data class MapHarbourMarker(
     val title: String,
     val subtitle: String,
     val coordinate: LatLng,
-    val role: MapHarbourRole = MapHarbourRole.NORMAL,
+    val role: MapHarbourRole,
     val order: Int? = null,
 )
 
@@ -477,12 +480,11 @@ fun FullBleedMap(
                         MapHarbourRole.START -> Color(0xFF14B8A6)
                         MapHarbourRole.STOP -> Color(0xFF2563EB)
                         MapHarbourRole.DESTINATION -> Color(0xFFEA580C)
-                        MapHarbourRole.NORMAL -> Color(0xFF275AA5)
                     }
                 circles.create(
                     CircleOptions()
                         .withLatLng(harbour.coordinate)
-                        .withCircleRadius(if (harbour.role == MapHarbourRole.NORMAL) 5f else 8f)
+                        .withCircleRadius(8f)
                         .withCircleColor(markerColor.toMapLibreRgba())
                         .withCircleStrokeColor(Color.White.toMapLibreRgba())
                         .withCircleStrokeWidth(2f),
@@ -492,7 +494,6 @@ fun FullBleedMap(
                         MapHarbourRole.START -> "S"
                         MapHarbourRole.DESTINATION -> "Z"
                         MapHarbourRole.STOP -> harbour.order?.toString().orEmpty()
-                        MapHarbourRole.NORMAL -> "⚓"
                     }
                 symbols.create(
                     SymbolOptions()
@@ -501,7 +502,7 @@ fun FullBleedMap(
                         .withTextColor(Color.White.toMapLibreRgba())
                         .withTextHaloColor(markerColor.toMapLibreRgba())
                         .withTextHaloWidth(1.5f)
-                        .withTextSize(if (harbour.role == MapHarbourRole.NORMAL) 10f else 12f)
+                        .withTextSize(12f)
                         .withTextOffset(arrayOf(0f, 1.45f)),
                 ).apply {
                     data = com.google.gson.JsonPrimitive("harbour:${harbour.id}")

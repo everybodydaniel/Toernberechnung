@@ -12,15 +12,22 @@ import com.example.trnberechnung.navigation.NavigationWaypoint
 import java.util.UUID
 import org.maplibre.android.geometry.LatLng
 
+/**
+ * Only the harbours that belong to the current plan become markers.
+ *
+ * The catalog used to be drawn in full, which put a blue dot and a name label on every harbour in
+ * the region and buried the nautical chart underneath them. Start, stops and destination carry
+ * meaning; the rest is noise, and harbours are selected in the planner sheet anyway.
+ */
 fun RoutePlanningUiState.mapHarbourMarkers(): List<MapHarbourMarker> {
     val stopOrder = intermediateStops.mapIndexed { index, stop -> stop.harbourId to index + 1 }.toMap()
-    return HarbourCatalog.all.map { harbour ->
+    return HarbourCatalog.all.mapNotNull { harbour ->
         val role =
             when (harbour.id) {
                 startHarbourId -> MapHarbourRole.START
                 destinationHarbourId -> MapHarbourRole.DESTINATION
                 in stopOrder -> MapHarbourRole.STOP
-                else -> MapHarbourRole.NORMAL
+                else -> return@mapNotNull null
             }
         MapHarbourMarker(
             id = harbour.id.rawValue,

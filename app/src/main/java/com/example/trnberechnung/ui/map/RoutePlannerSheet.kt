@@ -1,6 +1,5 @@
 package com.example.trnberechnung.ui.map
 
-import android.annotation.SuppressLint
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.foundation.background
@@ -81,9 +80,9 @@ import com.example.trnberechnung.mapplanning.IntermediateStop
 import com.example.trnberechnung.mapplanning.MAP_PLANNING_ZONE_ID
 import com.example.trnberechnung.mapplanning.RoutePlanningUiState
 import com.example.trnberechnung.mapplanning.RoutePlanningViewModel
-import com.example.trnberechnung.ui.theme.TideNodeBlue
-import com.example.trnberechnung.ui.theme.TideNodeCyan
-import com.example.trnberechnung.ui.theme.TideNodeInk
+import com.example.trnberechnung.ui.components.TideNodeBlue
+import com.example.trnberechnung.ui.components.TideNodeCyan
+import com.example.trnberechnung.ui.components.TideNodeInk
 import com.example.trnberechnung.ui.components.tideNodeGlass
 import java.time.LocalDate
 import java.time.LocalTime
@@ -522,7 +521,6 @@ private fun IntermediateStopRow(
     }
 }
 
-@SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 private fun DepartureRow(
     departure: ZonedDateTime,

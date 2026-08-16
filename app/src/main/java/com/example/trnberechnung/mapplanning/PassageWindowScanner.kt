@@ -61,26 +61,22 @@ class PassageWindowScanner(
         var candidate = scanStart
 
         while (!candidate.isAfter(scanEnd)) {
-            kotlinx.coroutines.yield()
             currentCoroutineContext().ensureActive()
             val assessment = evaluator.evaluate(candidate)
             if (assessment.isSafe) {
                 val safeAssessment = assessment.toSafeAssessment()
-                if (openWindow == null) {
-                    openWindow = OpenWindow(
+                openWindow =
+                    openWindow?.apply {
+                        end = candidate
+                        merge(safeAssessment)
+                    } ?: OpenWindow(
                         start = candidate,
                         end = candidate,
                         assessment = safeAssessment,
                     )
-                } else {
-                    openWindow.end = candidate
-                    openWindow.merge(safeAssessment)
-                }
             } else {
-                if (openWindow != null) {
-                    windows += openWindow.toWindow()
-                    openWindow = null
-                }
+                openWindow?.let { windows += it.toWindow() }
+                openWindow = null
             }
             candidate = candidate.plus(scanIncrement)
         }
@@ -95,7 +91,6 @@ class PassageWindowScanner(
         val quality: WaterLevelQuality,
         val anchoredHighWater: ZonedDateTime?,
         val bottleneckName: String?,
-        val minClearance: Double?,
     )
 
     private data class OpenWindow(
@@ -104,26 +99,8 @@ class PassageWindowScanner(
         var assessment: SafeAssessment,
     ) {
         fun merge(candidate: SafeAssessment) {
-            // Behalte die schlechteste Qualität für das gesamte Fenster bei
-            val newQuality =
-                if (candidate.quality.qualityRank > assessment.quality.qualityRank) {
-                    candidate.quality
-                } else {
-                    assessment.quality
-                }
-
-            // Aktualisiere die Engstelle, wenn wir eine kritischere (geringere Tiefe) gefunden haben
-            val currentMin = assessment.minClearance ?: Double.MAX_VALUE
-            val candidateMin = candidate.minClearance ?: Double.MAX_VALUE
-
-            if (candidateMin < currentMin || newQuality != assessment.quality) {
-                assessment =
-                    SafeAssessment(
-                        quality = newQuality,
-                        bottleneckName = if (candidateMin < currentMin) candidate.bottleneckName else assessment.bottleneckName,
-                        minClearance = if (candidateMin < currentMin) candidate.minClearance else assessment.minClearance,
-                        anchoredHighWater = if (candidateMin < currentMin) candidate.anchoredHighWater else assessment.anchoredHighWater,
-                    )
+            if (candidate.quality.qualityRank > assessment.quality.qualityRank) {
+                assessment = candidate
             }
         }
 
@@ -144,7 +121,6 @@ class PassageWindowScanner(
             quality = worstQuality,
             anchoredHighWater = bottleneck?.anchoredHighWater,
             bottleneckName = bottleneck?.waypointName,
-            minClearance = bottleneck?.clearanceMeters,
         )
     }
 }

@@ -3,6 +3,7 @@ package com.example.trnberechnung.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.trnberechnung.logic.DecisionLogic
+import com.example.trnberechnung.logic.TideTimes
 import com.example.trnberechnung.model.TideStationData
 import com.example.trnberechnung.model.TideEvent
 import com.example.trnberechnung.model.toModel
@@ -70,9 +71,23 @@ class TideViewModel(
     private val _tideLoading = MutableStateFlow(false)
     val tideLoading: StateFlow<Boolean> = _tideLoading
 
-    init {
+    private val _lastWeatherUpdate = MutableStateFlow<Long?>(null)
 
+    /**
+     * Epoch millis of the last successful weather load, or `null` while nothing has arrived yet.
+     *
+     * The Revier screen used to print a hardcoded "Aktualisiert vor 5 Min.", which said nothing
+     * about whether data was actually fresh. Now that the app refreshes on its own, this is what
+     * makes that visible.
+     */
+    val lastWeatherUpdate: StateFlow<Long?> = _lastWeatherUpdate
+
+    init {
         _allStations.value = LOCAL_HARBOURS
+        // Both Revier tabs read selectedStation, so a default here spares the skipper the
+        // "Standort wählen" / "Unbekannt" empty state on first launch. loadData() later swaps this
+        // placeholder for the same harbour enriched with BSH events and live weather.
+        _selectedStation.value = LOCAL_HARBOURS.firstOrNull { it.gaugeLabel == DEFAULT_STATION }
     }
 
     fun loadData() {
@@ -134,6 +149,14 @@ class TideViewModel(
                     }.awaitAll()
                 }
                 _allStations.value = stationsWithWeather
+
+                // Re-point the selection at the freshly enriched copy of the same harbour. This is
+                // also what turns the placeholder default from init into a station that actually
+                // carries tide events and weather.
+                val selectedLabel = _selectedStation.value?.gaugeLabel ?: DEFAULT_STATION
+                stationsWithWeather
+                    .firstOrNull { it.gaugeLabel == selectedLabel }
+                    ?.let(::selectStation)
 
             } catch (e: Exception) {
 
@@ -209,24 +232,7 @@ class TideViewModel(
         _currentTideEvents.value = station.events
 
         val now = LocalDateTime.now()
-        val eventsWithTime = station.events.mapNotNull { event ->
-            try {
-
-                val cleanTs = event.timestamp
-                    .replace("T", " ")
-                    .replace(Regex("Z$"), "")
-                    .replace(Regex("\\+\\d{2}:\\d{2}$"), "")
-                    .replace(Regex("\\+\\d{2}$"), "")
-                    .trim()
-
-                val dt = try {
-                    LocalDateTime.parse(cleanTs, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                } catch (_: Exception) {
-                    LocalDateTime.parse(cleanTs, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                }
-                Pair(event, dt)
-            } catch (_: Exception) { null }
-        }
+        val eventsWithTime = TideTimes.sortedByTime(station.events)
 
         val nextHwEvent = eventsWithTime
             .filter { it.first.type == "HW" && it.second.isAfter(now) }
@@ -275,6 +281,10 @@ class TideViewModel(
                     )
                 val result = DecisionLogic.calculateDecision(tide, mergedWeather)
                 _decision.value = result
+
+                if (mergedWeather != null) {
+                    _lastWeatherUpdate.value = System.currentTimeMillis()
+                }
 
             } catch (e: Exception) {
                 _weatherError.value = "Wetter-Fehler: ${e.message}"
@@ -412,6 +422,9 @@ class TideViewModel(
     }
 
     companion object {
+        /** Revier, das ohne eigene Auswahl des Skippers in Wetter und Gezeiten angezeigt wird. */
+        const val DEFAULT_STATION = "Norderney"
+
         /** Lokale Hafen-Liste – nur echte Wattenmeer-Häfen innerhalb des Routing-Grids */
         val LOCAL_HARBOURS = listOf(
             // ── Deutschland – Ostfriesische Inseln (Häfen) ──

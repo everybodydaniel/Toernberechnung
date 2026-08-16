@@ -108,8 +108,9 @@ class FullAppUiTest {
 
         composeTestRule.onNodeWithTag("nav_crew").performClick()
         composeTestRule.onNodeWithTag("nav_crew").assertIsSelected()
-        composeTestRule.onNodeWithTag("screen_header_crew").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("screen_crewspace").assertIsDisplayed()
         composeTestRule.onNodeWithText("KI-Assistent").assertDoesNotExist()
+        assertTabSurfaceFitsBetweenOverlays("screen_crewspace")
 
         composeTestRule.onNodeWithTag("nav_logbook").performClick()
         composeTestRule.onNodeWithTag("nav_logbook").assertIsSelected()

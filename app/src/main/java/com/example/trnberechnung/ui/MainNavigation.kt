@@ -64,6 +64,7 @@ import com.example.trnberechnung.mapplanning.CatalogFairwayRouteResolver
 import com.example.trnberechnung.mapplanning.RoutePlanningViewModel
 import com.example.trnberechnung.mapplanning.RoutePlanningViewModelFactory
 import com.example.trnberechnung.nauti.GeminiNautiClient
+import com.example.trnberechnung.repository.TideRepository
 import com.example.trnberechnung.navigation.ActiveVoyageState
 import com.example.trnberechnung.navigation.SensorHeadingProvider
 import com.example.trnberechnung.navigation.VoyageServiceController
@@ -75,6 +76,8 @@ import com.example.trnberechnung.ui.components.tideNodeGlass
 import com.example.trnberechnung.ui.map.MapTabScreen
 import com.example.trnberechnung.ui.navigation.FullScreenNavigationScreen
 import com.example.trnberechnung.ui.theme.NauticalBackground
+import com.example.trnberechnung.viewmodel.CrewspaceViewModel
+import com.example.trnberechnung.viewmodel.CrewspaceViewModelFactory
 import com.example.trnberechnung.viewmodel.NautiViewModel
 import com.example.trnberechnung.viewmodel.TideViewModel
 
@@ -87,7 +90,7 @@ sealed class Screen(
 
     data object Revier : Screen("revier", "Wetter", Icons.Default.Cloud)
 
-    data object Crew : Screen("crew", "Crew", Icons.Default.People)
+    data object Crew : Screen("crew", "Crewspace", Icons.Default.People)
 
     data object Logbook : Screen("logbook", "Logbuch", Icons.AutoMirrored.Filled.MenuBook)
 
@@ -111,6 +114,22 @@ fun MainAppScreen(
     val currentRoute = backStackEntry?.destination?.route ?: Screen.MapRoute.route
     val isMainTab = currentRoute in bottomNavItems.map(Screen::route)
 
+    val crewspaceViewModel: CrewspaceViewModel =
+        viewModel(
+            factory =
+                remember(application) {
+                    val db = application.database
+                    CrewspaceViewModelFactory(
+                        TideRepository(
+                            db.tideDao(),
+                            db.logbookDao(),
+                            db.crewMemberDao(),
+                            db.checklistDao(),
+                            db.plannerEventDao(),
+                        ),
+                    )
+                },
+        )
     val nautiViewModel: NautiViewModel =
         viewModel(
             factory =
@@ -199,8 +218,9 @@ fun MainAppScreen(
             }
             composable(Screen.Crew.route) {
                 MainTabContent {
-                    CrewScreen(
-                        viewModel = viewModel,
+                    CrewspaceScreen(
+                        viewModel = crewspaceViewModel,
+                        topOverlayClearance = topClearance,
                         bottomOverlayClearance = bottomOverlayClearance,
                     )
                 }

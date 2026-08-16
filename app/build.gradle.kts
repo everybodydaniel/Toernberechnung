@@ -12,11 +12,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.trnberechnung"
+        applicationId = "de.tidenode.com"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -40,12 +40,29 @@ android {
         buildConfigField("String", "GEMINI_MODEL", "\"$geminiModel\"")
     }
 
+    // Release-Signatur nur konfigurieren, wenn die Keystore-Properties gesetzt sind (sie liegen in
+    // ~/.gradle/gradle.properties, nicht im Repo). Ohne sie bleiben Debug- und CI-Builds lauffaehig,
+    // `bundleRelease` liefert dann aber ein unsigniertes Bundle, das Play ablehnt.
+    val storeFilePath = providers.gradleProperty("TB_STORE_FILE").orNull
+
+    signingConfigs {
+        if (storeFilePath != null) {
+            create("release") {
+                storeFile = file(storeFilePath)
+                storePassword = providers.gradleProperty("TB_STORE_PASSWORD").get()
+                keyAlias = providers.gradleProperty("TB_KEY_ALIAS").get()
+                keyPassword = providers.gradleProperty("TB_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         debug {
             enableUnitTestCoverage = true
             enableAndroidTestCoverage = true
         }
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

@@ -73,7 +73,7 @@ import androidx.compose.ui.unit.sp
 import com.example.trnberechnung.R
 import com.example.trnberechnung.model.AuthRepository
 import com.example.trnberechnung.model.BoatProfileRepository
-import com.example.trnberechnung.ui.components.TideNodeBlue
+import com.example.trnberechnung.ui.theme.TideNodeBlue
 import com.example.trnberechnung.ui.components.tideNodeGlass
 
 import androidx.compose.ui.window.Dialog
@@ -245,7 +245,7 @@ fun DashboardScreen(
                         text = boatType,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
+                        color = SettingsTextColor,
                         modifier = Modifier.weight(1f),
                     )
                     Icon(Icons.Default.UnfoldMore, null, tint = SettingsPrimaryBlue, modifier = Modifier.size(20.dp))

@@ -1,5 +1,6 @@
 package com.example.trnberechnung.mapplanning
 
+import java.time.Duration
 import java.time.ZonedDateTime
 
 data class MarineWeatherAssessment(
@@ -13,70 +14,50 @@ data class MarineWeatherAssessment(
 object WeatherSafetyEvaluator {
     fun evaluate(assessment: MarineWeatherAssessment?): WeatherStatus {
         if (assessment == null) return WeatherStatus.UNVOLLSTAENDIG
-
         return when {
-            assessment.windKnots >= 28 ||
-                assessment.gustKnots >= 34 ||
-                assessment.visibilityKilometers < 1 ->
+            assessment.windKnots >= 28.0 || assessment.gustKnots >= 34.0 ||
+                assessment.visibilityKilometers < 1.0 ->
                 WeatherStatus.NICHT_BEFAHRBAR
 
-            assessment.windKnots >= 20 ||
-                assessment.gustKnots >= 27 ||
-                assessment.visibilityKilometers < 5 ||
-                assessment.precipitationChancePercent >= 60 ||
-                assessment.precipitationMillimeters >= 3 ->
+            assessment.windKnots >= 20.0 || assessment.gustKnots >= 27.0 ||
+                assessment.visibilityKilometers < 5.0 ||
+                assessment.precipitationChancePercent >= 60.0 ||
+                assessment.precipitationMillimeters >= 3.0 ->
                 WeatherStatus.EINGESCHRAENKT
 
             else -> WeatherStatus.BEFAHRBAR
         }
     }
 
-    /**
-     * Selects the nearest hourly sample for every arrival time. Every waypoint
-     * must have a sample no farther than 90 minutes away.
-     */
+    fun evaluateAll(assessments: List<MarineWeatherAssessment?>): WeatherStatus {
+        if (assessments.isEmpty()) return WeatherStatus.UNVOLLSTAENDIG
+        return assessments.map { evaluate(it) }.maxBy { it.precedence }
+    }
+
     fun evaluateRoute(
         waypointArrivals: List<ZonedDateTime>,
         hourlyAssessments: List<Pair<ZonedDateTime, MarineWeatherAssessment>>,
     ): WeatherStatus {
         if (waypointArrivals.isEmpty()) return WeatherStatus.UNVOLLSTAENDIG
 
-        val statuses =
+        val assessments =
             waypointArrivals.map { arrival ->
                 val nearest =
-                    hourlyAssessments.minByOrNull { (time) ->
-                        kotlin.math.abs(
-                            java.time.Duration.between(arrival.toInstant(), time.toInstant())
-                                .toMinutes(),
-                        )
+                    hourlyAssessments.minByOrNull { (time, _) ->
+                        Duration.between(time, arrival).abs().toMinutes()
                     }
-                val differenceMinutes =
-                    nearest?.let { (time) ->
-                        kotlin.math.abs(
-                            java.time.Duration.between(arrival.toInstant(), time.toInstant())
-                                .toMinutes(),
-                        )
-                    }
-                if (nearest == null || differenceMinutes == null || differenceMinutes > 90) {
-                    WeatherStatus.UNVOLLSTAENDIG
+
+                if (nearest != null &&
+                    Duration.between(nearest.first, arrival).abs().toMinutes() <= 90
+                ) {
+                    nearest.second
                 } else {
-                    evaluate(nearest.second)
+                    null
                 }
             }
 
-        return statuses.reduce(::combineWeatherStatus)
+        return evaluateAll(assessments)
     }
-
-    fun evaluateAll(assessments: List<MarineWeatherAssessment?>): WeatherStatus {
-        if (assessments.isEmpty()) return WeatherStatus.UNVOLLSTAENDIG
-        return assessments.map(::evaluate).reduce(::combineWeatherStatus)
-    }
-
-    private fun combineWeatherStatus(
-        first: WeatherStatus,
-        second: WeatherStatus,
-    ): WeatherStatus =
-        listOf(first, second).maxBy(WeatherStatus::precedence)
 }
 
 data class ClearanceSample(
@@ -127,18 +108,15 @@ object UnderKeelSafetyEvaluator {
 }
 
 object RouteStatusEvaluator {
-    fun combine(
-        tidalStatus: RouteStatus,
-        weatherStatus: WeatherStatus,
-    ): RouteStatus {
+    fun combine(tidal: RouteStatus, weather: WeatherStatus): RouteStatus {
         val normalizedWeather =
-            when (weatherStatus) {
+            when (weather) {
                 WeatherStatus.BEFAHRBAR -> RouteStatus.BEFAHRBAR
                 WeatherStatus.EINGESCHRAENKT -> RouteStatus.EINGESCHRAENKT
                 WeatherStatus.NICHT_BEFAHRBAR -> RouteStatus.NICHT_BEFAHRBAR
                 WeatherStatus.UNVOLLSTAENDIG -> RouteStatus.UNVOLLSTAENDIG
             }
-        return listOf(tidalStatus, normalizedWeather).maxBy(RouteStatus::precedence)
+        return listOf(tidal, normalizedWeather).maxBy(RouteStatus::precedence)
     }
 }
 
@@ -172,28 +150,27 @@ fun interface RouteAssessmentProvider {
 object IncompleteRouteAssessmentProvider : RouteAssessmentProvider {
     override suspend fun assess(input: RouteAssessmentInput): RouteSafetyAssessment =
         RouteSafetyAssessment(
-            expectedWaypointCount = input.request.harbourChain.size,
+            expectedWaypointCount = 0,
             clearanceSamples = emptyList(),
             allLegsValid = false,
             weatherStatus = WeatherStatus.UNVOLLSTAENDIG,
-            messages = listOf("Gezeiten-, Wasserstands- und Wetterdaten fehlen."),
         )
 }
 
-private val RouteStatus.precedence: Int
+val RouteStatus.precedence: Int
     get() =
         when (this) {
-            RouteStatus.BEFAHRBAR -> 0
-            RouteStatus.EINGESCHRAENKT -> 1
-            RouteStatus.UNVOLLSTAENDIG -> 2
-            RouteStatus.NICHT_BEFAHRBAR -> 3
+            RouteStatus.NICHT_BEFAHRBAR -> 4
+            RouteStatus.UNVOLLSTAENDIG -> 3
+            RouteStatus.EINGESCHRAENKT -> 2
+            RouteStatus.BEFAHRBAR -> 1
         }
 
-private val WeatherStatus.precedence: Int
+val WeatherStatus.precedence: Int
     get() =
         when (this) {
-            WeatherStatus.BEFAHRBAR -> 0
-            WeatherStatus.EINGESCHRAENKT -> 1
-            WeatherStatus.UNVOLLSTAENDIG -> 2
-            WeatherStatus.NICHT_BEFAHRBAR -> 3
+            WeatherStatus.NICHT_BEFAHRBAR -> 4
+            WeatherStatus.UNVOLLSTAENDIG -> 3
+            WeatherStatus.EINGESCHRAENKT -> 2
+            WeatherStatus.BEFAHRBAR -> 1
         }

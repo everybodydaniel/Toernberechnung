@@ -2,6 +2,7 @@ package com.example.trnberechnung.repository
 
 import com.example.trnberechnung.database.NautiDao
 import com.example.trnberechnung.database.NautiMessageEntity
+import com.example.trnberechnung.mapplanning.MapPlanningMainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -9,9 +10,13 @@ import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 
 class NautiConversationRepositoryTest {
+    @get:Rule
+    val mainDispatcherRule = MapPlanningMainDispatcherRule()
+
     private val dao = mockk<NautiDao>(relaxed = true)
 
     @Test

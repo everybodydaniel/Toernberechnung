@@ -85,9 +85,9 @@ import com.example.trnberechnung.database.NautiConversationEntity
 import com.example.trnberechnung.database.NautiMessageEntity
 import com.example.trnberechnung.nauti.NautiActionCodec
 import com.example.trnberechnung.repository.NautiConversationRepository
-import com.example.trnberechnung.ui.components.TideNodeBlue
-import com.example.trnberechnung.ui.components.TideNodeCyan
-import com.example.trnberechnung.ui.components.TideNodeInk
+import com.example.trnberechnung.ui.theme.TideNodeBlue
+import com.example.trnberechnung.ui.theme.TideNodeCyan
+import com.example.trnberechnung.ui.theme.TideNodeInk
 import com.example.trnberechnung.ui.components.tideNodeGlass
 import com.example.trnberechnung.viewmodel.NautiPanelMode
 import com.example.trnberechnung.viewmodel.NautiViewModel
@@ -490,8 +490,6 @@ private fun NautiComposer(
     }
 }
 
-
-
 @Composable
 private fun NautiHistory(
     conversations: List<NautiConversationEntity>,
@@ -504,8 +502,8 @@ private fun NautiHistory(
     onPin: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
 ) {
-    var renameTarget by remember { mutableStateOf<NautiConversationEntity?>(null) }
-    var deleteTarget by remember { mutableStateOf<NautiConversationEntity?>(null) }
+    val renameTarget = remember { mutableStateOf<NautiConversationEntity?>(null) }
+    val deleteTarget = remember { mutableStateOf<NautiConversationEntity?>(null) }
 
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val titleColor = if (isDark) Color(0xFFF8FAFC) else TideNodeInk
@@ -589,10 +587,10 @@ private fun NautiHistory(
                             tint = if (conversation.isPinned) TideNodeCyan else iconTint,
                         )
                     }
-                    IconButton(onClick = { renameTarget = conversation }) {
+                    IconButton(onClick = { renameTarget.value = conversation }) {
                         Icon(Icons.Default.Edit, "Umbenennen", tint = iconTint)
                     }
-                    IconButton(onClick = { deleteTarget = conversation }) {
+                    IconButton(onClick = { deleteTarget.value = conversation }) {
                         Icon(Icons.Default.Delete, "Löschen", tint = if (isDark) Color(0xFFF87171) else Color(0xFFB91C1C))
                     }
                 }
@@ -600,10 +598,10 @@ private fun NautiHistory(
         }
     }
 
-    renameTarget?.let { conversation ->
+    renameTarget.value?.let { conversation ->
         var value by remember(conversation.id) { mutableStateOf(conversation.title) }
         AlertDialog(
-            onDismissRequest = { renameTarget = null },
+            onDismissRequest = { renameTarget.value = null },
             title = { Text("Chat umbenennen") },
             text = {
                 OutlinedTextField(value = value, onValueChange = { value = it }, singleLine = true)
@@ -612,37 +610,37 @@ private fun NautiHistory(
                 TextButton(
                     onClick = {
                         onRename(conversation.id, value)
-                        renameTarget = null
+                        renameTarget.value = null
                     },
                 ) {
                     Text("Speichern")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { renameTarget = null }) {
+                TextButton(onClick = { renameTarget.value = null }) {
                     Text("Abbrechen")
                 }
             },
         )
     }
 
-    deleteTarget?.let { conversation ->
+    deleteTarget.value?.let { conversation ->
         AlertDialog(
-            onDismissRequest = { deleteTarget = null },
+            onDismissRequest = { deleteTarget.value = null },
             title = { Text("Chat löschen?") },
             text = { Text("„${conversation.title}“ wird dauerhaft von diesem Gerät entfernt.") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         onDelete(conversation.id)
-                        deleteTarget = null
+                        deleteTarget.value = null
                     },
                 ) {
                     Text("Löschen", color = Color(0xFFB91C1C))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
+                TextButton(onClick = { deleteTarget.value = null }) {
                     Text("Abbrechen")
                 }
             },

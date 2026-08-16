@@ -22,15 +22,14 @@ import androidx.compose.ui.unit.dp
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.luminance
-
-val TideNodeInk = Color(0xFF111318)
-val TideNodeBlue = Color(0xFF24579F)
-val TideNodeCyan = Color(0xFF09B7D6)
-val TideNodeTeal = Color(0xFF12B8A6)
-val TideNodeWarning = Color(0xFFF59E0B)
-val TideNodeDanger = Color(0xFFDC2626)
-val TideNodeSuccess = Color(0xFF15803D)
-val TideNodeGlassBorder = Color.White.copy(alpha = 0.68f)
+import com.example.trnberechnung.ui.theme.TideNodeBlue
+import com.example.trnberechnung.ui.theme.TideNodeCyan
+import com.example.trnberechnung.ui.theme.TideNodeDanger
+import com.example.trnberechnung.ui.theme.TideNodeInk
+import com.example.trnberechnung.ui.theme.TideNodeSuccess
+import com.example.trnberechnung.ui.theme.TideNodeTeal
+import com.example.trnberechnung.ui.theme.TideNodeWarning
+import com.example.trnberechnung.ui.theme.TideNodeGlassBorder
 
 @Composable
 fun Modifier.tideNodeGlass(

@@ -94,14 +94,14 @@ class AndroidRouteAssessmentProviderTest {
                 ZonedDateTime.parse("2026-07-29T15:00:00+02:00[Europe/Berlin]")
             val station =
                 TideStationData(
-                    area = "Emden",
+                    area = "DeepSea",
                     region = "Nordsee",
-                    latitude = 53.3421,
-                    longitude = 7.1852,
+                    latitude = 54.0, // Open sea, far from Wadden Sanitizer
+                    longitude = 6.0,
                     waterLevel = null,
                     meanHighWater = null,
                     meanLowWater = null,
-                    gaugeLabel = "Emden",
+                    gaugeLabel = "DeepSea",
                     forecastTimestamp = "",
                     weatherForecast = listOf(weather("2026-07-29T13:00:00Z")),
                     events =
@@ -126,8 +126,8 @@ class AndroidRouteAssessmentProviderTest {
                 )
             val geometry =
                 listOf(
-                    GeoPoint(53.3421, 7.1852),
-                    GeoPoint(53.3430, 7.1840),
+                    GeoPoint(54.0, 6.0),
+                    GeoPoint(54.1, 6.1),
                 )
             val metrics =
                 requireNotNull(
@@ -139,6 +139,8 @@ class AndroidRouteAssessmentProviderTest {
                 )
             val assessment =
                 provider.assess(RouteAssessmentInput(request, geometry, metrics))
+
+            assessment.clearanceSamples.all { it.isValid } shouldBe false
 
             UnderKeelSafetyEvaluator.evaluate(
                 samples = assessment.clearanceSamples,

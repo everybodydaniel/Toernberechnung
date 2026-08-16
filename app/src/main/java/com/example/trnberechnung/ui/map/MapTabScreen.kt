@@ -64,8 +64,8 @@ import com.example.trnberechnung.navigation.ActiveVoyageManager
 import com.example.trnberechnung.navigation.FusedLocationProvider
 import com.example.trnberechnung.navigation.LocationAccess
 import com.example.trnberechnung.navigation.VoyageServiceController
-import com.example.trnberechnung.ui.components.TideNodeBlue
-import com.example.trnberechnung.ui.components.TideNodeInk
+import com.example.trnberechnung.ui.theme.TideNodeBlue
+import com.example.trnberechnung.ui.theme.TideNodeInk
 import com.example.trnberechnung.ui.components.tideNodeGlass
 import com.example.trnberechnung.ui.nauti.NautiDrawer
 import com.example.trnberechnung.viewmodel.NautiPanelMode
@@ -221,7 +221,10 @@ fun MapTabScreen(
     LaunchedEffect(nautiViewModel) {
         nautiViewModel.actions.collect { action ->
             when (action) {
-                NautiAction.OpenTripPlanner -> showPlanner = true
+                NautiAction.OpenTripPlanner -> {
+                    showPlanner = true
+                    nautiViewModel.showCompact()
+                }
                 is NautiAction.PlanTrip -> {
                     val start = HarbourId.fromRawValue(action.startHarbourId)
                     val destination = HarbourId.fromRawValue(action.destinationHarbourId)
@@ -235,6 +238,7 @@ fun MapTabScreen(
                         planningViewModel.addIntermediateStops(stops)
                         action.departure?.let(planningViewModel::updateDeparture)
                         showPlanner = true
+                        nautiViewModel.showCompact()
                     }
                 }
                 NautiAction.StartNavigation -> currentNavigationStarter(Unit)
@@ -244,6 +248,7 @@ fun MapTabScreen(
                     val preflight = nautiVoyageLauncher.planAndPreflight(action)
                     // Always reveal what was actually computed, whatever the outcome.
                     showPlanner = true
+                    nautiViewModel.showCompact()
                     when (preflight.outcome) {
                         VoyagePreflight.READY -> {
                             // Reuses the existing permission -> startVoyage -> foreground service
@@ -265,6 +270,7 @@ fun MapTabScreen(
                 NautiAction.ShowPassageWindow -> {
                     if (currentRouteState.hasCompleteRouteInput) {
                         planningViewModel.refreshPassageWindow()
+                        nautiViewModel.showCompact()
                     } else {
                         showPlanner = true
                     }

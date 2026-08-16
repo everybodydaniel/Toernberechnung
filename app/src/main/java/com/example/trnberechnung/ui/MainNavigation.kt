@@ -73,8 +73,8 @@ import com.example.trnberechnung.navigation.SensorHeadingProvider
 import com.example.trnberechnung.navigation.VoyageServiceController
 import com.example.trnberechnung.ui.components.GlassIconButton
 import com.example.trnberechnung.ui.components.TideNodeAppHeader
-import com.example.trnberechnung.ui.components.TideNodeBlue
-import com.example.trnberechnung.ui.components.TideNodeInk
+import com.example.trnberechnung.ui.theme.TideNodeBlue
+import com.example.trnberechnung.ui.theme.TideNodeInk
 import com.example.trnberechnung.ui.components.tideNodeGlass
 import com.example.trnberechnung.ui.map.MapTabScreen
 import com.example.trnberechnung.ui.navigation.FullScreenNavigationScreen

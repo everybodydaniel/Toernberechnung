@@ -50,6 +50,10 @@ class BoatProfileRepository(context: Context) {
         get() = prefs.getFloat("safety_margin", 0.0f)
         set(value) = prefs.edit().putFloat("safety_margin", value).apply()
 
+    var waterLevelCorrection: Float
+        get() = prefs.getFloat("water_level_correction", 0.0f)
+        set(value) = prefs.edit().putFloat("water_level_correction", value).apply()
+
     var fuelCapacity: Float
         get() = prefs.getFloat("fuel_capacity", 0f)
         set(value) = prefs.edit().putFloat("fuel_capacity", value).apply()

@@ -209,6 +209,7 @@ fun MapTabScreen(
             draftMeters = boatProfile.draft.toDouble(),
             safetyMarginMeters = boatProfile.safetyMargin.toDouble(),
             speedKnots = boatProfile.speed.toDouble(),
+            waterLevelCorrectionMeters = boatProfile.waterLevelCorrection.toDouble(),
         )
     }
 

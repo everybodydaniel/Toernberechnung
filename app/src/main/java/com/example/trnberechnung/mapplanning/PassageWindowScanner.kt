@@ -49,13 +49,14 @@ class PassageWindowScanner(
         require(!scanForward.isNegative) { "Der Vorwärtsbereich darf nicht negativ sein." }
     }
 
-    suspend fun findSafeWindow(
+    suspend fun findSafeWindows(
         center: ZonedDateTime,
         evaluator: PassageCandidateEvaluator,
-    ): PassageWindow? {
+    ): List<PassageWindow> {
         val berlinCenter = center.withZoneSameInstant(MAP_PLANNING_ZONE_ID)
-        val scanStart = berlinCenter.minus(scanBackward)
-        val scanEnd = berlinCenter.plus(scanForward)
+        // Wir scannen den gesamten Tag (12h vorher bis 12h nachher), um alle Fenster zu finden
+        val scanStart = berlinCenter.minus(Duration.ofHours(12))
+        val scanEnd = berlinCenter.plus(Duration.ofHours(12))
         val windows = mutableListOf<PassageWindow>()
         var openWindow: OpenWindow? = null
         var candidate = scanStart
@@ -82,9 +83,7 @@ class PassageWindowScanner(
         }
 
         openWindow?.let { windows += it.toWindow() }
-
-        return windows.firstOrNull { it.contains(berlinCenter) }
-            ?: windows.firstOrNull { it.start.toInstant() > berlinCenter.toInstant() }
+        return windows
     }
 
     private data class SafeAssessment(

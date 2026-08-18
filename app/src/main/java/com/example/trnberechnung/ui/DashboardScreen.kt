@@ -119,9 +119,10 @@ fun DashboardScreen(
     var boatName by remember { mutableStateOf(repo.boatName) }
     var boatType by remember { mutableStateOf(repo.boatType.ifBlank { "Segelyacht" }) }
     var callSign by remember { mutableStateOf(repo.callSign) }
-    var draft by remember { mutableStateOf(if (repo.draft > 0) repo.draft.toString() else "") }
+    var draft by remember { mutableStateOf(repo.draft.toString()) }
     var length by remember { mutableStateOf(if (repo.length > 0) repo.length.toString() else "") }
-    var safetyMargin by remember { mutableStateOf(if (repo.safetyMargin > 0) repo.safetyMargin.toString() else "") }
+    var safetyMargin by remember { mutableStateOf(repo.safetyMargin.toString()) }
+    var waterLevelCorrection by remember { mutableStateOf(repo.waterLevelCorrection.toString()) }
 
     var isDark by remember { mutableStateOf(appPreferences?.isDarkMode ?: false) }
     var boatTypeExpanded by remember { mutableStateOf(false) }
@@ -294,7 +295,7 @@ fun DashboardScreen(
                     value = draft,
                     onValueChange = {
                         draft = it
-                        it.toFloatOrNull()?.let { v -> repo.draft = v }
+                        it.replace(',', '.').toFloatOrNull()?.let { v -> repo.draft = v }
                     },
                     icon = Icons.Default.ArrowDownward,
                     label = "Tiefgang",
@@ -304,7 +305,7 @@ fun DashboardScreen(
                     value = length,
                     onValueChange = {
                         length = it
-                        it.toFloatOrNull()?.let { v -> repo.length = v }
+                        it.replace(',', '.').toFloatOrNull()?.let { v -> repo.length = v }
                     },
                     icon = Icons.Default.Straighten,
                     label = "Länge",
@@ -314,18 +315,31 @@ fun DashboardScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Full row width: at half width the label wrapped and was clipped by the field's
-            // height. This is the longest label of the group, so it gets the whole line.
-            SettingsNumberBox(
-                value = safetyMargin,
-                onValueChange = {
-                    safetyMargin = it
-                    it.toFloatOrNull()?.let { v -> repo.safetyMargin = v }
-                },
-                icon = Icons.Default.Shield,
-                label = "Sicherheitsabstand (m)",
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-            )
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                SettingsNumberBox(
+                    value = safetyMargin,
+                    onValueChange = {
+                        safetyMargin = it
+                        it.replace(',', '.').toFloatOrNull()?.let { v -> repo.safetyMargin = v }
+                    },
+                    icon = Icons.Default.Shield,
+                    label = "UKC-M",
+                    modifier = Modifier.weight(1f),
+                )
+                SettingsNumberBox(
+                    value = waterLevelCorrection,
+                    onValueChange = {
+                        waterLevelCorrection = it
+                        it.replace(',', '.').toFloatOrNull()?.let { v -> repo.waterLevelCorrection = v }
+                    },
+                    icon = Icons.Default.Water,
+                    label = "Korrekt",
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
 
         // ══════════════════════════════════════════════════

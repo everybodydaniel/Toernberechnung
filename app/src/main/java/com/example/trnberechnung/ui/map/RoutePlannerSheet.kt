@@ -411,7 +411,7 @@ private fun HarbourSelector(
                         expanded = false
                     },
                 )
-                HarbourCatalog.all.filterNot { it.id in excluded }.forEach { harbour ->
+                HarbourCatalog.all.forEach { harbour ->
                     DropdownMenuItem(
                         text = {
                             Column {
@@ -573,8 +573,8 @@ private fun DepartureRow(
                 .background(rowBg)
                 .padding(12.dp),
     ) {
-        val stackControls = maxWidth < 290.dp
-        val useCompactChips = maxWidth < 370.dp
+        val stackControls = this.maxWidth < 290.dp
+        val useCompactChips = this.maxWidth < 370.dp
 
         if (stackControls) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -722,27 +722,49 @@ private fun PassageWindowCard(
     ) {
         Icon(Icons.Default.Schedule, null, tint = titleColor)
         Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                "Sicheres Abfahrtsfenster",
-                color = titleColor,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 17.sp,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                passageWindowText(uiState),
-                color = subtitleColor,
-                fontWeight = FontWeight.SemiBold,
-            )
-            uiState.passageWindow?.bottleneckName?.let {
+            Column(Modifier.weight(1f)) {
                 Text(
-                    "Engstelle: $it",
-                    color = subtitleColor,
-                    fontSize = 12.sp,
+                    "Sichere Passagefenster",
+                    color = titleColor,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 17.sp,
                 )
+                Spacer(Modifier.height(4.dp))
+                if (uiState.isSearchingPassageWindow) {
+                    Text("Wird berechnet…", color = subtitleColor)
+                } else if (uiState.passageWindows.isEmpty()) {
+                    Text(
+                        "Für diesen Tag liegt kein sicheres Passagefenster vor.",
+                        color = subtitleColor,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                } else {
+                    uiState.passageWindows.forEach { window ->
+                        Column(Modifier.padding(vertical = 4.dp)) {
+                            Text(
+                                "${window.start.format(routeTimeFormatter)} – ${window.end.format(routeTimeFormatter)} Uhr",
+                                color = subtitleColor,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            window.anchoredHighWater?.let { hw ->
+                                Text(
+                                    "Wattenhoch: ${hw.format(routeTimeFormatter)} Uhr",
+                                    color = titleColor.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+                uiState.passageWindows.firstOrNull()?.bottleneckName?.let {
+                    Text(
+                        "Engstelle: $it",
+                        color = subtitleColor,
+                        fontSize = 12.sp,
+                    )
+                }
             }
-        }
         if (uiState.isSearchingPassageWindow) {
             CircularProgressIndicator(
                 modifier = Modifier.size(24.dp),
@@ -780,11 +802,7 @@ private fun IntermediateStopsPicker(
     val pending = remember { mutableStateListOf<HarbourId>() }
     val unavailable =
         remember(existingStops, startHarbourId, destinationHarbourId) {
-            buildSet {
-                addAll(existingStops.map(IntermediateStop::harbourId))
-                startHarbourId?.let(::add)
-                destinationHarbourId?.let(::add)
-            }
+            emptySet<HarbourId>()
         }
     val filtered =
         remember(query) {

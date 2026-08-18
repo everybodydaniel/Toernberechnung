@@ -129,12 +129,14 @@ class RoutePlanningViewModel(
         draftMeters: Double,
         safetyMarginMeters: Double,
         speedKnots: Double,
+        waterLevelCorrectionMeters: Double,
     ) {
         val settings =
             BoatSettings(
                 draftMeters = draftMeters,
                 safetyMarginMeters = safetyMarginMeters,
                 speedKnots = speedKnots,
+                waterLevelCorrectionMeters = waterLevelCorrectionMeters,
             )
         if (_uiState.value.boatSettings == settings) return
         _uiState.update { it.copy(boatSettings = settings) }
@@ -175,15 +177,15 @@ class RoutePlanningViewModel(
         calculationJob =
             viewModelScope.launch {
                 try {
-                    val window =
-                        findPassageWindow(
+                    val windows =
+                        findPassageWindows(
                             request = request,
                             routeGeometry = snapshot.routeGeometry,
                             distanceNm = metrics.distanceNm,
                         )
                     updateForGeneration(generation) {
                         it.copy(
-                            passageWindow = window,
+                            passageWindows = windows,
                             isSearchingPassageWindow = false,
                         )
                     }
@@ -218,7 +220,7 @@ class RoutePlanningViewModel(
                 tidalStatus = RouteStatus.UNVOLLSTAENDIG,
                 weatherStatus = WeatherStatus.UNVOLLSTAENDIG,
                 routeMetrics = null,
-                passageWindow = null,
+                passageWindows = emptyList(),
                 isCalculating = false,
                 isSearchingPassageWindow = false,
                 messages = emptyList(),
@@ -257,7 +259,7 @@ class RoutePlanningViewModel(
                                     tidalStatus = RouteStatus.UNVOLLSTAENDIG,
                                     weatherStatus = WeatherStatus.UNVOLLSTAENDIG,
                                     routeMetrics = null,
-                                    passageWindow = null,
+                                    passageWindows = emptyList(),
                                     isCalculating = false,
                                     isSearchingPassageWindow = false,
                                     messages = listOf(geometryResult.reason),
@@ -316,7 +318,7 @@ class RoutePlanningViewModel(
                             tidalStatus = RouteStatus.UNVOLLSTAENDIG,
                             weatherStatus = WeatherStatus.UNVOLLSTAENDIG,
                             routeMetrics = null,
-                            passageWindow = null,
+                            passageWindows = emptyList(),
                             isCalculating = false,
                             isSearchingPassageWindow = false,
                             messages = listOf(fairwayResult.reason),
@@ -377,7 +379,7 @@ class RoutePlanningViewModel(
                 tidalStatus = tidalStatus,
                 weatherStatus = assessment.weatherStatus,
                 routeMetrics = metrics,
-                passageWindow = null,
+                passageWindows = emptyList(),
                 isCalculating = false,
                 isSearchingPassageWindow = true,
                 messages = assessment.messages,
@@ -385,8 +387,8 @@ class RoutePlanningViewModel(
             )
         }
 
-        val passageWindow = withContext(Dispatchers.Default) {
-            findPassageWindow(
+        val passageWindows = withContext(Dispatchers.Default) {
+            findPassageWindows(
                 request = request,
                 routeGeometry = routeGeometry,
                 distanceNm = metrics.distanceNm,
@@ -394,18 +396,18 @@ class RoutePlanningViewModel(
         }
         updateForGeneration(generation) {
             it.copy(
-                passageWindow = passageWindow,
+                passageWindows = passageWindows,
                 isSearchingPassageWindow = false,
             )
         }
     }
 
-    private suspend fun findPassageWindow(
+    private suspend fun findPassageWindows(
         request: RoutePlanningRequest,
         routeGeometry: List<GeoPoint>,
         distanceNm: Double,
-    ): PassageWindow? =
-        passageWindowScanner.findSafeWindow(
+    ): List<PassageWindow> =
+        passageWindowScanner.findSafeWindows(
             center = request.departure,
             evaluator =
                 PassageCandidateEvaluator { candidateDeparture ->

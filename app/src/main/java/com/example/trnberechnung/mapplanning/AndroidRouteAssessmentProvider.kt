@@ -95,18 +95,20 @@ class AndroidRouteAssessmentProvider(
                     RouteMetricsCalculator.haversineNm(sample.point, it.coordinate)
                 }
             val tideHeight = station?.tideHeightAt(arrival)
+            val correction = input.request.boatSettings.waterLevelCorrectionMeters
+            val correctedTideHeight = tideHeight?.let { it + correction }
 
             // WICHTIG: Wir bevorzugen IMMER die SeaMask-Tiefe, da diese live aktualisiert wird.
             // Nur wenn der Punkt außerhalb des Grids liegt, nutzen wir den Katalogwert.
             val chartDepth = chartDepthProvider.depthMetersAt(sample.point) ?: sample.chartDepthMeters
 
-            val clearance = tideHeight?.let { height ->
+            val clearance = correctedTideHeight?.let { height ->
                 chartDepth?.let { depth ->
                     depth + height - input.request.boatSettings.draftMeters
                 }
             }
 
-            android.util.Log.d("RouteAssessment", "Point: ${sample.point}, Depth: $chartDepth, Tide: $tideHeight, Clearance: $clearance, Draft: ${input.request.boatSettings.draftMeters}")
+            android.util.Log.d("RouteAssessment", "Point: ${sample.point}, Depth: $chartDepth, Tide: $tideHeight, Correction: $correction, Clearance: $clearance, Draft: ${input.request.boatSettings.draftMeters}")
 
             clearances +=
                 ClearanceSample(

@@ -48,6 +48,7 @@ data class BoatSettings(
     val safetyMarginMeters: Double = 0.0,
     val speedKnots: Double = 6.0,
     val dieselLitersPerNm: Double = 0.35,
+    val waterLevelCorrectionMeters: Double = 0.0,
 ) {
     init {
         require(draftMeters > 0) { "Der Tiefgang muss größer als 0 sein." }
@@ -136,7 +137,7 @@ data class RoutePlanningUiState(
     val tidalStatus: RouteStatus = RouteStatus.UNVOLLSTAENDIG,
     val weatherStatus: WeatherStatus = WeatherStatus.UNVOLLSTAENDIG,
     val routeMetrics: RouteMetrics? = null,
-    val passageWindow: PassageWindow? = null,
+    val passageWindows: List<PassageWindow> = emptyList(),
     val isCalculating: Boolean = false,
     val isSearchingPassageWindow: Boolean = false,
     val messages: List<String> = emptyList(),
@@ -158,4 +159,7 @@ data class RoutePlanningUiState(
                 "${start.name} → ${destination.name}"
             }
         }
+
+    val passageWindow: PassageWindow?
+        get() = passageWindows.firstOrNull()
 }

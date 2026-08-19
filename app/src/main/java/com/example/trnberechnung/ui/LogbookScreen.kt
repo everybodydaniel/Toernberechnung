@@ -382,7 +382,8 @@ private fun LogbookOverviewCard(
                     DetailField("ANKUNFT", data.ankunft.ifBlank { "–" })
                     DetailField("DISTANZ", log.distance)
                     DetailField("WT", data.wt.ifBlank { "–" })
-                    DetailField("UKC", data.ukc.ifBlank { "–" })
+                    DetailField("Erf. Tiefe", data.erfTiefe.ifBlank { "–" })
+                    DetailField("WuK (Netto)", data.ukc.ifBlank { "–" })
                     DetailField("FMW", data.fmw.ifBlank { "–" })
                     DetailField("WETTER", data.wetter.ifBlank { "–" })
                     DetailField("GEZEITEN", data.gezeiten.ifBlank { "–" })
@@ -687,6 +688,7 @@ internal data class LogbookDetails(
     val abfahrt: String = "",
     val ankunft: String = "",
     val wt: String = "",
+    val erfTiefe: String = "",
     val ukc: String = "",
     val fmw: String = "",
     val wetter: String = "",
@@ -704,6 +706,7 @@ internal data class LogbookDetails(
         if (abfahrt.isNotBlank()) parts += "abfahrt:${abfahrt.sanitize()}"
         if (ankunft.isNotBlank()) parts += "ankunft:${ankunft.sanitize()}"
         if (wt.isNotBlank()) parts += "wt:${wt.sanitize()}"
+        if (erfTiefe.isNotBlank()) parts += "erft:${erfTiefe.sanitize()}"
         if (ukc.isNotBlank()) parts += "ukc:${ukc.sanitize()}"
         if (fmw.isNotBlank()) parts += "fmw:${fmw.sanitize()}"
         if (wetter.isNotBlank()) parts += "wetter:${wetter.sanitize()}"
@@ -743,10 +746,11 @@ internal data class LogbookDetails(
                 abfahrt = map["abfahrt"] ?: "",
                 ankunft = map["ankunft"] ?: "",
                 wt = map["wt"] ?: "",
+                erfTiefe = map["erft"] ?: "",
                 ukc = map["ukc"] ?: "",
                 fmw = map["fmw"] ?: "",
                 wetter = map["wetter"] ?: map.entries.firstOrNull {
-                    it.key !in setOf("abfahrt","ankunft","wt","ukc","fmw","wetter","gezeiten","crew",
+                    it.key !in setOf("abfahrt","ankunft","wt","erft","ukc","fmw","wetter","gezeiten","crew",
                                      "check","aufh_on","aufh","bsa","bsb","bem")
                 }?.value ?: "",
                 gezeiten = map["gezeiten"] ?: "",

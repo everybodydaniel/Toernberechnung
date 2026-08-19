@@ -98,30 +98,31 @@ object UnderKeelSafetyEvaluator {
         }
         if (samples.isEmpty()) return RouteStatus.UNVOLLSTAENDIG
 
+        // Wenn Daten fehlen, ist die Route UNVOLLSTÄNDIG, egal wie tief das Wasser an anderen Stellen ist.
+        if (!allLegsValid || samples.any { !it.isValid || it.clearanceMeters == null }) {
+            return RouteStatus.UNVOLLSTAENDIG
+        }
+
         val statuses =
             samples.map { sample ->
                 when {
                     sample.clearanceMeters != null && sample.clearanceMeters < 0 ->
                         RouteStatus.NICHT_BEFAHRBAR
 
-                    !sample.isValid || sample.clearanceMeters == null ->
-                        RouteStatus.UNVOLLSTAENDIG
-
                     sample.waterLevelQuality == WaterLevelQuality.STALE ||
                         sample.waterLevelQuality == WaterLevelQuality.OUTSIDE_FORECAST_HORIZON ||
                         sample.waterLevelQuality == WaterLevelQuality.UNAVAILABLE ->
                         RouteStatus.UNVOLLSTAENDIG
 
-                    sample.clearanceMeters < safetyMarginMeters ||
+                    sample.clearanceMeters!! < safetyMarginMeters ||
                         sample.waterLevelQuality == WaterLevelQuality.MANUAL ||
                         sample.waterLevelQuality == WaterLevelQuality.CONFIRMED_COMPARISON ->
                         RouteStatus.EINGESCHRAENKT
 
                     else -> RouteStatus.BEFAHRBAR
                 }
-            }.toMutableList()
+            }
 
-        if (!allLegsValid) statuses += RouteStatus.UNVOLLSTAENDIG
         return statuses.maxBy(RouteStatus::precedence)
     }
 }
@@ -146,6 +147,7 @@ data class RouteAssessmentInput(
     val request: RoutePlanningRequest,
     val routeGeometry: List<GeoPoint>,
     val routeMetrics: RouteMetrics,
+    val isScan: Boolean = false,
 )
 
 data class RouteSafetyAssessment(

@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
@@ -154,6 +157,7 @@ fun RouteResultDashboardContent(
         modifier =
             modifier
                 .fillMaxWidth()
+                .heightIn(max = 480.dp)
                 .tideNodeGlass(cornerRadius = 32.dp, elevation = 16.dp, alpha = 0.82f)
                 .padding(bottom = 14.dp) // padding top and sides handled inside to allow full-width progress bar
                 .testTag("route_result_dashboard"),
@@ -169,15 +173,19 @@ fun RouteResultDashboardContent(
             Spacer(Modifier.height(3.dp))
         }
 
-        Column(
-            modifier = Modifier.padding(horizontal = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        Box(modifier = Modifier.padding(horizontal = 18.dp)) {
             DashboardDragHandle(
                 mode = mode,
                 onModeChange = onModeChange,
             )
+        }
 
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 18.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             if (mode != RouteDashboardMode.COMPACT) {
                 RouteStatusHeader(uiState)
             }
@@ -456,12 +464,22 @@ private fun DashboardMetrics(uiState: RoutePlanningUiState) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         DashboardMetric(
-            label = "WUK",
+            label = "WuK (Netto)",
             value =
                 metrics?.worstUnderKeelClearanceMeters?.let {
                     String.format(Locale.GERMANY, "%.2f m", it)
                 } ?: "–",
             icon = Icons.Default.Water,
+            isLoading = isLoading,
+            modifier = Modifier.weight(1f),
+        )
+        DashboardMetric(
+            label = "ERF. TIEFE",
+            value =
+                metrics?.let {
+                    String.format(Locale.GERMANY, "%.2f m", it.requiredDepthMeters)
+                } ?: "–",
+            icon = Icons.Default.Straighten,
             isLoading = isLoading,
             modifier = Modifier.weight(1f),
         )
@@ -475,6 +493,11 @@ private fun DashboardMetrics(uiState: RoutePlanningUiState) {
             isLoading = isLoading,
             modifier = Modifier.weight(1f),
         )
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         DashboardMetric(
             label = "ENGSTELLE",
             value = metrics?.worstClearanceName ?: "–",
@@ -482,6 +505,7 @@ private fun DashboardMetrics(uiState: RoutePlanningUiState) {
             isLoading = isLoading,
             modifier = Modifier.weight(1f),
         )
+        Spacer(Modifier.weight(2f))
     }
 }
 

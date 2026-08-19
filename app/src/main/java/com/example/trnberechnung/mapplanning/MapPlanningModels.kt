@@ -86,6 +86,8 @@ data class RouteMetrics(
     val travelTime: Duration,
     val arrival: ZonedDateTime,
     val worstUnderKeelClearanceMeters: Double?,
+    val draftMeters: Double = 0.0,
+    val safetyMarginMeters: Double = 0.0,
     val dieselLiters: Double,
     val dieselReserveLiters: Double = 0.0,
     val worstClearanceName: String? = null,
@@ -94,6 +96,7 @@ data class RouteMetrics(
     val maxGustKnots: Double? = null,
 ) {
     val totalDieselLiters: Double get() = dieselLiters + dieselReserveLiters
+    val requiredDepthMeters: Double get() = draftMeters + safetyMarginMeters
 }
 
 data class PassageWindow(

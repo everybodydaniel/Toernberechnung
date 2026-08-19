@@ -16,8 +16,8 @@ object LogbookPdfGenerator {
 
     private const val PW = 595
     private const val PH = 842
-    private const val M = 32f  
-    private val CW get() = PW - 2 * M  
+    private const val M = 32f
+    private val CW get() = PW - 2 * M
 
     private fun titlePaint() = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = 15f; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
@@ -92,7 +92,7 @@ object LogbookPdfGenerator {
         d: LogbookDetails, bp: BoatProfileRepository
     ): Float {
         var y = startY
-        val rh = 28f  
+        val rh = 28f
         val lp = labelPaint(); val vp = valuePaint()
         val brd = borderPaint()
 
@@ -104,6 +104,7 @@ object LogbookPdfGenerator {
         val wx = d.wetter.ifBlank { "–" }
         val tide = d.gezeiten.ifBlank { "–" }
         val wt = d.wt.ifBlank { "–" }
+        val erfTiefe = d.erfTiefe.ifBlank { "–" }
         val ukc = d.ukc.ifBlank { "–" }
         val aufbHoehe = if (d.aufbauhoeheActive && d.aufbauhoehe.isNotBlank()) d.aufbauhoehe else "–"
         val bsA = d.bsAbfahrt.ifBlank { "–" }
@@ -162,8 +163,8 @@ object LogbookPdfGenerator {
 
         val r4c1 = CW * 0.38f; val r4c2 = CW * 0.30f; val r4c3 = CW * 0.32f
         drawCell(c, M, y, r4c1, rh, "Wasserst.-Vorhers. (+/- m):", wt, lp, vp, brd)
-        drawCell(c, M + r4c1, y, r4c2, rh, "Gezeiten:", tide.take(35), lp, vp, brd)
-        drawCell(c, M + r4c1 + r4c2, y, r4c3, rh, "UKC:", ukc, lp, vp, brd)
+        drawCell(c, M + r4c1, y, r4c2, rh, "Erf. Tiefe:", erfTiefe, lp, vp, brd)
+        drawCell(c, M + r4c1 + r4c2, y, r4c3, rh, "WuK (Netto):", ukc, lp, vp, brd)
         y += rh
 
         return y + 6f
@@ -253,19 +254,19 @@ object LogbookPdfGenerator {
         val arrTime = d.ankunft.takeLast(5).ifBlank { "–" }
 
         val colX = floatArrayOf(
-            0f,           
-            CW * 0.22f,   
-            CW * 0.28f,   
-            CW * 0.35f,   
-            CW * 0.42f,   
-            CW * 0.52f,   
-            CW * 0.62f,   
-            CW * 0.72f,   
-            CW * 0.82f,   
-            CW * 0.91f,   
-            CW            
+            0f,
+            CW * 0.22f,
+            CW * 0.28f,
+            CW * 0.35f,
+            CW * 0.42f,
+            CW * 0.52f,
+            CW * 0.62f,
+            CW * 0.72f,
+            CW * 0.82f,
+            CW * 0.91f,
+            CW
         )
-        val rightStart = 4  
+        val rightStart = 4
 
         val hdr1H = 12f
         c.drawRect(M, y, M + colX[rightStart], y + hdr1H, brd)
@@ -280,8 +281,8 @@ object LogbookPdfGenerator {
         c.drawRect(M, y, M + CW, y + hdr2H, brd)
         c.drawText("Wegepunkte (WP)", M + 3f, y + 10f, lp)
         c.drawText("Nr.", M + colX[1] + 2f, y + 10f, lp)
-        c.drawText("WuK", M + colX[2] + 2f, y + 10f, lp)
-        c.drawText("UKW", M + colX[3] + 2f, y + 10f, lp)
+        c.drawText("Tiefe", M + colX[2] + 2f, y + 10f, lp)
+        c.drawText("WuK(N)", M + colX[3] + 2f, y + 10f, lp)
         c.drawText("Entf. (sm)", M + colX[4] + 2f, y + 10f, lp)
         c.drawText("Windstärke", M + colX[5] + 2f, y + 10f, lp)
         c.drawText("Windricht.", M + colX[6] + 2f, y + 10f, lp)
@@ -295,7 +296,7 @@ object LogbookPdfGenerator {
         y += hdr2H
 
         val rowH = 20f
-        val totalRows = 2  
+        val totalRows = 2
         val wuK = d.wt.takeIf { it.isNotBlank() }?.replace(" m", "")?.replace("m", "")?.trim() ?: ""
         val ukw = d.ukc.takeIf { it.isNotBlank() }?.replace(" m", "")?.replace("m", "")?.trim() ?: ""
         val windKn = parseWindSpeed(d.wetter)

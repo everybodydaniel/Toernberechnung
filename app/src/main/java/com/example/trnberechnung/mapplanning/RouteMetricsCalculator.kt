@@ -57,6 +57,8 @@ object RouteMetricsCalculator {
             travelTime = travelTime,
             arrival = berlinDeparture.plus(travelTime),
             worstUnderKeelClearanceMeters = worstClearanceMeters,
+            draftMeters = boatSettings.draftMeters,
+            safetyMarginMeters = boatSettings.safetyMarginMeters,
             worstClearanceName = worstClearanceName,
             dieselLiters = consumptionBase,
             dieselReserveLiters = consumptionBase * (DIESEL_SAFETY_RESERVE_FACTOR - 1.0),

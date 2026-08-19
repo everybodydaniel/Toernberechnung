@@ -301,6 +301,7 @@ class RoutePlanningViewModel(
         request: RoutePlanningRequest,
         routeGeometry: List<GeoPoint>,
     ) {
+        android.util.Log.d("RoutePlanning", "Starte Sicherheitsprüfung für Abfahrt ${request.departure}")
         val fairwayResult = withContext(Dispatchers.Default) {
             metricRouteResolver?.resolve(request)
         }
@@ -354,6 +355,7 @@ class RoutePlanningViewModel(
                     request = request,
                     routeGeometry = routeGeometry,
                     routeMetrics = initialMetrics,
+                    isScan = false,
                 ),
             )
         }
@@ -394,6 +396,16 @@ class RoutePlanningViewModel(
                 distanceNm = metrics.distanceNm,
             )
         }
+
+        // WICHTIG: Wenn die aktuelle Abfahrt NICHT im ersten gefundenen Fenster liegt,
+        // passen wir die Abfahrt und damit die Ankunft automatisch an den Fensterstart an.
+        val firstSafeWindow = passageWindows.firstOrNull()
+        if (firstSafeWindow != null && !firstSafeWindow.contains(request.departure)) {
+             android.util.Log.d("RoutePlanning", "Verschiebe Abfahrt von ${request.departure} auf Fensterstart ${firstSafeWindow.start}")
+             updateDeparture(firstSafeWindow.start)
+             return // updateDeparture triggert eine neue Berechnung, wir können hier abbrechen
+        }
+
         updateForGeneration(generation) {
             it.copy(
                 passageWindows = passageWindows,
@@ -424,6 +436,7 @@ class RoutePlanningViewModel(
                                 request = shiftedRequest,
                                 routeGeometry = routeGeometry,
                                 routeMetrics = shiftedMetrics,
+                                isScan = true,
                             ),
                         )
                     PassageCandidateAssessment(

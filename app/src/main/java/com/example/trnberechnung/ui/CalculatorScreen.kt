@@ -27,7 +27,7 @@ fun CalculatorScreen(
     var nwHeightStr by remember { mutableStateOf("0.5") }
     var targetTimeStr by remember { mutableStateOf("2024-01-01T14:00:00") }
 
-    var chartDatumDepthStr by remember { mutableStateOf("-0.5") } 
+    var chartDatumDepthStr by remember { mutableStateOf("-0.5") }
 
     var resultText by remember { mutableStateOf<String?>(null) }
     var goNoGoResult by remember { mutableStateOf<Boolean?>(null) }
@@ -137,8 +137,9 @@ fun CalculatorScreen(
                             safetyMargin = boatProfile.safetyMargin.toDouble()
                         )
 
-                        resultText = String.format("Pegel: %.2fm | UKC: %.2fm\n(Tiefgang: %.2fm, Marge: %.2fm)", 
-                                        calculatedLevel, ukc, boatProfile.draft, boatProfile.safetyMargin)
+                        val requiredDepth = boatProfile.draft.toDouble() + boatProfile.safetyMargin.toDouble()
+                        resultText = String.format("Pegel: %.2fm | WuK (Netto): %.2fm\n(Erf. Tiefe: %.2fm [Tiefgang %.2fm + UKC %.2fm])",
+                                        calculatedLevel, ukc, requiredDepth, boatProfile.draft.toDouble(), boatProfile.safetyMargin.toDouble())
                         goNoGoResult = isGo
                     } catch (e: Exception) {
                         resultText = "Fehlerhafte Eingabe: ${e.message}"
@@ -170,8 +171,8 @@ fun CalculatorScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = if (goNoGoResult == true) "GO: Passage sicher!" 
-                                   else if (goNoGoResult == false) "NO-GO: Gefahr der Grundberührung!" 
+                            text = if (goNoGoResult == true) "GO: Passage sicher!"
+                                   else if (goNoGoResult == false) "NO-GO: Gefahr der Grundberührung!"
                                    else "Berechnungsfehler",
                             style = MaterialTheme.typography.titleLarge,
                             color = contentColor

@@ -348,6 +348,8 @@ fun MapTabScreen(
                     val metrics = routeState.routeMetrics
                     val distStr = metrics?.distanceNm?.let { String.format(Locale.GERMANY, "%.1f nm", it) } ?: "–"
                     val durStr = metrics?.travelTime?.toMinutes()?.let { durationLabel(it) } ?: "–"
+                    val wtStr = metrics?.worstUnderKeelClearanceMeters?.let { String.format(Locale.GERMANY, "%.2f m", it) } ?: "–"
+                    val erftStr = String.format(Locale.GERMANY, "%.2f m", routeState.boatSettings.draftMeters + routeState.boatSettings.safetyMarginMeters)
                     tideViewModel.saveLog(
                         LogbookEntry(
                             date = routeState.departure.format(LOGBOOK_DATE_FORMAT),
@@ -356,8 +358,10 @@ fun MapTabScreen(
                             duration = durStr,
                             status = "planned",
                             details =
-                                "Abfahrt ${routeState.departure.format(PILL_DATE_FORMAT)}|" +
-                                    "Status ${routeState.routeStatus.name}",
+                                "abfahrt:${routeState.departure.format(PILL_DATE_FORMAT)}|" +
+                                    "ukc:$wtStr|" +
+                                    "erft:$erftStr|" +
+                                    "bem:Geplant mit Status ${routeState.routeStatus.name}",
                         ),
                     )
                     Toast.makeText(context, "Törn im Logbuch gespeichert", Toast.LENGTH_SHORT).show()

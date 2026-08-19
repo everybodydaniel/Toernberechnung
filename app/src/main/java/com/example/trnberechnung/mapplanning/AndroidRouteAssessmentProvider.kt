@@ -82,41 +82,59 @@ class AndroidRouteAssessmentProvider(
 
         val clearances = mutableListOf<ClearanceSample>()
         val weather = mutableListOf<MarineWeatherAssessment?>()
+
+        val logTag = if (input.isScan) "PassageScan" else "RouteAssessment"
+        android.util.Log.d(logTag, "Beurteilung gestartet: Abfahrt=${input.request.departure}, Boot=${input.request.boatSettings}")
+
         for (sample in samples) {
-            val arrival =
-                input.request.departure.plus(
-                    Duration.ofSeconds(
-                        (sample.cumulativeDistanceNm / input.request.boatSettings.speedKnots * 3_600)
-                            .toLong(),
-                    ),
-                )
-            val station =
-                stations.minByOrNull {
-                    RouteMetricsCalculator.haversineNm(sample.point, it.coordinate)
-                }
+            val travelDuration = Duration.ofSeconds(
+                (sample.cumulativeDistanceNm / input.request.boatSettings.speedKnots * 3_600).toLong()
+            )
+            val arrival = input.request.departure.plus(travelDuration)
+
+            val station = stations.minByOrNull {
+                RouteMetricsCalculator.haversineNm(sample.point, it.coordinate)
+            }
+
             val tideHeight = station?.tideHeightAt(arrival)
             val correction = input.request.boatSettings.waterLevelCorrectionMeters
             val correctedTideHeight = tideHeight?.let { it + correction }
 
-            // WICHTIG: Wir bevorzugen IMMER die SeaMask-Tiefe, da diese live aktualisiert wird.
-            // Nur wenn der Punkt außerhalb des Grids liegt, nutzen wir den Katalogwert.
             val chartDepth = chartDepthProvider.depthMetersAt(sample.point) ?: sample.chartDepthMeters
+            val totalWaterDepth = correctedTideHeight?.let { h -> chartDepth?.let { d -> d + h } }
 
-            val clearance = correctedTideHeight?.let { height ->
-                chartDepth?.let { depth ->
-                    depth + height - input.request.boatSettings.draftMeters
-                }
+            // WuK (Netto) = tatsächlicher Wasserstand unter dem Kiel (Gesamtwassertiefe - Tiefgang)
+            val clearance = totalWaterDepth?.let { total ->
+                total - input.request.boatSettings.draftMeters
             }
 
-            android.util.Log.d("RouteAssessment", "Point: ${sample.point}, Depth: $chartDepth, Tide: $tideHeight, Correction: $correction, Clearance: $clearance, Draft: ${input.request.boatSettings.draftMeters}")
+            val isPointValid = station != null && tideHeight != null && chartDepth != null
+            val requiredDepth = input.request.boatSettings.draftMeters + input.request.boatSettings.safetyMarginMeters
+            val isSafe = (clearance ?: -10.0) >= input.request.boatSettings.safetyMarginMeters
+
+            // Detailliertes Logging für die Analyse der Engstellen-Zeitberechnung
+            if (sample.cumulativeDistanceNm == 0.0 || sample.cumulativeDistanceNm >= (input.routeMetrics.distanceNm - 0.1) || !isSafe || !isPointValid) {
+                android.util.Log.d(logTag,
+                    "Punkt-Check: ${station?.source?.gaugeLabel ?: "Route"} | " +
+                    "Dist=${String.format("%.2f", sample.cumulativeDistanceNm)}sm | " +
+                    "Fahrzeit=${travelDuration.toMinutes()}min | " +
+                    "Ankunft=${arrival.format(DateTimeFormatter.ofPattern("HH:mm"))} | " +
+                    "ChartDepth=${chartDepth?.let { String.format("%.2f", it) } ?: "N/A"}m | " +
+                    "Tide=${tideHeight?.let { String.format("%.2f", it) } ?: "N/A"}m | " +
+                    "Gesamttiefe=${totalWaterDepth?.let { String.format("%.2f", it) } ?: "N/A"}m | " +
+                    "WuK(Netto)=${clearance?.let { String.format("%.2f", it) } ?: "N/A"}m | " +
+                    "Erf.Tiefe=${String.format("%.2f", requiredDepth)}m | " +
+                    "Ok=$isSafe"
+                )
+            }
 
             clearances +=
                 ClearanceSample(
                     waypointName = station?.source?.gaugeLabel ?: station?.source?.area ?: "Route",
                     clearanceMeters = clearance,
-                    isValid = station != null && tideHeight != null && chartDepth != null,
+                    isValid = isPointValid,
                     waterLevelQuality =
-                        if (station != null && tideHeight != null && chartDepth != null) {
+                        if (isPointValid) {
                             WaterLevelQuality.LOCAL_OFFICIAL
                         } else {
                             WaterLevelQuality.UNAVAILABLE
@@ -138,9 +156,15 @@ class AndroidRouteAssessmentProvider(
             maxGustKnots = maxGust,
             messages =
                 buildList {
-                    if (clearances.any { it.clearanceMeters == null }) {
-                        add("Für mindestens einen Routenpunkt fehlen Tiefen- oder Gezeitendaten.")
+                    val missingTide = clearances.any { it.isValid && it.clearanceMeters == null } // theoretically not possible with current isValid logic
+                    val missingStation = clearances.any { !it.isValid }
+
+                    if (missingStation) {
+                        add("Für mindestens einen Routenpunkt fehlen Tiefendaten oder eine Gezeitenstation in der Nähe.")
+                    } else if (clearances.any { it.clearanceMeters == null }) {
+                        add("Für mindestens einen Routenpunkt fehlen aktuelle Gezeitendaten.")
                     }
+
                     if (weather.any { it == null }) {
                         add("Für mindestens einen Routenpunkt fehlen Wetterdaten im ±90-Minuten-Fenster.")
                     }

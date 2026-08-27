@@ -5,19 +5,24 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -42,8 +47,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.luminance
@@ -64,9 +69,11 @@ import com.example.trnberechnung.navigation.ActiveVoyageManager
 import com.example.trnberechnung.navigation.FusedLocationProvider
 import com.example.trnberechnung.navigation.LocationAccess
 import com.example.trnberechnung.navigation.VoyageServiceController
+import com.example.trnberechnung.ui.TabletLayoutTokens
 import com.example.trnberechnung.ui.components.TideNodeBlue
 import com.example.trnberechnung.ui.components.TideNodeInk
 import com.example.trnberechnung.ui.components.tideNodeGlass
+import com.example.trnberechnung.ui.currentAdaptiveLayout
 import com.example.trnberechnung.ui.nauti.NautiDrawer
 import com.example.trnberechnung.viewmodel.NautiPanelMode
 import com.example.trnberechnung.viewmodel.NautiViewModel
@@ -75,6 +82,18 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
+
+private val TabletRoutePlanningPillHeight = 92.dp
+private val TabletRoutePlanningTopSpacing = 12.dp
+private val TabletNautiPanelGap = 16.dp
+private val TabletNautiBottomSpacing = 12.dp
+private const val TabletNautiMaxHeightFraction = 0.70f
+private val SmartphoneRoutePlanningPillHeight = 76.dp
+private val SmartphoneRoutePlanningTopSpacing = 8.dp
+private val SmartphoneNautiPanelGap = 12.dp
+private val SmartphoneNautiBottomSpacing = 8.dp
+private const val SmartphoneNautiMaxHeightFraction = 0.70f
+private const val SmartphoneLandscapeNautiMaxHeightFraction = 0.76f
 
 @Composable
 fun MapTabScreen(
@@ -89,6 +108,9 @@ fun MapTabScreen(
     onOpenNavigation: () -> Unit,
 ) {
     val context = LocalContext.current
+    val adaptiveLayout = currentAdaptiveLayout()
+    val layoutDirection = LocalLayoutDirection.current
+    val safeDrawingPadding = WindowInsets.safeDrawing.asPaddingValues()
     val activity = context.findActivity()
     val scope = rememberCoroutineScope()
     val routeState by planningViewModel.uiState.collectAsState()
@@ -294,103 +316,216 @@ fun MapTabScreen(
             onHarbourClick = { showPlanner = true },
         )
 
-        val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val panelWidthModifier = if (isLandscape) Modifier.fillMaxWidth(0.48f).widthIn(max = 440.dp) else Modifier
-
-        RoutePlanningPill(
-            title = if (routeState.hasCompleteRouteInput) routeState.routeTitle else "Törn planen",
-            subtitle =
-                if (routeState.hasCompleteRouteInput) {
-                    routeState.departure.format(PILL_DATE_FORMAT)
-                } else {
-                    "Start, Ziel und Abfahrt auswählen"
-                },
-            isLoading = routeState.isCalculating,
-            onClick = { showPlanner = true },
+        BoxWithConstraints(
             modifier =
                 Modifier
-                    .align(if (isLandscape) Alignment.TopStart else Alignment.TopCenter)
-                    .then(panelWidthModifier)
-                    .padding(
-                        start = 16.dp,
-                        end = if (isLandscape) 4.dp else 16.dp,
-                        top = topOverlayClearance + 8.dp,
+                    .fillMaxSize()
+                    .then(
+                        if (adaptiveLayout.isTablet) {
+                            Modifier.padding(
+                                start = safeDrawingPadding.calculateStartPadding(layoutDirection),
+                                end = safeDrawingPadding.calculateEndPadding(layoutDirection),
+                            )
+                        } else {
+                            Modifier
+                        },
                     ),
-        )
-
-        val openRevierForHarbour: (String?) -> Unit = { harbourId ->
-            selectNautiStation(harbourId, stations, tideViewModel)
-            onOpenWeather()
-        }
-
-        if (nautiState.mode != NautiPanelMode.COMPACT) {
-            NautiDrawer(
-                viewModel = nautiViewModel,
-                stations = stations,
-                onOpenRevier = openRevierForHarbour,
-                modifier =
-                    Modifier
-                        .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
-                        .then(panelWidthModifier)
-                        .padding(
-                            start = 14.dp,
-                            end = if (isLandscape) 4.dp else 14.dp,
-                            bottom = bottomOverlayClearance + 4.dp,
-                        ),
-            )
-        } else if (routeState.hasCompleteRouteInput || routeState.routeMetrics != null) {
-            RouteResultDashboard(
-                state = routeState,
-                onOpenNauti = nautiViewModel::showChat,
-                onRefreshPassageWindow = planningViewModel::refreshPassageWindow,
-                onStartNavigation = ::requestNavigationStart,
-                onSave = {
-                    val metrics = routeState.routeMetrics
-                    val distStr = metrics?.distanceNm?.let { String.format(Locale.GERMANY, "%.1f nm", it) } ?: "–"
-                    val durStr = metrics?.travelTime?.toMinutes()?.let { durationLabel(it) } ?: "–"
-                    val wtStr = metrics?.worstUnderKeelClearanceMeters?.let { String.format(Locale.GERMANY, "%.2f m", it) } ?: "–"
-                    val erftStr = String.format(Locale.GERMANY, "%.2f m", routeState.boatSettings.draftMeters + routeState.boatSettings.safetyMarginMeters)
-                    tideViewModel.saveLog(
-                        LogbookEntry(
-                            date = routeState.departure.format(LOGBOOK_DATE_FORMAT),
-                            routeDesc = routeState.routeTitle,
-                            distance = distStr,
-                            duration = durStr,
-                            status = "planned",
-                            details =
-                                "abfahrt:${routeState.departure.format(PILL_DATE_FORMAT)}|" +
-                                    "ukc:$wtStr|" +
-                                    "erft:$erftStr|" +
-                                    "bem:Geplant mit Status ${routeState.routeStatus.name}",
-                        ),
+        ) {
+            val isLandscape = adaptiveLayout.isLandscape
+            val panelWidthModifier =
+                when {
+                    adaptiveLayout.isTablet ->
+                        Modifier
+                            .padding(horizontal = adaptiveLayout.horizontalScreenPadding)
+                            .widthIn(max = adaptiveLayout.overlayMaxWidth)
+                            .fillMaxWidth()
+                    isLandscape -> Modifier.fillMaxWidth(0.48f).widthIn(max = 440.dp)
+                    else -> Modifier
+                }
+            val topPanelAlignment =
+                if (adaptiveLayout.isTablet || !isLandscape) Alignment.TopCenter else Alignment.TopStart
+            val bottomPanelAlignment =
+                if (adaptiveLayout.isTablet || !isLandscape) Alignment.BottomCenter else Alignment.BottomStart
+            val expandedNautiAlignment =
+                if (!adaptiveLayout.isTablet && isLandscape) Alignment.BottomEnd else bottomPanelAlignment
+            val tabletExpandedNautiHeight =
+                if (adaptiveLayout.isTablet) {
+                    val bottomReservedHeight = bottomOverlayClearance + TabletNautiBottomSpacing
+                    val heightAboveBottomNavigation =
+                        (maxHeight - bottomReservedHeight).coerceAtLeast(0.dp)
+                    val clearanceBoundedHeight =
+                        (
+                            heightAboveBottomNavigation -
+                                topOverlayClearance -
+                                TabletRoutePlanningTopSpacing -
+                                TabletRoutePlanningPillHeight -
+                                TabletNautiPanelGap
+                        ).coerceAtLeast(0.dp)
+                    minOf(
+                        clearanceBoundedHeight,
+                        heightAboveBottomNavigation * TabletNautiMaxHeightFraction,
                     )
-                    Toast.makeText(context, "Törn im Logbuch gespeichert", Toast.LENGTH_SHORT).show()
-                },
+                } else {
+                    null
+                }
+            val smartphoneExpandedNautiHeight =
+                if (!adaptiveLayout.isTablet) {
+                    val bottomReservedHeight = bottomOverlayClearance + SmartphoneNautiBottomSpacing
+                    val heightAboveBottomNavigation =
+                        (maxHeight - bottomReservedHeight).coerceAtLeast(0.dp)
+                    val clearanceBoundedHeight =
+                        if (isLandscape) {
+                            (
+                                heightAboveBottomNavigation -
+                                    topOverlayClearance -
+                                    SmartphoneNautiPanelGap
+                            ).coerceAtLeast(0.dp)
+                        } else {
+                            (
+                                heightAboveBottomNavigation -
+                                    topOverlayClearance -
+                                    SmartphoneRoutePlanningTopSpacing -
+                                    SmartphoneRoutePlanningPillHeight -
+                                    SmartphoneNautiPanelGap
+                            ).coerceAtLeast(0.dp)
+                        }
+                    minOf(
+                        clearanceBoundedHeight,
+                        heightAboveBottomNavigation *
+                            if (isLandscape) {
+                                SmartphoneLandscapeNautiMaxHeightFraction
+                            } else {
+                                SmartphoneNautiMaxHeightFraction
+                            },
+                    )
+                } else {
+                    null
+                }
+
+            RoutePlanningPill(
+                title = if (routeState.hasCompleteRouteInput) routeState.routeTitle else "Törn planen",
+                subtitle =
+                    if (routeState.hasCompleteRouteInput) {
+                        routeState.departure.format(PILL_DATE_FORMAT)
+                    } else {
+                        "Start, Ziel und Abfahrt auswählen"
+                    },
+                isLoading = routeState.isCalculating,
+                onClick = { showPlanner = true },
                 modifier =
                     Modifier
-                        .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
+                        .align(topPanelAlignment)
                         .then(panelWidthModifier)
                         .padding(
-                            start = 14.dp,
-                            end = if (isLandscape) 4.dp else 14.dp,
-                            bottom = bottomOverlayClearance + 4.dp,
+                            start = if (adaptiveLayout.isTablet) 0.dp else 16.dp,
+                            end = if (adaptiveLayout.isTablet) 0.dp else if (isLandscape) 4.dp else 16.dp,
+                            top =
+                                topOverlayClearance +
+                                    if (adaptiveLayout.isTablet) {
+                                        TabletRoutePlanningTopSpacing
+                                    } else {
+                                        SmartphoneRoutePlanningTopSpacing
+                                    },
                         ),
             )
-        } else {
-            NautiDrawer(
-                viewModel = nautiViewModel,
-                stations = stations,
-                onOpenRevier = openRevierForHarbour,
-                modifier =
-                    Modifier
-                        .align(if (isLandscape) Alignment.BottomStart else Alignment.BottomCenter)
-                        .then(panelWidthModifier)
-                        .padding(
-                            start = 16.dp,
-                            end = if (isLandscape) 4.dp else 16.dp,
-                            bottom = bottomOverlayClearance + 10.dp,
-                        ),
-            )
+
+            val openRevierForHarbour: (String?) -> Unit = { harbourId ->
+                selectNautiStation(harbourId, stations, tideViewModel)
+                onOpenWeather()
+            }
+
+            if (nautiState.mode != NautiPanelMode.COMPACT) {
+                NautiDrawer(
+                    viewModel = nautiViewModel,
+                    stations = stations,
+                    onOpenRevier = openRevierForHarbour,
+                    tabletExpandedHeight = tabletExpandedNautiHeight,
+                    modifier =
+                        Modifier
+                            .align(expandedNautiAlignment)
+                            .then(panelWidthModifier)
+                            .padding(
+                                start =
+                                    when {
+                                        adaptiveLayout.isTablet -> 0.dp
+                                        isLandscape -> 4.dp
+                                        else -> 14.dp
+                                    },
+                                end =
+                                    when {
+                                        adaptiveLayout.isTablet -> 0.dp
+                                        isLandscape ->
+                                            safeDrawingPadding.calculateEndPadding(layoutDirection) + 14.dp
+                                        else -> 14.dp
+                                    },
+                                bottom =
+                                    if (adaptiveLayout.isTablet) {
+                                        bottomOverlayClearance + TabletNautiBottomSpacing
+                                    } else {
+                                        bottomOverlayClearance + SmartphoneNautiBottomSpacing
+                                    },
+                            ).then(
+                                if (smartphoneExpandedNautiHeight != null) {
+                                    Modifier.height(smartphoneExpandedNautiHeight)
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                )
+            } else if (routeState.hasCompleteRouteInput || routeState.routeMetrics != null) {
+                RouteResultDashboard(
+                    state = routeState,
+                    onOpenNauti = nautiViewModel::showChat,
+                    onRefreshPassageWindow = planningViewModel::refreshPassageWindow,
+                    onStartNavigation = ::requestNavigationStart,
+                    onSave = {
+                        val metrics = routeState.routeMetrics
+                        val distStr = metrics?.distanceNm?.let { String.format(Locale.GERMANY, "%.1f nm", it) } ?: "–"
+                        val durStr = metrics?.travelTime?.toMinutes()?.let { durationLabel(it) } ?: "–"
+                        val wtStr = metrics?.worstUnderKeelClearanceMeters?.let { String.format(Locale.GERMANY, "%.2f m", it) } ?: "–"
+                        val erftStr = String.format(Locale.GERMANY, "%.2f m", routeState.boatSettings.draftMeters + routeState.boatSettings.safetyMarginMeters)
+                        tideViewModel.saveLog(
+                            LogbookEntry(
+                                date = routeState.departure.format(LOGBOOK_DATE_FORMAT),
+                                routeDesc = routeState.routeTitle,
+                                distance = distStr,
+                                duration = durStr,
+                                status = "planned",
+                                details =
+                                    "abfahrt:${routeState.departure.format(PILL_DATE_FORMAT)}|" +
+                                        "ukc:$wtStr|" +
+                                        "erft:$erftStr|" +
+                                        "bem:Geplant mit Status ${routeState.routeStatus.name}",
+                            ),
+                        )
+                        Toast.makeText(context, "Törn im Logbuch gespeichert", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier =
+                        Modifier
+                            .align(bottomPanelAlignment)
+                            .then(panelWidthModifier)
+                            .padding(
+                                start = if (adaptiveLayout.isTablet) 0.dp else 14.dp,
+                                end = if (adaptiveLayout.isTablet) 0.dp else if (isLandscape) 4.dp else 14.dp,
+                                bottom = bottomOverlayClearance + if (adaptiveLayout.isTablet) 8.dp else 4.dp,
+                            ),
+                )
+            } else {
+                NautiDrawer(
+                    viewModel = nautiViewModel,
+                    stations = stations,
+                    onOpenRevier = openRevierForHarbour,
+                    modifier =
+                        Modifier
+                            .align(bottomPanelAlignment)
+                            .then(panelWidthModifier)
+                            .padding(
+                                start = if (adaptiveLayout.isTablet) 0.dp else 16.dp,
+                                end = if (adaptiveLayout.isTablet) 0.dp else if (isLandscape) 4.dp else 16.dp,
+                                bottom = bottomOverlayClearance + if (adaptiveLayout.isTablet) 12.dp else 10.dp,
+                            ),
+                )
+            }
         }
     }
 
@@ -452,45 +587,67 @@ private fun RoutePlanningPill(
     modifier: Modifier = Modifier,
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val adaptiveLayout = currentAdaptiveLayout()
     val titleColor = if (isDark) Color(0xFFF8FAFC) else TideNodeInk
     val subtitleColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF62666C)
     val accentColor = if (isDark) Color(0xFF60A5FA) else TideNodeBlue
+    val pillHeight =
+        if (adaptiveLayout.isTablet) {
+            TabletRoutePlanningPillHeight
+        } else {
+            SmartphoneRoutePlanningPillHeight
+        }
+    val cornerRadius = if (adaptiveLayout.isTablet) 34.dp else 28.dp
+    val horizontalPadding = if (adaptiveLayout.isTablet) 22.dp else 18.dp
+    val iconContainerSize =
+        if (adaptiveLayout.isTablet) TabletLayoutTokens.PrimaryControlHeight else 48.dp
+    val iconSize = if (adaptiveLayout.isTablet) TabletLayoutTokens.StandardIconSize else 24.dp
+    val iconSpacing = if (adaptiveLayout.isTablet) 17.dp else 14.dp
+    val titleSize = if (adaptiveLayout.isTablet) 22.sp else 18.sp
+    val subtitleSize = if (adaptiveLayout.isTablet) 16.sp else 13.sp
+    val scheduleIconSize = if (adaptiveLayout.isTablet) 17.dp else 14.dp
+    val chevronSize = if (adaptiveLayout.isTablet) 36.sp else 30.sp
 
     Row(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(76.dp)
-                .tideNodeGlass(cornerRadius = 28.dp, elevation = 12.dp, alpha = 0.85f)
+                .height(pillHeight)
+                .tideNodeGlass(cornerRadius = cornerRadius, elevation = 12.dp, alpha = 0.85f)
                 .clickable(onClick = onClick)
-                .padding(horizontal = 18.dp)
+                .padding(horizontal = horizontalPadding)
                 .testTag("route_planning_pill"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier =
                 Modifier
-                    .size(48.dp)
-                    .tideNodeGlass(cornerRadius = 24.dp, elevation = 0.dp, alpha = 0.55f),
+                    .size(iconContainerSize)
+                    .tideNodeGlass(cornerRadius = iconContainerSize / 2f, elevation = 0.dp, alpha = 0.55f),
             contentAlignment = Alignment.Center,
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     color = accentColor,
                     strokeWidth = 2.dp,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(iconSize),
                 )
             } else {
-                Icon(Icons.AutoMirrored.Filled.AltRoute, null, tint = accentColor)
+                Icon(
+                    Icons.AutoMirrored.Filled.AltRoute,
+                    null,
+                    tint = accentColor,
+                    modifier = if (adaptiveLayout.isTablet) Modifier.size(iconSize) else Modifier,
+                )
             }
         }
-        Spacer(Modifier.size(14.dp))
+        Spacer(Modifier.size(iconSpacing))
         Column(Modifier.weight(1f)) {
             Text(
                 title,
                 color = titleColor,
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = 18.sp,
+                fontSize = titleSize,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -500,21 +657,21 @@ private fun RoutePlanningPill(
                         Icons.Default.Schedule,
                         null,
                         tint = subtitleColor,
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(scheduleIconSize),
                     )
-                    Spacer(Modifier.size(5.dp))
+                    Spacer(Modifier.size(if (adaptiveLayout.isTablet) 6.dp else 5.dp))
                 }
                 Text(
                     subtitle,
                     color = subtitleColor,
-                    fontSize = 13.sp,
+                    fontSize = subtitleSize,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-        Text("›", color = accentColor, fontWeight = FontWeight.Bold, fontSize = 30.sp)
+        Text("›", color = accentColor, fontWeight = FontWeight.Bold, fontSize = chevronSize)
     }
 }
 
